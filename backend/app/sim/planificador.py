@@ -35,9 +35,13 @@ class Planificador:
             accesos = [a.id for a in self.esc.accesos if a.id not in self.cerrados]
         res = []
         for f in range(int(max(desde, 0) // FRANJA_MIN), int(hasta // FRANJA_MIN) + 1):
-            centro = f * FRANJA_MIN + FRANJA_MIN / 2
+            ini, fin = f * FRANJA_MIN, (f + 1) * FRANJA_MIN
+            # distancia de la hora deseada a la franja: 0 si cae dentro [ini, fin); si no, a su borde más cercano
+            if ini <= deseada < fin:
+                desplazamiento_h = 0.0
+            else:
+                desplazamiento_h = min(abs(deseada - ini), abs(deseada - fin)) / 60 + 0.01
             for a in accesos:
-                desplazamiento_h = abs(centro - deseada) / 60
                 cambio_acceso = 0.0 if a == acceso_id else 0.3
                 res.append((self.carga(a, f) + 0.15 * desplazamiento_h + cambio_acceso, a, f))
         res.sort()

@@ -22,14 +22,9 @@ class Settings(BaseSettings):
     semaforo_amarillo_min: float = 20.0
     semaforo_rojo_min: float = 45.0
 
-    # Factores de impacto (fuente a citar en README; los provee el equipo de Datos)
-    diesel_ralenti_l_h: float = 2.5
-    diesel_precio_mxn_l: float = 26.0
-    co2_kg_por_l: float = 2.68
-
     # Pronóstico
-    pronostico_horas: int = 12
-    pronostico_franja_min: int = 30
+    pronostico_autoentrenar: bool = True  # entrenar al arrancar si no existe modelos/pronostico.joblib
+    pronostico_guardar_cada_min: float = 60.0  # minutos simulados entre pronósticos guardados en la BD
 
     # Asistente IA / mensajería
     llm_api_key: str = ""

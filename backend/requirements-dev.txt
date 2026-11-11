@@ -1,0 +1,3 @@
+# Dependencias solo para desarrollo y pruebas (instalar con pip dentro de .venv)
+-r requirements.txt
+pytest==9.2.0

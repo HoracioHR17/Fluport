@@ -5,7 +5,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from app.config import get_settings
-from app.contracts.enums import EstadoSim, TipoCorrida
+from app.contracts.enums import EstadoSim, Mundo, TipoCorrida
 from app.contracts.schemas import EventoCreate, EventoOut, SimControl, SimEstadoOut
 from app.db.base import engine
 from app.sim.escenario import Escenario, escenario_actual
@@ -34,6 +34,8 @@ class ServicioSim:
         self.sim: Simulador | None = None
         self._tarea: asyncio.Task | None = None
         self._suscriptores: set[asyncio.Queue] = set()  # sobreviven a un reset del simulador
+        self._t_pronostico_guardado = -1e9
+        self._entrenando: asyncio.Task | None = None
 
     # ───────────── Ciclo de vida ─────────────
     async def iniciar(self, semilla: int | None = None) -> None:
@@ -48,11 +50,46 @@ class ServicioSim:
             )
         self.sim = Simulador(self.esc, semilla, inicio, self.cfg.sim_velocidad, corrida_id=corrida_id)
         self.sim.publicador = self.publicar
+        self._t_pronostico_guardado = -1e9
         if self._tarea is None or self._tarea.done():
             self._tarea = asyncio.create_task(self._bucle(), name="fluport-sim")
+        self._autoentrenar()
         log.info("Simulación iniciada: corrida=%s semilla=%s inicio=%s", corrida_id, semilla, inicio)
 
+    def _autoentrenar(self) -> None:
+        """Si no hay modelo de pronóstico, lo entrena en segundo plano (mientras tanto se usa balance de flujo)."""
+        from app.prediction.entrenar import entrenar
+        from app.prediction.pronosticador import pronosticador
+
+        if pronosticador.paquete or not self.cfg.pronostico_autoentrenar:
+            return
+        if self._entrenando and not self._entrenando.done():
+            return
+
+        async def _tarea() -> None:
+            try:
+                log.info("No hay modelo de pronóstico: entrenando en segundo plano…")
+                await asyncio.to_thread(entrenar)
+                pronosticador.cargar()
+                pronosticador.t_cache = -1e9
+            except Exception:  # noqa: BLE001
+                log.exception("Falló el entrenamiento automático; se mantiene el balance de flujo")
+
+        self._entrenando = asyncio.create_task(_tarea(), name="fluport-entrenamiento")
+
+    async def _guardar_pronostico(self, sim: Simulador) -> None:
+        from app.prediction.pronosticador import pronosticador
+
+        if sim.t - self._t_pronostico_guardado < self.cfg.pronostico_guardar_cada_min:
+            return
+        self._t_pronostico_guardado = sim.t
+        pron = pronosticador.obtener(sim, Mundo.B)
+        if self.persistencia.activa and sim.corrida_id:
+            await asyncio.to_thread(self.persistencia.guardar_pronosticos, pron)
+
     async def detener(self) -> None:
+        if self._entrenando and not self._entrenando.done():
+            self._entrenando.cancel()
         if self._tarea:
             self._tarea.cancel()
             try:
@@ -74,6 +111,7 @@ class ServicioSim:
                 sim.publicar_snapshot()
                 if sim.tick % TICKS_POR_ESCRITURA == 0:
                     await self._escribir()
+                await self._guardar_pronostico(sim)
             except Exception:  # noqa: BLE001
                 log.exception("Error en el tick %s", sim.tick)
 

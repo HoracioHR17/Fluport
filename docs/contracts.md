@@ -16,7 +16,7 @@
 | Tabla | Propósito | Claves |
 |---|---|---|
 | `acceso` | Accesos al puerto y su capacidad | `id` (str), `zona`, `carriles`, `tiempo_servicio_min`, `estado` |
-| `transportista` | Usuarios del canal (solo teléfonos del equipo) | `telefono` único, `es_demo` |
+| `transportista` | Usuarios del canal (solo teléfonos de prueba con consentimiento) | `telefono` único, `es_demo` |
 | `cita` | Citas de entrada | `acceso_id`, `ventana_inicio/fin`, `tipo_carga`, `prioridad`, `estado`, `cita_anterior_id` |
 | `buque` | Buques programados/atracados | `eta`, `contenedores`, `estado` |
 | `sim_corrida` | Cada ejecución del simulador | `tipo` (vivo/historico), `semilla`, `parametros` (JSONB) |
@@ -35,7 +35,8 @@ Enums: `tipo_carga` (contenedor_20, contenedor_40, refrigerado, peligroso, grane
 | GET | `/api/accesos` | — | `AccesoOut[]` | M1 |
 | GET | `/api/accesos/estado?mundo=B` | — | `AccesoEstado[]` | M1 |
 | GET | `/api/accesos/rutas` | — | GeoJSON `FeatureCollection` (accesos `Point`, rutas `LineString` en `[lon, lat]`) | M1 |
-| GET | `/api/pronostico?acceso_id=&horas=12` | — | `PronosticoOut[]` | M2 |
+| GET | `/api/pronostico?acceso_id=&horas=12&mundo=B` | — | `PronosticoOut[]` (24 franjas de 30 min) | M2 |
+| GET | `/api/pronostico/modelo` | — | `{version, metricas}` del modelo en uso | M2 |
 | POST | `/api/citas` | `CitaCreate` | `CitaOut` (201) | M3 |
 | GET | `/api/citas?telefono=&transportista_id=&acceso_id=&estado=` | — | `CitaOut[]` | M3 |
 | POST | `/api/citas/sugerencias` | `SugerenciaRequest` | `Sugerencia[]` (top 3) | M3 |
@@ -62,7 +63,8 @@ Payload de `EventoCreate.payload` por tipo:
 Notas de simulación:
 - `velocidad` = segundos simulados por segundo real (60 → 1 s real = 1 min simulado; 600 → 10 min).
 - `503` en rutas de simulación si el simulador aún no arranca.
-- Parámetros del escenario (accesos, carriles, demanda, buques, norte) en `backend/data/escenario.json`.
+- Parámetros del escenario (accesos, carriles, demanda, buques, norte, factores de impacto) en `backend/data/escenario.json`.
+- Pronóstico: `modelo_version` = `hgb-…` (modelo entrenado) o `balance-flujo-v1` (respaldo mientras no hay modelo).
 
 ## 4. WebSocket `WS /ws/sim`
 Servidor → cliente, JSON. Al conectar se envía un snapshot inmediato; luego uno por tick (1 s real por defecto) y un mensaje `evento` cada vez que se aplica uno. La conexión sobrevive a un `reset`. Unión discriminada por `tipo`:

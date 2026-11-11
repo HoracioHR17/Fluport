@@ -3,7 +3,7 @@
 
 Fluport predice la congestión en los accesos al puerto de Veracruz y redistribuye la llegada de camiones mediante citas en el horario de menor espera, avisando a cada actor por el canal que ya usa.
 
-> ⚠️ **SIMULACIÓN.** Todos los datos de Fluport son sintéticos, generados por un simulador. No se usan datos reales de la terminal, la aduana ni de personas. Los teléfonos usados en la demo pertenecen al equipo, con su consentimiento.
+> ⚠️ **SIMULACIÓN.** Todos los datos de Fluport son sintéticos, generados por un simulador. No se usan datos reales de la terminal, la aduana ni de personas. Los teléfonos usados en la demo son números de prueba con consentimiento de sus titulares.
 
 ## El problema
 Cientos de camiones llegan al puerto todos los días a las mismas horas. Se forman filas largas en los accesos, se pierden horas de trabajo, se quema diésel en ralentí y el tráfico se desborda a la ciudad.
@@ -32,21 +32,20 @@ uvicorn app.main:app --reload
 ```
 Abrir `http://localhost:8000` (tablero) · `http://localhost:8000/publico/` (vecinos) · `http://localhost:8000/docs` (API).
 
-## Equipo
-| Rol | Integrante |
-|---|---|
-| Desarrollo | Angel |
-| Datos | _(pendiente)_ |
-| Pruebas | _(pendiente)_ |
-| Documentación | _(pendiente)_ |
-| Presentación | _(pendiente)_ |
+**Pruebas:**
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest                 # todas (≈15 s)
+pytest -m "not lento"  # sin la prueba de entrenamiento
+```
 
 ---
 
 ## Bitácora de IA
 
 
-### 2026-11-11 15:45 · `#001` · Contratos M0 y esqueleto del proyecto
+### 2026-11-11 15:45 · `aae10d9` · Contratos M0 y esqueleto del proyecto
 
 - **Qué se agregó:**
 
@@ -71,7 +70,7 @@ Abrir `http://localhost:8000` (tablero) · `http://localhost:8000/publico/` (vec
   | `backend/app/api/publico.py` | Vista para vecinos (M7). | `GET /api/publico/zonas`. |
   | `backend/app/main.py` | Punto de entrada: arma la aplicación. | Registra los 6 routers; `GET /api/salud` revisa la conexión a la BD con `SELECT 1`; `/` redirige al tablero; sirve `frontend/operador`, `frontend/publico` y `frontend/static`. |
   | `frontend/operador/index.html`, `frontend/publico/index.html` | Páginas provisionales mientras se define el diseño. | Muestran la etiqueta "SIMULACIÓN" y el enlace a la documentación de la API. |
-  | `docs/contracts.md` | Resumen legible de todos los contratos para el equipo y los agentes. | Convenciones, tablas, endpoints, formato del WebSocket, herramientas del asistente. |
+  | `docs/contracts.md` | Resumen legible de todos los contratos para el desarrollo de cada módulo. | Convenciones, tablas, endpoints, formato del WebSocket, herramientas del asistente. |
   | `docs/openapi.json` | Especificación completa de la API generada por FastAPI. | 15 rutas con sus esquemas de entrada y salida. |
   | `docs/ejemplo-snapshot.json` | Mensaje de ejemplo del WebSocket. | Permite construir el tablero con datos simulados antes de que exista el simulador. |
 
@@ -91,22 +90,14 @@ Abrir `http://localhost:8000` (tablero) · `http://localhost:8000/publico/` (vec
 
 - **Herramientas de IA:** Claude (Opus 5.5) diseñó el esquema, los schemas, los routers y la migración; los verificó en un PostgreSQL 16 de prueba (migración de ida y vuelta, `alembic check` sin diferencias, arranque de la app, validación de entradas y verificación del webhook).
 
-- **Decisiones clave:**
-  - Contratos en código (Pydantic + SQLAlchemy) y no solo en documento: los agentes no pueden desviarse sin que falle la validación.
-  - Un solo proceso FastAPI (API + WebSocket + frontend): un único deploy y dominio, menos puntos de falla en la demo.
-  - Frontend sin paso de compilación (Leaflet y Chart.js como archivos estáticos): no depende de npm.
-  - El simulador envía el progreso 0–1 de cada camión sobre su ruta y el navegador calcula su posición: menos carga en el servidor y animación fluida.
-  - `GET /api/sim/snapshot` como respaldo por polling si el WebSocket falla en el hosting.
-  - Reprogramar crea una cita nueva ligada a la anterior (`cita_anterior_id`): conserva la traza y permite medir cumplimiento.
-  - Tipo de evento `personalizado` con `payload` JSONB reservado para el giro del jueves.
 
-### 2026-11-11 16:05 · `#002` · M1 Simulador en tiempo real (mundos A/B, eventos, WebSocket, histórico)
+### 2026-11-11 16:05 · `d1a97ad` · M1 Simulador en tiempo real (mundos A/B, eventos, WebSocket, histórico)
 
 - **Qué se agregó:**
 
   | Archivo | Qué hace | Funciones / elementos principales |
   |---|---|---|
-  | `backend/data/escenario.json` | Parámetros de la simulación en un archivo editable sin tocar código. **Valores provisionales** hasta que el equipo de Datos entregue los reales. | 3 accesos (carriles, tiempo de servicio, participación, coordenadas y rutas); 1 300 camiones/día; perfil de llegadas por hora; mezcla de tipos de carga; % de no-show (8 %) y de cumplimiento de la sugerencia (70 %); buques (0–1 por día) y probabilidad de norte (10 %). |
+  | `backend/data/escenario.json` | Parámetros de la simulación en un archivo editable sin tocar código. **Valores provisionales** hasta contar con datos públicos del puerto. | 3 accesos (carriles, tiempo de servicio, participación, coordenadas y rutas); 1 300 camiones/día; perfil de llegadas por hora; mezcla de tipos de carga; % de no-show (8 %) y de cumplimiento de la sugerencia (70 %); buques (0–1 por día) y probabilidad de norte (10 %). |
   | `backend/app/sim/escenario.py` | Lee y valida `escenario.json`. | `Escenario`, `AccesoParam`, `Ruta`, `BuquesParam`, `NorteParam` (modelos Pydantic que rechazan valores imposibles, p. ej. 0 carriles o ids repetidos); `capacidad_hora` = carriles × 60 / servicio; `cargar_escenario()` y `escenario_actual()`. |
   | `backend/app/sim/demanda.py` | Genera los camiones que llegarán. | `CamionPlan`: cada camión con **todos sus valores aleatorios ya sorteados** (tipo de carga, acceso, ruta, tiempo de trayecto, de revisión y de estancia, retraso, si falta a la cita, si sigue la sugerencia); `demanda_dia()` crea las llegadas de un día con un proceso de Poisson por hora (reproducible por semilla y día); `ola_buque()` agrega la ola de camiones que provoca un buque; `crear_camion()`. |
   | `backend/app/sim/planificador.py` | El "cerebro" de Fluport en el Mundo B: reparte las llegadas en franjas de 30 min. | `Planificador.asignar()` elige la franja con menor carga dentro de −60/+180 min de la hora deseada, penalizando moverse lejos o cambiar de acceso; la carga refrigerada y peligrosa conserva su horario; `candidatos()` devuelve las opciones ordenadas (lo reutilizará M3 para sugerir los 3 mejores horarios); `registrar()` cuenta a quienes no siguen la sugerencia. |
@@ -138,10 +129,87 @@ Abrir `http://localhost:8000` (tablero) · `http://localhost:8000/publico/` (vec
 
 - **Herramientas de IA:** Claude (Opus 5.5) diseñó e implementó el simulador y su API, y lo verificó: corridas de 3 días con dos semillas, cierre y reapertura de acceso (en A la fila crece en el acceso cerrado; en B los camiones se desvían), inyección de una cita de demo, servidor en vivo con cliente WebSocket (snapshots, eventos, pausa que congela el reloj, reset sin perder la conexión), errores 422 y escritura de lecturas y eventos en PostgreSQL 16.
 
-- **Decisiones clave:**
-  - Parámetros en JSON y no en código: el equipo de Datos los ajusta y el giro del jueves se puede absorber cambiando valores.
-  - Primera calibración: con 1 500 camiones/día y buques grandes el sistema quedaba saturado todo el día (esperas de 10 h, irreal); se bajó a 1 300/día, buques más pequeños y la participación de cada acceso proporcional a su capacidad, para que haya picos que se disipan de noche.
-  - La demanda se genera con un día de anticipación: así el Mundo B puede planificar, como ocurre con citas reales.
-  - En el Mundo A los camiones no saben que un acceso cerró (esperan); en el B se desvían: es justamente el valor de informar a tiempo.
-  - Un mismo archivo de código sirve para vivo e histórico: el modelo de M2 se entrena con datos coherentes con lo que se ve en el mapa.
-  - Si PostgreSQL falla, la simulación continúa sin guardar: prioridad a que la demo no se caiga.
+### 2026-11-11 17:20 · `#003` · Datos del puerto integrados al simulador
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/data/escenario.json` (reemplazado) | Parámetros de la simulación tomados de la hoja de datos `Fluport_Rol_Datos.xlsx`. | 3 accesos reales: casetas La Antigua (4 carriles, 3.9 min), Paso del Toro (4 carriles, 4.1 min) y San Julián (3 carriles, 4.5 min) con coordenadas aproximadas; 2 000 camiones/día; llegadas por franja (5 % de 00–06 h, 24 % de 06–10 h, 28 % de 10–14 h, 26 % de 14–18 h, 17 % de 18–24 h); 65 % con cita, 15 % de no-show y 50 % que acepta la hora sugerida; retraso medio de 20 min; carga refrigerada 6 % y peligrosa 17.5 %; 1.1 buques/día de ~2 050 contenedores; norte de 24 h (12–48 h) que reduce 30 % la atención; 10 % de revisión aduanal con 45 min extra; factores de impacto (3 L/h de diésel en ralentí, 26 MXN/L, 385 MXN por hora de camión parado, 2.68 kg CO₂/L). Participación por acceso (40/38/22 %) tomada de la hoja «Validación». |
+  | `backend/app/sim/escenario.py` (modificado) | Valida el nuevo formato del escenario. | `FranjaLlegadas` y validador que exige que las franjas sumen 100 %; `perfil_horario` reparte cada franja en sus horas; `camiones_base_dia` y `camiones_buque_dia` (separa la demanda base de las olas por buque); `retraso_sigma_min` convierte el retraso promedio en la σ de una distribución normal (σ = promedio × √(π/2)); `NorteParam.factor_servicio` = 1 / (1 − reducción de atención); nuevos modelos `RevisionAduanal` e `Impacto`. |
+  | `backend/app/sim/demanda.py` (modificado) | Sorteo de cada camión. | Nuevos atributos `con_cita` y `revision_aduanal`; el no-show y el seguimiento de la sugerencia solo aplican a camiones con cita; la revisión aduanal suma su tiempo a la estancia dentro del puerto (no ocupa carril en la caseta); `poisson()` ahora es pública para sortear el número de buques por día. |
+  | `backend/app/sim/mundo.py` (modificado) | Mundo B. | Solo los camiones con cita que aceptan la sugerencia se reubican en otra franja; los demás llegan a su hora. |
+  | `backend/app/sim/motor.py` (modificado) | Eventos automáticos y KPIs. | Buques por día con distribución de Poisson (media 1.1); duración de cada norte sorteada entre 12 y 48 h; el costo evitado usa el costo integral de la hora de camión parado (385 MXN/h) y el diésel/CO₂ los factores del escenario. |
+  | `backend/app/config.py` (modificado) | Configuración. | Se retiran los factores de diésel y CO₂: ahora viven en `escenario.json` junto con su fuente. |
+
+- **Funcionalidad:** la simulación ya corre con los parámetros del puerto entregados por Datos: tres casetas reales en el mapa, la demanda y su distribución por hora, el comportamiento de los transportistas y los factores de costo y emisiones. Si la hoja de datos cambia, basta con editar `escenario.json`; un validador avisa si los porcentajes por franja no suman 100 %. Con estos valores (en 8 semillas de 7 días) el Mundo A tiene una espera promedio mediana de 25 min y el Mundo B la reduce entre 4 % y 20 %; la mejora es moderada porque solo el 65 % tiene cita y de ellos la mitad acepta moverse. Los días con norte de 24 h la capacidad baja a ~110 camiones/h y las filas se disparan en ambos mundos.
+
+- **Tecnologías usadas:**
+  - `Pydantic` (`field_validator`, propiedades calculadas): ver `aae10d9`. Aquí valida que las franjas sumen 100 % y deriva valores (perfil por hora, σ del retraso, factor de norte) para que la hoja de datos se capture en las mismas unidades que entregó Datos.
+  - Distribución **normal** con desvío absoluto medio: el dato entregado es "retraso promedio"; para una Normal(0, σ), E|X| = σ·√(2/π), de donde se obtiene σ. Permite que haya camiones adelantados y retrasados con el promedio solicitado.
+  - Distribución de **Poisson** para el número de buques por día: modelo estándar para eventos independientes con una media conocida (1.1/día); hay días sin buques y días con dos o más.
+  - `openpyxl`: lectura de la hoja de Excel de Datos para extraer los valores y calcular la calibración (esperas promedio por acceso y hora de la hoja «Validación»). Se usó solo como herramienta de análisis; no forma parte de la aplicación.
+
+- **Herramientas de IA:** Claude (Opus 5.5) leyó la hoja de datos, convirtió cada valor al formato del escenario, adaptó el modelo a los datos nuevos (cita, revisión aduanal, buques Poisson, costo por hora) y calibró con 8 semillas de 7 días contra la hoja «Validación»; verificó la API en vivo (casetas, evento norte con factor 1.43 y KPIs).
+
+### 2026-11-11 17:30 · `#004` · M2 Pronóstico de congestión a 12 horas
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/app/prediction/features.py` | Define las variables con las que se predice, iguales en entrenamiento y en vivo. | `HORIZONTES` (30, 60, …, 720 min); `capacidad_franja()` (camiones atendibles en 30 min); `espera_de_fila()`; `proyeccion_fluida()`: **balance de flujo** franja por franja, fila = máx(0, fila anterior + llegadas conocidas − capacidad); `dataset_entrenamiento()` convierte la serie de lecturas en ejemplos "estado en t → espera en t + h" con 15 variables (acceso, mundo, horizonte, hora y día objetivo, fila y espera actuales, llegadas y atendidos de la última hora, norte, citas de la franja objetivo, buques, espera por balance de flujo, carriles y tiempo de servicio). |
+  | `backend/app/prediction/entrenar.py` | Entrena y evalúa el modelo. | `entrenar()`: genera 17 días simulados, separa los últimos 3 para evaluar (separación temporal, sin mezclar con el entrenamiento), entrena un `HistGradientBoostingRegressor` que aprende la **corrección** sobre el balance de flujo, mide el error medio contra dos referencias (balance de flujo solo y "persistencia": suponer que la espera no cambia) y guarda modelo + métricas en `backend/modelos/pronostico.joblib`. Comando: `python -m app.prediction.entrenar --dias 14`. |
+  | `backend/app/prediction/pronosticador.py` | Pronóstico en vivo. | `Pronosticador.calcular()` arma las variables desde el estado actual del simulador (en el Mundo B usa las llegadas agendadas por el planificador) y predice las 24 franjas de cada acceso; si un acceso está cerrado supone que sigue cerrado la próxima hora; `obtener()` guarda el resultado en caché y lo recalcula cada 15 min simulados; `espera_en()` da la espera prevista en un instante (la usará M3 para sugerir horarios); si no hay modelo, responde con el balance de flujo (`balance-flujo-v1`). |
+  | `backend/app/api/pronostico.py` (implementado) | Rutas del pronóstico. | `GET /api/pronostico?acceso_id=&horas=&mundo=` (404 si el acceso no existe); nuevo `GET /api/pronostico/modelo` con versión y métricas. |
+  | `backend/app/sim/historico.py` (modificado) | Histórico simulado. | `generar()` ahora devuelve también las lecturas y puede correr sin PostgreSQL (`persistir=False`), para entrenar en cualquier entorno. |
+  | `backend/app/sim/servicio.py` (modificado) | Servicio en vivo. | `_autoentrenar()`: si al arrancar no existe el modelo, lo entrena en segundo plano y lo activa al terminar (mientras tanto responde el balance de flujo); `_guardar_pronostico()` escribe en la tabla `pronostico` cada 60 min simulados. |
+  | `backend/app/sim/persistencia.py` (modificado) | BD. | `guardar_pronosticos()`. |
+  | `backend/app/config.py` (modificado) | Configuración. | `pronostico_autoentrenar`, `pronostico_guardar_cada_min`. |
+  | `.gitignore` (modificado) | — | Excluye `modelos/` (el modelo se regenera con un comando en ~10 s). |
+  | `docs/contracts.md`, `docs/openapi.json` (actualizados) | Contratos. | Parámetro `mundo` del pronóstico y ruta `/api/pronostico/modelo`. |
+
+- **Funcionalidad:** el sistema estima para cada caseta la espera de las próximas 12 horas en franjas de 30 minutos, con su semáforo, y la actualiza cada 15 minutos simulados según lo que está pasando (fila actual, citas agendadas, buques, norte, cierres). Evaluado sobre 3 días que el modelo no vio, el error medio es de **2.5 min** frente a 6.7 min del balance de flujo solo y 7.5 min de suponer que la espera no cambia; en momentos de congestión (espera ≥ 20 min) el error es de 9.7 min. En 4 corridas de prueba adicionales con otras semillas el modelo superó siempre al balance de flujo, incluida una con norte (26 vs 38 min de error). Si no hay modelo, la app lo entrena sola al arrancar.
+
+- **Tecnologías usadas:**
+  - `scikit-learn` · `HistGradientBoostingRegressor`: modelo de árboles de decisión potenciados por gradiente que agrupa los valores en histogramas. **Por qué:** entrena en segundos con cientos de miles de filas, captura relaciones no lineales (hora pico × fila × buques) sin escalar variables y maneja directamente variables categóricas (acceso, mundo).
+  - **Aprendizaje del residuo** (técnica): el modelo predice cuánto corregir la proyección por balance de flujo en vez de la espera directa. **Por qué:** los árboles no extrapolan fuera de los valores vistos; partir de una proyección física permite responder razonablemente ante situaciones extremas (nortes largos) y en pruebas redujo el error en el caso con norte de 57 a 26 min.
+  - **Balance de flujo** (modelo de colas determinista): fila futura = fila actual + llegadas − capacidad. **Por qué:** es explicable en una frase ante el jurado, sirve de respaldo sin entrenamiento y de variable principal del modelo.
+  - **Validación temporal** (hold-out por fecha): se evalúa con días posteriores a los de entrenamiento. **Por qué:** imita el uso real (predecir el futuro con datos del pasado) y evita resultados inflados por mezclar momentos cercanos.
+  - `pandas` / `numpy`: tablas y arreglos numéricos. **Por qué:** construcción eficiente del conjunto de entrenamiento (≈190 000 ejemplos) a partir de las lecturas.
+  - `joblib`: serialización de objetos de Python. **Por qué:** formato recomendado por scikit-learn para guardar y cargar modelos entrenados de forma rápida.
+  - `asyncio.create_task` + `asyncio.to_thread`: ver `d1a97ad`. Aquí el entrenamiento automático corre en un hilo para que el simulador y la API sigan respondiendo.
+
+- **Herramientas de IA:** Claude (Opus 5.5) diseñó las variables y el esquema de entrenamiento, comparó variantes (predicción directa vs. residuo, 14 vs. 28 días) en 4 semillas de prueba, implementó el pronóstico en vivo y lo verificó con el servidor corriendo: arranque sin modelo, entrenamiento automático, cambio de versión, reacción al cierre de un acceso, error 404 y escritura de pronósticos en PostgreSQL.
+
+### 2026-11-11 17:45 · `#005` · Suite de pruebas automáticas y corrección de dos errores
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/requirements-dev.txt` | Dependencias solo para desarrollo. | Incluye `requirements.txt` + `pytest`. |
+  | `backend/pytest.ini` | Configuración de las pruebas. | Carpeta `tests/`, ruta de importación y marca `lento` para la prueba de entrenamiento. |
+  | `backend/tests/conftest.py` | Preparación común. | Apunta a una base de datos inexistente y desactiva el entrenamiento automático, para que las pruebas **no toquen tu PostgreSQL ni tu modelo**; fixtures `esc` (escenario real) y `sim` (simulador sin eventos automáticos). |
+  | `backend/tests/test_escenario.py` (9) | Datos del puerto. | Validez del archivo, capacidad por hora, perfil horario que suma 100 %, rechazo de franjas que no suman 100 %, de ids repetidos y de 0 carriles, factor de norte, σ del retraso, demanda base con y sin buques. |
+  | `backend/tests/test_demanda.py` (10) | Generación de camiones. | Misma semilla = misma demanda, días distintos difieren, llegadas ordenadas y dentro del día, volumen diario ±5 %, proporciones de cita y carga peligrosa, reglas de no-show/cumplimiento, prioridad, revisión aduanal, ola de buque, media de Poisson. |
+  | `backend/tests/test_planificador.py` (6) | Franjas del Mundo B. | Evita franjas saturadas, respeta la hora si no hay carga, carga prioritaria conserva su horario, evita accesos cerrados, reserva lugar, candidatos ordenados. |
+  | `backend/tests/test_mundo.py` (7) | Colas en las casetas. | Ciclo de vida completo del camión, no-show, fila cuando llegan más camiones que carriles, prioridad en el Mundo B, cierre/reapertura, desvío en el Mundo B, efecto del norte. |
+  | `backend/tests/test_motor.py` (14) | Orquestación A/B. | Misma demanda en ambos mundos, Fluport reduce la espera con cumplimiento total, reloj, cada tipo de evento, error con acceso inválido, inyección de cita, lecturas cada 5 min, KPIs con los factores del escenario, snapshot válido con tope de camiones, publicación al WebSocket. |
+  | `backend/tests/test_prediccion.py` (7) | Pronóstico. | Balance de flujo, capacidad y espera, conjunto de entrenamiento con 24 horizontes, respaldo sin modelo, un cierre sube el pronóstico inmediato, caché de 15 min, entrenamiento corto en archivo temporal (marca `lento`). |
+  | `backend/tests/test_contratos.py` (10) | Contratos. | Umbrales del semáforo (5 casos), validaciones de cita y de control, esquema compilable para PostgreSQL. |
+  | `backend/tests/test_api.py` (12) | API completa con el simulador corriendo y sin BD. | Salud, redirección, accesos y GeoJSON, estado por mundo, pausa/velocidad/play, eventos y errores 422, KPIs, pronóstico y 404, WebSocket (snapshot inicial y eventos), reset, rutas pendientes (501), verificación del webhook. |
+  | `backend/app/sim/motor.py` (corregido) | Lecturas. | `_mover()` ahora se detiene en cada lectura: antes, si el reloj avanzaba más de 5 min en un paso (velocidades altas), se guardaba solo una lectura. |
+  | `backend/app/sim/planificador.py` (corregido) | Franjas. | La distancia se mide a la franja que contiene la hora deseada: antes, en un empate, elegía la franja anterior y adelantaba 30 min a camiones que no necesitaban moverse. |
+  | `backend/app/prediction/entrenar.py` (modificado) | Entrenamiento. | Parámetro `ruta` para guardar el modelo en otro archivo (lo usan las pruebas). |
+  | `backend/app/api/sim.py` (modificado) | — | Código 422 explícito (la constante de Starlette quedó obsoleta). |
+
+- **Funcionalidad:** 75 pruebas automáticas verifican los datos, la simulación, el planificador, el pronóstico, los contratos y la API completa en ~12 s, sin necesitar PostgreSQL. Al escribirlas se encontraron y corrigieron dos errores: lecturas perdidas a velocidad alta (afectaba el histórico y el pronóstico) y reprogramaciones innecesarias de 30 min en el Mundo B.
+
+- **Tecnologías usadas:**
+  - `pytest`: framework de pruebas de Python. **Por qué:** pruebas como funciones simples con `assert`, *fixtures* reutilizables (escenario, simulador, cliente), `parametrize` para casos tabulares (semáforo) y marcas para separar pruebas lentas.
+  - `fastapi.testclient.TestClient`: cliente HTTP y WebSocket en memoria sobre la app. **Por qué:** prueba la API real, incluido el `lifespan` (arranque del simulador) y el WebSocket, sin levantar un servidor.
+  - `pytest` · `tmp_path`: carpeta temporal por prueba. **Por qué:** el entrenamiento de prueba escribe ahí y no reemplaza el modelo de `backend/modelos/`.
+  - `sqlalchemy.schema.CreateTable` con el dialecto de PostgreSQL: genera el DDL sin conexión. **Por qué:** comprueba que el esquema es válido para PostgreSQL aun sin base de datos disponible.
+
+- **Herramientas de IA:** Claude (Opus 5.5) diseñó y escribió las pruebas, detectó con ellas los dos errores, los corrigió y verificó que las 75 pasan y que la calibración del simulador no cambió.

@@ -31,7 +31,7 @@ from app.contracts.schemas import (
     WsEvento,
     WsSnapshot,
 )
-from app.sim.demanda import MIN_DIA, CamionPlan, crear_camion, demanda_dia, ola_buque
+from app.sim.demanda import MIN_DIA, CamionPlan, crear_camion, demanda_dia, ola_buque, poisson
 from app.sim.escenario import Escenario
 from app.sim.mundo import MundoSim
 
@@ -67,7 +67,7 @@ class Simulador:
         self.eventos_recientes: deque[EventoOut] = deque(maxlen=15)
         self.lecturas_pendientes: list[dict[str, Any]] = []
         self.eventos_pendientes: list[dict[str, Any]] = []
-        self._ultima_lectura = -1e9
+        self._ultima_lectura = 0.0  # la primera lectura ocurre al minuto `intervalo_lectura`
         self._seq_evento = 0
         self._rng_eventos = random.Random(semilla + 7919)
         self.publicador: Callable[[str], None] | None = None  # lo asigna el servicio en vivo
@@ -100,7 +100,7 @@ class Simulador:
     def _programar_eventos_dia(self, d: int) -> None:
         rng = random.Random(self.semilla * 31 + d)
         b = self.esc.buques
-        for i in range(rng.randint(*b.por_dia)):
+        for i in range(poisson(rng, b.por_dia_media)):
             t = d * MIN_DIA + rng.uniform(0, MIN_DIA)
             cont = rng.randint(*b.contenedores)
             self._alimentar(ola_buque(self.esc, rng, f"B{d:02d}{i}", t, cont))  # demanda conocida por adelantado
@@ -110,7 +110,10 @@ class Simulador:
             )
         if rng.random() < self.esc.norte.prob_dia:
             t = d * MIN_DIA + rng.uniform(0, MIN_DIA)
-            self.programados.append((t, EventoCreate(tipo=TipoEventoSim.norte, payload={"auto": True})))
+            dur = rng.uniform(*self.esc.norte.duracion_rango_h)
+            self.programados.append(
+                (t, EventoCreate(tipo=TipoEventoSim.norte, payload={"auto": True, "duracion_h": round(dur, 1)}))
+            )
         self.programados.sort(key=lambda x: x[0])
 
     # ───────────── Avance ─────────────
@@ -127,15 +130,16 @@ class Simulador:
         self.tick += 1
 
     def _mover(self, t: float) -> None:
-        if t <= self.t:
-            return
-        self.t = t
-        self._asegurar_demanda()
-        for mundo in self.mundos.values():
-            mundo.avanzar(t)
-        if self.t - self._ultima_lectura >= self.intervalo_lectura:
-            self._registrar_lecturas()
-            self._ultima_lectura = self.t
+        """Avanza el reloj hasta `t`, deteniéndose en cada lectura (una cada `intervalo_lectura` minutos)."""
+        while self.t < t:
+            paso = min(t, self._ultima_lectura + self.intervalo_lectura)
+            self.t = paso
+            self._asegurar_demanda()
+            for mundo in self.mundos.values():
+                mundo.avanzar(paso)
+            if paso >= self._ultima_lectura + self.intervalo_lectura - 1e-9:
+                self._registrar_lecturas()
+                self._ultima_lectura = paso
 
     def _registrar_lecturas(self) -> None:
         ts = self.ts()
@@ -213,7 +217,7 @@ class Simulador:
         rng = random.Random(cita_id)
         plan = crear_camion(self.esc, rng, f"C{cita_id:05d}", max(self.t, self.a_minuto(inicio)),
                             acceso_id=acceso_id, tipo_carga=tipo_carga, origen="cita")
-        plan.cita_id, plan.es_demo, plan.no_show, plan.cumple = cita_id, es_demo, False, True
+        plan.cita_id, plan.es_demo, plan.con_cita, plan.no_show, plan.cumple = cita_id, es_demo, True, False, True
         self._alimentar([plan])
         return plan.id
 
@@ -232,7 +236,8 @@ class Simulador:
     def comparacion(self, ka: Kpis | None = None, kb: Kpis | None = None) -> KpisComparacion:
         ka, kb = ka or self.kpis(Mundo.A), kb or self.kpis(Mundo.B)
         horas = max(0.0, ka.horas_camion_espera - kb.horas_camion_espera)
-        diesel = horas * self.cfg.diesel_ralenti_l_h
+        imp = self.esc.impacto
+        diesel = horas * imp.diesel_ralenti_l_h
 
         def pct(a: float, b: float) -> float:
             return round(100 * (a - b) / a, 1) if a > 0 else 0.0
@@ -240,8 +245,8 @@ class Simulador:
         return KpisComparacion(
             horas_ahorradas=round(horas, 1),
             diesel_l_evitado=round(diesel, 1),
-            costo_mxn_evitado=round(diesel * self.cfg.diesel_precio_mxn_l, 0),
-            co2_kg_evitado=round(diesel * self.cfg.co2_kg_por_l, 1),
+            costo_mxn_evitado=round(horas * imp.costo_hora_camion_mxn, 0),  # costo integral de la hora parada
+            co2_kg_evitado=round(diesel * imp.co2_kg_por_l, 1),
             reduccion_espera_pct=pct(ka.espera_prom_min, kb.espera_prom_min),
             reduccion_pico_fila_pct=pct(ka.pico_fila, kb.pico_fila),
         )

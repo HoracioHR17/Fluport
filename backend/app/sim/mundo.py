@@ -69,7 +69,7 @@ class MundoSim:
                 if p.cita_id is not None:  # cita real del asistente/API: ya trae su horario
                     acceso, t = p.acceso_id, p.llegada_deseada
                     self.planificador.registrar(acceso, t)
-                elif p.cumple:
+                elif p.con_cita and p.cumple:
                     acceso, base = self.planificador.asignar(p.llegada_deseada, p.acceso_id, p.prioritario)
                     # dentro de la franja: desfase pseudoaleatorio (fijo por camión) + impuntualidad
                     t = base if p.prioritario else base + (p.llegada_deseada % 30) + p.retraso_min

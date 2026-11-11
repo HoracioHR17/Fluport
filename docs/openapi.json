@@ -133,11 +133,22 @@
       "required": false,
       "schema": {
        "type": "integer",
-       "maximum": 24,
+       "maximum": 12,
        "minimum": 1,
        "default": 12,
        "title": "Horas"
       }
+     },
+     {
+      "name": "mundo",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "$ref": "#/components/schemas/Mundo",
+       "description": "B = con Fluport (operación), A = sin Fluport",
+       "default": "B"
+      },
+      "description": "B = con Fluport (operación), A = sin Fluport"
      }
     ],
     "responses": {
@@ -161,6 +172,30 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/pronostico/modelo": {
+   "get": {
+    "tags": [
+     "pronostico"
+    ],
+    "summary": "Modelo",
+    "description": "Versión y métricas de evaluación del modelo en uso (error medio en minutos sobre días no vistos).",
+    "operationId": "modelo_api_pronostico_modelo_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Modelo Api Pronostico Modelo Get"
         }
        }
       }
@@ -1069,7 +1104,7 @@
        }
       ],
       "title": "Telefono",
-      "description": "Identifica/crea al transportista (solo números del equipo)"
+      "description": "Identifica/crea al transportista (solo números de prueba con consentimiento)"
      },
      "transportista_id": {
       "anyOf": [

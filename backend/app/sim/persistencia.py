@@ -67,6 +67,20 @@ class Persistencia:
             with self.engine.begin() as c:
                 c.execute(insert(m.LecturaCongestion), filas)
 
+    def guardar_pronosticos(self, pronosticos: list) -> None:
+        """Guarda una tanda de `PronosticoOut` (una fila por acceso y franja)."""
+        filas = [
+            dict(acceso_id=p.acceso_id, generado_en=p.generado_en, franja_inicio=f.inicio, espera_min=f.espera_min,
+                 semaforo=f.semaforo, modelo_version=p.modelo_version)
+            for p in pronosticos for f in p.franjas
+        ]
+        if filas and self.activa:
+            try:
+                with self.engine.begin() as c:
+                    c.execute(insert(m.Pronostico), filas)
+            except Exception as e:  # noqa: BLE001
+                log.error("Error al guardar pronósticos: %s", e)
+
     def guardar_eventos(self, filas: list[dict[str, Any]]) -> None:
         if filas and self.activa:
             with self.engine.begin() as c:

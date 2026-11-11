@@ -1,5 +1,6 @@
 """Carga y valida los parámetros del escenario (backend/data/escenario.json)."""
 import json
+import math
 from functools import lru_cache
 from pathlib import Path
 
@@ -31,8 +32,26 @@ class AccesoParam(BaseModel):
         return int(self.carriles * 60 / self.tiempo_servicio_min)
 
 
+class FranjaLlegadas(BaseModel):
+    desde: int = Field(ge=0, le=24)
+    hasta: int = Field(ge=0, le=24)
+    pct: float = Field(ge=0, le=1)
+
+
+class RevisionAduanal(BaseModel):
+    prob: float = Field(ge=0, le=1)
+    extra_min: float = Field(ge=0)
+
+
+class Impacto(BaseModel):
+    diesel_ralenti_l_h: float
+    diesel_precio_mxn_l: float
+    costo_hora_camion_mxn: float
+    co2_kg_por_l: float
+
+
 class BuquesParam(BaseModel):
-    por_dia: tuple[int, int]
+    por_dia_media: float = Field(ge=0)
     contenedores: tuple[int, int]
     camiones_por_contenedor: float
     ola_horas: tuple[float, float]
@@ -41,26 +60,69 @@ class BuquesParam(BaseModel):
 class NorteParam(BaseModel):
     prob_dia: float
     duracion_h: float
-    factor_servicio: float
+    duracion_rango_h: tuple[float, float]
+    reduccion_atencion: float = Field(ge=0, lt=1)  # 0.30 = se atiende 30 % menos
+
+    @property
+    def factor_servicio(self) -> float:
+        """Multiplicador del tiempo de revisión: atender 30 % menos ⇒ cada camión tarda 1/0.7 veces."""
+        return 1 / (1 - self.reduccion_atencion)
 
 
 class Escenario(BaseModel):
     inicio_hora: int = 4
     camiones_dia: int
-    perfil_horario: list[float] = Field(min_length=24, max_length=24)
+    camiones_dia_incluye_buques: bool = True
+    llegadas_por_franja: list[FranjaLlegadas] = Field(min_length=1)
     mezcla_carga: dict[TipoCarga, float]
     cargas_prioritarias: list[TipoCarga]
     servicio_sigma: float
     ruta_min: tuple[float, float]
     estancia_min: tuple[float, float]
-    retraso_sigma_min: float
-    no_show: float
-    cumplimiento_sugerencia: float
+    con_cita: float = Field(ge=0, le=1)
+    no_show: float = Field(ge=0, le=1)  # sobre los camiones con cita
+    cumplimiento_sugerencia: float = Field(ge=0, le=1)  # sobre los camiones con cita
+    retraso_promedio_min: float = Field(ge=0)  # desvío absoluto medio respecto a la cita
     ventana_reprogramacion_min: tuple[int, int]
     ocupacion_objetivo_franja: float
+    revision_aduanal: RevisionAduanal
     buques: BuquesParam
     norte: NorteParam
+    impacto: Impacto
     accesos: list[AccesoParam] = Field(min_length=1)
+
+    @field_validator("llegadas_por_franja")
+    @classmethod
+    def _franjas_suman_100(cls, v: list[FranjaLlegadas]) -> list[FranjaLlegadas]:
+        if abs(sum(f.pct for f in v) - 1) > 0.01:
+            raise ValueError("los % de llegadas por franja deben sumar 100 %")
+        return v
+
+    @property
+    def perfil_horario(self) -> list[float]:
+        """Peso de llegadas por hora del día (0–23), repartiendo cada franja uniformemente."""
+        pesos = [0.0] * 24
+        for f in self.llegadas_por_franja:
+            for h in range(f.desde, f.hasta):
+                pesos[h] += f.pct / (f.hasta - f.desde)
+        return pesos
+
+    @property
+    def camiones_buque_dia(self) -> float:
+        b = self.buques
+        return b.por_dia_media * sum(b.contenedores) / 2 * b.camiones_por_contenedor
+
+    @property
+    def camiones_base_dia(self) -> float:
+        """Demanda sin olas de buque (si el total diario ya las incluye, se descuentan)."""
+        if self.camiones_dia_incluye_buques:
+            return max(0.0, self.camiones_dia - self.camiones_buque_dia)
+        return float(self.camiones_dia)
+
+    @property
+    def retraso_sigma_min(self) -> float:
+        """σ de una Normal(0, σ) cuyo desvío absoluto medio es retraso_promedio_min (E|X| = σ·√(2/π))."""
+        return self.retraso_promedio_min * math.sqrt(math.pi / 2)
 
     @field_validator("accesos")
     @classmethod

@@ -71,7 +71,7 @@ class PronosticoOut(Modelo):
 
 # ───────────────────────────── Citas (M3) ─────────────────────────────
 class CitaCreate(Modelo):
-    telefono: str | None = Field(None, description="Identifica/crea al transportista (solo números del equipo)")
+    telefono: str | None = Field(None, description="Identifica/crea al transportista (solo números de prueba con consentimiento)")
     transportista_id: int | None = None
     alias: str | None = None
     acceso_id: str

@@ -25,8 +25,10 @@ class CamionPlan:
     servicio_base: float  # minutos de revisión (antes del factor de clima)
     estancia_min: float
     retraso_min: float  # desvío respecto a la hora de cita (Mundo B)
-    no_show: bool
-    cumple: bool  # sigue la sugerencia de Fluport (Mundo B)
+    con_cita: bool
+    no_show: bool  # solo aplica si tiene cita
+    cumple: bool  # sigue la sugerencia de Fluport (solo si tiene cita)
+    revision_aduanal: bool
     prioritario: bool
     cita_id: int | None = None
     es_demo: bool = False
@@ -58,6 +60,9 @@ def crear_camion(
         acceso_id = _elegir(rng, {a.id: a.participacion for a in esc.accesos})  # type: ignore[assignment]
     acc = esc.acceso(acceso_id)
     tipo = tipo_carga or _elegir(rng, esc.mezcla_carga)  # type: ignore[assignment]
+    con_cita = rng.random() < esc.con_cita
+    aduana = rng.random() < esc.revision_aduanal.prob
+    estancia = rng.uniform(*esc.estancia_min) + (esc.revision_aduanal.extra_min if aduana else 0.0)
     return CamionPlan(
         id=id_,
         acceso_id=acc.id,
@@ -66,10 +71,12 @@ def crear_camion(
         llegada_deseada=llegada,
         ruta_min=rng.uniform(*esc.ruta_min),
         servicio_base=_lognormal(rng, acc.tiempo_servicio_min, esc.servicio_sigma),
-        estancia_min=rng.uniform(*esc.estancia_min),
+        estancia_min=estancia,
         retraso_min=rng.gauss(0, esc.retraso_sigma_min),
-        no_show=rng.random() < esc.no_show,
-        cumple=rng.random() < esc.cumplimiento_sugerencia,
+        con_cita=con_cita,
+        no_show=con_cita and rng.random() < esc.no_show,
+        cumple=con_cita and rng.random() < esc.cumplimiento_sugerencia,
+        revision_aduanal=aduana,
         prioritario=(tipo in esc.cargas_prioritarias) if prioritario is None else prioritario,
         origen=origen,
     )
@@ -78,13 +85,14 @@ def crear_camion(
 def demanda_dia(esc: Escenario, semilla: int, dia: int) -> list[CamionPlan]:
     """Llegadas del día `dia` (Poisson no homogéneo por hora). Reproducible por (semilla, día)."""
     rng = random.Random(semilla * 10_007 + dia)
-    total_pesos = sum(esc.perfil_horario)
+    perfil = esc.perfil_horario
+    total_pesos = sum(perfil)
     camiones: list[CamionPlan] = []
     inicio_dia = dia * MIN_DIA
     for h in range(24):
         hora_real = (esc.inicio_hora + h) % 24  # el minuto 0 simulado corresponde a inicio_hora
-        lam = esc.camiones_dia * esc.perfil_horario[hora_real] / total_pesos
-        n = _poisson(rng, lam)
+        lam = esc.camiones_base_dia * perfil[hora_real] / total_pesos
+        n = poisson(rng, lam)
         for _ in range(n):
             t = inicio_dia + h * 60 + rng.uniform(0, 60)
             camiones.append(crear_camion(esc, rng, f"T{dia:02d}-{len(camiones):04d}", t))
@@ -98,6 +106,7 @@ def ola_buque(
     """Ola de demanda por un buque: camiones repartidos (triangular) en las horas siguientes."""
     n = int(contenedores * esc.buques.camiones_por_contenedor)
     a, b = esc.buques.ola_horas
+    # moda temprana: la mayoría sale en el primer tercio de la ventana tras el atraque
     camiones = [
         crear_camion(
             esc, rng, f"{prefijo}-{i:04d}", t_atraque + 60 * rng.triangular(a, b, a + (b - a) / 3), origen="buque"
@@ -108,7 +117,7 @@ def ola_buque(
     return camiones
 
 
-def _poisson(rng: random.Random, lam: float) -> int:
+def poisson(rng: random.Random, lam: float) -> int:
     if lam > 30:  # aproximación normal para tasas altas
         return max(0, round(rng.gauss(lam, math.sqrt(lam))))
     limite, k, p = math.exp(-lam), 0, 1.0

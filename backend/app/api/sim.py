@@ -24,7 +24,7 @@ async def control(body: SimControl) -> SimEstadoOut:
     try:
         return await servicio.control(body)
     except ValueError as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
+        raise HTTPException(422, str(e)) from e
 
 
 @router.post("/api/sim/eventos", response_model=EventoOut, status_code=status.HTTP_201_CREATED)
@@ -32,7 +32,7 @@ async def inyectar_evento(body: EventoCreate) -> EventoOut:
     try:
         return servicio.evento(body)
     except ValueError as e:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
+        raise HTTPException(422, str(e)) from e
 
 
 @router.get("/api/sim/kpis", response_model=KpisResponse)
