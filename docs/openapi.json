@@ -1,0 +1,1937 @@
+{
+ "openapi": "3.1.0",
+ "info": {
+  "title": "Fluport API",
+  "description": "Datos sintéticos · SIMULACIÓN",
+  "version": "0.1.0"
+ },
+ "paths": {
+  "/api/accesos": {
+   "get": {
+    "tags": [
+     "accesos"
+    ],
+    "summary": "Listar Accesos",
+    "operationId": "listar_accesos_api_accesos_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/AccesoOut"
+         },
+         "type": "array",
+         "title": "Response Listar Accesos Api Accesos Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/accesos/estado": {
+   "get": {
+    "tags": [
+     "accesos"
+    ],
+    "summary": "Estado Accesos",
+    "operationId": "estado_accesos_api_accesos_estado_get",
+    "parameters": [
+     {
+      "name": "mundo",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "$ref": "#/components/schemas/Mundo",
+       "default": "B"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/AccesoEstado"
+         },
+         "title": "Response Estado Accesos Api Accesos Estado Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/pronostico": {
+   "get": {
+    "tags": [
+     "pronostico"
+    ],
+    "summary": "Pronostico",
+    "operationId": "pronostico_api_pronostico_get",
+    "parameters": [
+     {
+      "name": "acceso_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "description": "None = todos los accesos",
+       "title": "Acceso Id"
+      },
+      "description": "None = todos los accesos"
+     },
+     {
+      "name": "horas",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 24,
+       "minimum": 1,
+       "default": 12,
+       "title": "Horas"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/PronosticoOut"
+         },
+         "title": "Response Pronostico Api Pronostico Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/citas": {
+   "post": {
+    "tags": [
+     "citas"
+    ],
+    "summary": "Crear Cita",
+    "operationId": "crear_cita_api_citas_post",
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CitaCreate"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CitaOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "get": {
+    "tags": [
+     "citas"
+    ],
+    "summary": "Listar Citas",
+    "operationId": "listar_citas_api_citas_get",
+    "parameters": [
+     {
+      "name": "telefono",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Telefono"
+      }
+     },
+     {
+      "name": "transportista_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "integer"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Transportista Id"
+      }
+     },
+     {
+      "name": "acceso_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Acceso Id"
+      }
+     },
+     {
+      "name": "estado",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "$ref": "#/components/schemas/EstadoCita"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Estado"
+      }
+     },
+     {
+      "name": "limite",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 500,
+       "default": 100,
+       "title": "Limite"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/CitaOut"
+         },
+         "title": "Response Listar Citas Api Citas Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/citas/sugerencias": {
+   "post": {
+    "tags": [
+     "citas"
+    ],
+    "summary": "Sugerir Horarios",
+    "operationId": "sugerir_horarios_api_citas_sugerencias_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SugerenciaRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/Sugerencia"
+         },
+         "type": "array",
+         "title": "Response Sugerir Horarios Api Citas Sugerencias Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/citas/{cita_id}": {
+   "get": {
+    "tags": [
+     "citas"
+    ],
+    "summary": "Obtener Cita",
+    "operationId": "obtener_cita_api_citas__cita_id__get",
+    "parameters": [
+     {
+      "name": "cita_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Cita Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CitaOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "patch": {
+    "tags": [
+     "citas"
+    ],
+    "summary": "Reprogramar Cita",
+    "description": "Crea una cita nueva con `cita_anterior_id` y marca la original como `reprogramada`.",
+    "operationId": "reprogramar_cita_api_citas__cita_id__patch",
+    "parameters": [
+     {
+      "name": "cita_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Cita Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CitaReprogramar"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CitaOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "delete": {
+    "tags": [
+     "citas"
+    ],
+    "summary": "Cancelar Cita",
+    "operationId": "cancelar_cita_api_citas__cita_id__delete",
+    "parameters": [
+     {
+      "name": "cita_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "integer",
+       "title": "Cita Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/CitaOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/sim/control": {
+   "post": {
+    "tags": [
+     "simulacion"
+    ],
+    "summary": "Control",
+    "operationId": "control_api_sim_control_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/SimControl"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SimEstadoOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/sim/eventos": {
+   "post": {
+    "tags": [
+     "simulacion"
+    ],
+    "summary": "Inyectar Evento",
+    "operationId": "inyectar_evento_api_sim_eventos_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/EventoCreate"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/EventoOut"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/sim/kpis": {
+   "get": {
+    "tags": [
+     "simulacion"
+    ],
+    "summary": "Kpis",
+    "operationId": "kpis_api_sim_kpis_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/KpisResponse"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/sim/snapshot": {
+   "get": {
+    "tags": [
+     "simulacion"
+    ],
+    "summary": "Snapshot",
+    "description": "Respaldo por polling (cada 1 s) si el WebSocket falla.",
+    "operationId": "snapshot_api_sim_snapshot_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SimSnapshot"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/asistente/mensaje": {
+   "post": {
+    "tags": [
+     "asistente"
+    ],
+    "summary": "Mensaje",
+    "operationId": "mensaje_api_asistente_mensaje_post",
+    "requestBody": {
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AsistenteRequest"
+       }
+      }
+     },
+     "required": true
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AsistenteResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/webhook/whatsapp": {
+   "get": {
+    "tags": [
+     "asistente"
+    ],
+    "summary": "Verificar Whatsapp",
+    "description": "Verificación del webhook de WhatsApp Cloud API.",
+    "operationId": "verificar_whatsapp_webhook_whatsapp_get",
+    "parameters": [
+     {
+      "name": "hub.mode",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Hub.Mode"
+      }
+     },
+     {
+      "name": "hub.verify_token",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Hub.Verify Token"
+      }
+     },
+     {
+      "name": "hub.challenge",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "title": "Hub.Challenge"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "text/plain": {
+        "schema": {
+         "type": "string"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   },
+   "post": {
+    "tags": [
+     "asistente"
+    ],
+    "summary": "Recibir Whatsapp",
+    "operationId": "recibir_whatsapp_webhook_whatsapp_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Recibir Whatsapp Webhook Whatsapp Post"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/webhook/telegram": {
+   "post": {
+    "tags": [
+     "asistente"
+    ],
+    "summary": "Recibir Telegram",
+    "operationId": "recibir_telegram_webhook_telegram_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Recibir Telegram Webhook Telegram Post"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/publico/zonas": {
+   "get": {
+    "tags": [
+     "publico"
+    ],
+    "summary": "Zonas",
+    "operationId": "zonas_api_publico_zonas_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "items": {
+          "$ref": "#/components/schemas/ZonaPublica"
+         },
+         "type": "array",
+         "title": "Response Zonas Api Publico Zonas Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/salud": {
+   "get": {
+    "tags": [
+     "salud"
+    ],
+    "summary": "Salud",
+    "operationId": "salud_api_salud_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Salud"
+        }
+       }
+      }
+     }
+    }
+   }
+  }
+ },
+ "components": {
+  "schemas": {
+   "AccesoEstado": {
+    "properties": {
+     "acceso_id": {
+      "type": "string",
+      "title": "Acceso Id"
+     },
+     "estado": {
+      "$ref": "#/components/schemas/EstadoAcceso"
+     },
+     "en_fila": {
+      "type": "integer",
+      "title": "En Fila"
+     },
+     "en_revision": {
+      "type": "integer",
+      "title": "En Revision"
+     },
+     "espera_min": {
+      "type": "number",
+      "title": "Espera Min"
+     },
+     "semaforo": {
+      "$ref": "#/components/schemas/Semaforo"
+     },
+     "atendidos_hora": {
+      "type": "number",
+      "title": "Atendidos Hora"
+     }
+    },
+    "type": "object",
+    "required": [
+     "acceso_id",
+     "estado",
+     "en_fila",
+     "en_revision",
+     "espera_min",
+     "semaforo",
+     "atendidos_hora"
+    ],
+    "title": "AccesoEstado",
+    "description": "Estado instantáneo de un acceso en un mundo de la simulación."
+   },
+   "AccesoOut": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "nombre": {
+      "type": "string",
+      "title": "Nombre"
+     },
+     "zona": {
+      "type": "string",
+      "title": "Zona"
+     },
+     "lat": {
+      "type": "number",
+      "title": "Lat"
+     },
+     "lon": {
+      "type": "number",
+      "title": "Lon"
+     },
+     "carriles": {
+      "type": "integer",
+      "title": "Carriles"
+     },
+     "tiempo_servicio_min": {
+      "type": "number",
+      "title": "Tiempo Servicio Min"
+     },
+     "capacidad_hora": {
+      "type": "integer",
+      "title": "Capacidad Hora"
+     },
+     "estado": {
+      "$ref": "#/components/schemas/EstadoAcceso"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "nombre",
+     "zona",
+     "lat",
+     "lon",
+     "carriles",
+     "tiempo_servicio_min",
+     "capacidad_hora",
+     "estado"
+    ],
+    "title": "AccesoOut"
+   },
+   "AccionAsistente": {
+    "properties": {
+     "herramienta": {
+      "type": "string",
+      "title": "Herramienta"
+     },
+     "resultado": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Resultado"
+     }
+    },
+    "type": "object",
+    "required": [
+     "herramienta",
+     "resultado"
+    ],
+    "title": "AccionAsistente"
+   },
+   "AsistenteRequest": {
+    "properties": {
+     "canal": {
+      "$ref": "#/components/schemas/Canal"
+     },
+     "remitente": {
+      "type": "string",
+      "title": "Remitente"
+     },
+     "texto": {
+      "type": "string",
+      "title": "Texto"
+     }
+    },
+    "type": "object",
+    "required": [
+     "canal",
+     "remitente",
+     "texto"
+    ],
+    "title": "AsistenteRequest"
+   },
+   "AsistenteResponse": {
+    "properties": {
+     "respuesta": {
+      "type": "string",
+      "title": "Respuesta"
+     },
+     "acciones": {
+      "items": {
+       "$ref": "#/components/schemas/AccionAsistente"
+      },
+      "type": "array",
+      "title": "Acciones",
+      "default": []
+     }
+    },
+    "type": "object",
+    "required": [
+     "respuesta"
+    ],
+    "title": "AsistenteResponse"
+   },
+   "CamionEstado": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "title": "Id"
+     },
+     "acceso_id": {
+      "type": "string",
+      "title": "Acceso Id"
+     },
+     "ruta_id": {
+      "type": "string",
+      "title": "Ruta Id"
+     },
+     "progreso": {
+      "type": "number",
+      "maximum": 1.0,
+      "minimum": 0.0,
+      "title": "Progreso"
+     },
+     "estado": {
+      "$ref": "#/components/schemas/EstadoCamion"
+     },
+     "tipo_carga": {
+      "$ref": "#/components/schemas/TipoCarga"
+     },
+     "cita_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cita Id"
+     },
+     "es_demo": {
+      "type": "boolean",
+      "title": "Es Demo",
+      "default": false
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "acceso_id",
+     "ruta_id",
+     "progreso",
+     "estado",
+     "tipo_carga"
+    ],
+    "title": "CamionEstado"
+   },
+   "Canal": {
+    "type": "string",
+    "enum": [
+     "whatsapp",
+     "telegram",
+     "web"
+    ],
+    "title": "Canal"
+   },
+   "CitaCreate": {
+    "properties": {
+     "telefono": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Telefono",
+      "description": "Identifica/crea al transportista (solo números del equipo)"
+     },
+     "transportista_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Transportista Id"
+     },
+     "alias": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Alias"
+     },
+     "acceso_id": {
+      "type": "string",
+      "title": "Acceso Id"
+     },
+     "ventana_inicio": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Ventana Inicio"
+     },
+     "ventana_fin": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Ventana Fin"
+     },
+     "tipo_carga": {
+      "$ref": "#/components/schemas/TipoCarga"
+     },
+     "origen": {
+      "$ref": "#/components/schemas/OrigenCita",
+      "default": "web"
+     }
+    },
+    "type": "object",
+    "required": [
+     "acceso_id",
+     "ventana_inicio",
+     "ventana_fin",
+     "tipo_carga"
+    ],
+    "title": "CitaCreate"
+   },
+   "CitaOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "transportista_id": {
+      "type": "integer",
+      "title": "Transportista Id"
+     },
+     "acceso_id": {
+      "type": "string",
+      "title": "Acceso Id"
+     },
+     "ventana_inicio": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Ventana Inicio"
+     },
+     "ventana_fin": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Ventana Fin"
+     },
+     "tipo_carga": {
+      "$ref": "#/components/schemas/TipoCarga"
+     },
+     "prioridad": {
+      "type": "integer",
+      "title": "Prioridad"
+     },
+     "estado": {
+      "$ref": "#/components/schemas/EstadoCita"
+     },
+     "origen": {
+      "$ref": "#/components/schemas/OrigenCita"
+     },
+     "espera_estimada_min": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Espera Estimada Min"
+     },
+     "cita_anterior_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cita Anterior Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "transportista_id",
+     "acceso_id",
+     "ventana_inicio",
+     "ventana_fin",
+     "tipo_carga",
+     "prioridad",
+     "estado",
+     "origen",
+     "espera_estimada_min",
+     "cita_anterior_id"
+    ],
+    "title": "CitaOut"
+   },
+   "CitaReprogramar": {
+    "properties": {
+     "acceso_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Acceso Id"
+     },
+     "ventana_inicio": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Ventana Inicio"
+     },
+     "ventana_fin": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Ventana Fin"
+     }
+    },
+    "type": "object",
+    "required": [
+     "ventana_inicio",
+     "ventana_fin"
+    ],
+    "title": "CitaReprogramar"
+   },
+   "Clima": {
+    "type": "string",
+    "enum": [
+     "normal",
+     "lluvia",
+     "norte"
+    ],
+    "title": "Clima"
+   },
+   "EstadoAcceso": {
+    "type": "string",
+    "enum": [
+     "abierto",
+     "cerrado"
+    ],
+    "title": "EstadoAcceso"
+   },
+   "EstadoCamion": {
+    "type": "string",
+    "enum": [
+     "en_ruta",
+     "en_fila",
+     "en_revision",
+     "dentro",
+     "saliendo"
+    ],
+    "title": "EstadoCamion"
+   },
+   "EstadoCita": {
+    "type": "string",
+    "enum": [
+     "agendada",
+     "en_ruta",
+     "cumplida",
+     "no_show",
+     "reprogramada",
+     "cancelada"
+    ],
+    "title": "EstadoCita"
+   },
+   "EstadoSim": {
+    "type": "string",
+    "enum": [
+     "corriendo",
+     "pausada",
+     "detenida"
+    ],
+    "title": "EstadoSim"
+   },
+   "EventoCreate": {
+    "properties": {
+     "tipo": {
+      "$ref": "#/components/schemas/TipoEventoSim"
+     },
+     "acceso_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Acceso Id"
+     },
+     "payload": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Payload",
+      "description": "buque_atraca: {contenedores, terminal}; norte: {duracion_h, factor_servicio}; cierre_acceso/reapertura: {}; carga_urgente: {camiones, tipo_carga}"
+     }
+    },
+    "type": "object",
+    "required": [
+     "tipo"
+    ],
+    "title": "EventoCreate"
+   },
+   "EventoOut": {
+    "properties": {
+     "id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Id"
+     },
+     "tipo": {
+      "$ref": "#/components/schemas/TipoEventoSim"
+     },
+     "acceso_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Acceso Id"
+     },
+     "ts_sim": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Ts Sim"
+     },
+     "payload": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Payload",
+      "default": {}
+     }
+    },
+    "type": "object",
+    "required": [
+     "tipo",
+     "ts_sim"
+    ],
+    "title": "EventoOut"
+   },
+   "FranjaPronostico": {
+    "properties": {
+     "inicio": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Inicio"
+     },
+     "espera_min": {
+      "type": "number",
+      "title": "Espera Min"
+     },
+     "semaforo": {
+      "$ref": "#/components/schemas/Semaforo"
+     }
+    },
+    "type": "object",
+    "required": [
+     "inicio",
+     "espera_min",
+     "semaforo"
+    ],
+    "title": "FranjaPronostico"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "type": "array",
+      "title": "Detail"
+     }
+    },
+    "type": "object",
+    "title": "HTTPValidationError"
+   },
+   "HoraPico": {
+    "properties": {
+     "inicio": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Inicio"
+     },
+     "fin": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Fin"
+     },
+     "semaforo": {
+      "$ref": "#/components/schemas/Semaforo"
+     }
+    },
+    "type": "object",
+    "required": [
+     "inicio",
+     "fin",
+     "semaforo"
+    ],
+    "title": "HoraPico"
+   },
+   "Kpis": {
+    "properties": {
+     "espera_prom_min": {
+      "type": "number",
+      "title": "Espera Prom Min"
+     },
+     "espera_max_min": {
+      "type": "number",
+      "title": "Espera Max Min"
+     },
+     "horas_camion_espera": {
+      "type": "number",
+      "title": "Horas Camion Espera"
+     },
+     "camiones_atendidos": {
+      "type": "integer",
+      "title": "Camiones Atendidos"
+     },
+     "pico_fila": {
+      "type": "integer",
+      "title": "Pico Fila"
+     }
+    },
+    "type": "object",
+    "required": [
+     "espera_prom_min",
+     "espera_max_min",
+     "horas_camion_espera",
+     "camiones_atendidos",
+     "pico_fila"
+    ],
+    "title": "Kpis"
+   },
+   "KpisComparacion": {
+    "properties": {
+     "horas_ahorradas": {
+      "type": "number",
+      "title": "Horas Ahorradas"
+     },
+     "diesel_l_evitado": {
+      "type": "number",
+      "title": "Diesel L Evitado"
+     },
+     "costo_mxn_evitado": {
+      "type": "number",
+      "title": "Costo Mxn Evitado"
+     },
+     "co2_kg_evitado": {
+      "type": "number",
+      "title": "Co2 Kg Evitado"
+     },
+     "reduccion_espera_pct": {
+      "type": "number",
+      "title": "Reduccion Espera Pct"
+     },
+     "reduccion_pico_fila_pct": {
+      "type": "number",
+      "title": "Reduccion Pico Fila Pct"
+     }
+    },
+    "type": "object",
+    "required": [
+     "horas_ahorradas",
+     "diesel_l_evitado",
+     "costo_mxn_evitado",
+     "co2_kg_evitado",
+     "reduccion_espera_pct",
+     "reduccion_pico_fila_pct"
+    ],
+    "title": "KpisComparacion",
+    "description": "Diferencia A − B, calculada (no supuesta)."
+   },
+   "KpisResponse": {
+    "properties": {
+     "ts_sim": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Ts Sim"
+     },
+     "A": {
+      "$ref": "#/components/schemas/Kpis"
+     },
+     "B": {
+      "$ref": "#/components/schemas/Kpis"
+     },
+     "comparacion": {
+      "$ref": "#/components/schemas/KpisComparacion"
+     }
+    },
+    "type": "object",
+    "required": [
+     "ts_sim",
+     "A",
+     "B",
+     "comparacion"
+    ],
+    "title": "KpisResponse"
+   },
+   "Mundo": {
+    "type": "string",
+    "enum": [
+     "A",
+     "B"
+    ],
+    "title": "Mundo"
+   },
+   "MundoEstado": {
+    "properties": {
+     "camiones": {
+      "items": {
+       "$ref": "#/components/schemas/CamionEstado"
+      },
+      "type": "array",
+      "title": "Camiones"
+     },
+     "camiones_ocultos": {
+      "type": "integer",
+      "title": "Camiones Ocultos",
+      "default": 0
+     },
+     "accesos": {
+      "items": {
+       "$ref": "#/components/schemas/AccesoEstado"
+      },
+      "type": "array",
+      "title": "Accesos"
+     },
+     "kpis": {
+      "$ref": "#/components/schemas/Kpis"
+     }
+    },
+    "type": "object",
+    "required": [
+     "camiones",
+     "accesos",
+     "kpis"
+    ],
+    "title": "MundoEstado"
+   },
+   "OrigenCita": {
+    "type": "string",
+    "enum": [
+     "web",
+     "whatsapp",
+     "telegram",
+     "asistente",
+     "simulador"
+    ],
+    "title": "OrigenCita"
+   },
+   "PronosticoOut": {
+    "properties": {
+     "acceso_id": {
+      "type": "string",
+      "title": "Acceso Id"
+     },
+     "generado_en": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Generado En"
+     },
+     "modelo_version": {
+      "type": "string",
+      "title": "Modelo Version"
+     },
+     "franja_min": {
+      "type": "integer",
+      "title": "Franja Min",
+      "default": 30
+     },
+     "franjas": {
+      "items": {
+       "$ref": "#/components/schemas/FranjaPronostico"
+      },
+      "type": "array",
+      "title": "Franjas"
+     }
+    },
+    "type": "object",
+    "required": [
+     "acceso_id",
+     "generado_en",
+     "modelo_version",
+     "franjas"
+    ],
+    "title": "PronosticoOut"
+   },
+   "Salud": {
+    "properties": {
+     "estado": {
+      "type": "string",
+      "const": "ok",
+      "title": "Estado",
+      "default": "ok"
+     },
+     "bd": {
+      "type": "boolean",
+      "title": "Bd"
+     },
+     "simulador": {
+      "$ref": "#/components/schemas/EstadoSim"
+     },
+     "version": {
+      "type": "string",
+      "title": "Version"
+     }
+    },
+    "type": "object",
+    "required": [
+     "bd",
+     "simulador",
+     "version"
+    ],
+    "title": "Salud"
+   },
+   "Semaforo": {
+    "type": "string",
+    "enum": [
+     "verde",
+     "amarillo",
+     "rojo"
+    ],
+    "title": "Semaforo"
+   },
+   "SimControl": {
+    "properties": {
+     "accion": {
+      "type": "string",
+      "enum": [
+       "play",
+       "pause",
+       "velocidad",
+       "reset"
+      ],
+      "title": "Accion"
+     },
+     "velocidad": {
+      "anyOf": [
+       {
+        "type": "number",
+        "exclusiveMinimum": 0.0
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Velocidad"
+     },
+     "semilla": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Semilla"
+     }
+    },
+    "type": "object",
+    "required": [
+     "accion"
+    ],
+    "title": "SimControl"
+   },
+   "SimEstadoOut": {
+    "properties": {
+     "corrida_id": {
+      "type": "integer",
+      "title": "Corrida Id"
+     },
+     "estado": {
+      "$ref": "#/components/schemas/EstadoSim"
+     },
+     "velocidad": {
+      "type": "number",
+      "title": "Velocidad"
+     },
+     "semilla": {
+      "type": "integer",
+      "title": "Semilla"
+     },
+     "ts_sim": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Ts Sim"
+     }
+    },
+    "type": "object",
+    "required": [
+     "corrida_id",
+     "estado",
+     "velocidad",
+     "semilla",
+     "ts_sim"
+    ],
+    "title": "SimEstadoOut"
+   },
+   "SimSnapshot": {
+    "properties": {
+     "corrida_id": {
+      "type": "integer",
+      "title": "Corrida Id"
+     },
+     "tick": {
+      "type": "integer",
+      "title": "Tick"
+     },
+     "ts_sim": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Ts Sim"
+     },
+     "velocidad": {
+      "type": "number",
+      "title": "Velocidad"
+     },
+     "estado": {
+      "$ref": "#/components/schemas/EstadoSim"
+     },
+     "clima": {
+      "$ref": "#/components/schemas/Clima"
+     },
+     "mundos": {
+      "additionalProperties": {
+       "$ref": "#/components/schemas/MundoEstado"
+      },
+      "propertyNames": {
+       "$ref": "#/components/schemas/Mundo"
+      },
+      "type": "object",
+      "title": "Mundos"
+     },
+     "comparacion": {
+      "$ref": "#/components/schemas/KpisComparacion"
+     },
+     "eventos_recientes": {
+      "items": {
+       "$ref": "#/components/schemas/EventoOut"
+      },
+      "type": "array",
+      "title": "Eventos Recientes",
+      "default": []
+     },
+     "etiqueta": {
+      "type": "string",
+      "title": "Etiqueta",
+      "default": "SIMULACIÓN"
+     }
+    },
+    "type": "object",
+    "required": [
+     "corrida_id",
+     "tick",
+     "ts_sim",
+     "velocidad",
+     "estado",
+     "clima",
+     "mundos",
+     "comparacion"
+    ],
+    "title": "SimSnapshot"
+   },
+   "Sugerencia": {
+    "properties": {
+     "acceso_id": {
+      "type": "string",
+      "title": "Acceso Id"
+     },
+     "inicio": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Inicio"
+     },
+     "fin": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Fin"
+     },
+     "espera_min_est": {
+      "type": "number",
+      "title": "Espera Min Est"
+     },
+     "semaforo": {
+      "$ref": "#/components/schemas/Semaforo"
+     },
+     "ahorro_vs_pico_min": {
+      "anyOf": [
+       {
+        "type": "number"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Ahorro Vs Pico Min"
+     }
+    },
+    "type": "object",
+    "required": [
+     "acceso_id",
+     "inicio",
+     "fin",
+     "espera_min_est",
+     "semaforo"
+    ],
+    "title": "Sugerencia"
+   },
+   "SugerenciaRequest": {
+    "properties": {
+     "acceso_id": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Acceso Id",
+      "description": "None = considerar todos los accesos abiertos"
+     },
+     "desde": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Desde"
+     },
+     "hasta": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Hasta"
+     },
+     "tipo_carga": {
+      "$ref": "#/components/schemas/TipoCarga"
+     },
+     "duracion_min": {
+      "type": "integer",
+      "title": "Duracion Min",
+      "default": 30
+     },
+     "max_resultados": {
+      "type": "integer",
+      "maximum": 10.0,
+      "minimum": 1.0,
+      "title": "Max Resultados",
+      "default": 3
+     }
+    },
+    "type": "object",
+    "required": [
+     "desde",
+     "hasta",
+     "tipo_carga"
+    ],
+    "title": "SugerenciaRequest"
+   },
+   "TipoCarga": {
+    "type": "string",
+    "enum": [
+     "contenedor_20",
+     "contenedor_40",
+     "refrigerado",
+     "peligroso",
+     "granel",
+     "carga_general"
+    ],
+    "title": "TipoCarga"
+   },
+   "TipoEventoSim": {
+    "type": "string",
+    "enum": [
+     "buque_atraca",
+     "norte",
+     "cierre_acceso",
+     "reapertura",
+     "carga_urgente",
+     "personalizado"
+    ],
+    "title": "TipoEventoSim"
+   },
+   "ValidationError": {
+    "properties": {
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "type": "array",
+      "title": "Location"
+     },
+     "msg": {
+      "type": "string",
+      "title": "Message"
+     },
+     "type": {
+      "type": "string",
+      "title": "Error Type"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "ctx": {
+      "type": "object",
+      "title": "Context"
+     }
+    },
+    "type": "object",
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError"
+   },
+   "ZonaPublica": {
+    "properties": {
+     "zona": {
+      "type": "string",
+      "title": "Zona"
+     },
+     "semaforo": {
+      "$ref": "#/components/schemas/Semaforo"
+     },
+     "espera_min": {
+      "type": "number",
+      "title": "Espera Min"
+     },
+     "horas_pico": {
+      "items": {
+       "$ref": "#/components/schemas/HoraPico"
+      },
+      "type": "array",
+      "title": "Horas Pico"
+     },
+     "actualizado_en": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Actualizado En"
+     },
+     "etiqueta": {
+      "type": "string",
+      "title": "Etiqueta",
+      "default": "SIMULACIÓN"
+     }
+    },
+    "type": "object",
+    "required": [
+     "zona",
+     "semaforo",
+     "espera_min",
+     "horas_pico",
+     "actualizado_en"
+    ],
+    "title": "ZonaPublica"
+   }
+  }
+ }
+}

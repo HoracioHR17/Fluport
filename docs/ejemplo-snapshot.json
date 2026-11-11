@@ -1,0 +1,135 @@
+{
+  "tipo": "snapshot",
+  "data": {
+    "corrida_id": 1,
+    "tick": 570,
+    "ts_sim": "2026-11-12T09:30:00-06:00",
+    "velocidad": 60.0,
+    "estado": "corriendo",
+    "clima": "normal",
+    "mundos": {
+      "A": {
+        "camiones": [
+          {
+            "id": "T-0001",
+            "acceso_id": "A1",
+            "ruta_id": "R-A1-norte",
+            "progreso": 0.42,
+            "estado": "en_ruta",
+            "tipo_carga": "contenedor_40",
+            "cita_id": null,
+            "es_demo": false
+          },
+          {
+            "id": "T-0002",
+            "acceso_id": "A2",
+            "ruta_id": "R-A2-sur",
+            "progreso": 1.0,
+            "estado": "en_fila",
+            "tipo_carga": "refrigerado",
+            "cita_id": 17,
+            "es_demo": true
+          }
+        ],
+        "camiones_ocultos": 0,
+        "accesos": [
+          {
+            "acceso_id": "A1",
+            "estado": "abierto",
+            "en_fila": 38,
+            "en_revision": 3,
+            "espera_min": 52.5,
+            "semaforo": "rojo",
+            "atendidos_hora": 42.0
+          },
+          {
+            "acceso_id": "A2",
+            "estado": "cerrado",
+            "en_fila": 0,
+            "en_revision": 0,
+            "espera_min": 0.0,
+            "semaforo": "verde",
+            "atendidos_hora": 0.0
+          }
+        ],
+        "kpis": {
+          "espera_prom_min": 42.0,
+          "espera_max_min": 84.0,
+          "horas_camion_espera": 117.8,
+          "camiones_atendidos": 310,
+          "pico_fila": 50
+        }
+      },
+      "B": {
+        "camiones": [
+          {
+            "id": "T-0001",
+            "acceso_id": "A1",
+            "ruta_id": "R-A1-norte",
+            "progreso": 0.42,
+            "estado": "en_ruta",
+            "tipo_carga": "contenedor_40",
+            "cita_id": null,
+            "es_demo": false
+          },
+          {
+            "id": "T-0002",
+            "acceso_id": "A2",
+            "ruta_id": "R-A2-sur",
+            "progreso": 1.0,
+            "estado": "en_fila",
+            "tipo_carga": "refrigerado",
+            "cita_id": 17,
+            "es_demo": true
+          }
+        ],
+        "camiones_ocultos": 0,
+        "accesos": [
+          {
+            "acceso_id": "A1",
+            "estado": "abierto",
+            "en_fila": 14,
+            "en_revision": 3,
+            "espera_min": 18.0,
+            "semaforo": "verde",
+            "atendidos_hora": 42.0
+          },
+          {
+            "acceso_id": "A2",
+            "estado": "cerrado",
+            "en_fila": 0,
+            "en_revision": 0,
+            "espera_min": 0.0,
+            "semaforo": "verde",
+            "atendidos_hora": 0.0
+          }
+        ],
+        "kpis": {
+          "espera_prom_min": 14.4,
+          "espera_max_min": 28.8,
+          "horas_camion_espera": 43.4,
+          "camiones_atendidos": 310,
+          "pico_fila": 26
+        }
+      }
+    },
+    "comparacion": {
+      "horas_ahorradas": 73.5,
+      "diesel_l_evitado": 183.8,
+      "costo_mxn_evitado": 4778.0,
+      "co2_kg_evitado": 492.5,
+      "reduccion_espera_pct": 65.7,
+      "reduccion_pico_fila_pct": 52.0
+    },
+    "eventos_recientes": [
+      {
+        "id": 3,
+        "tipo": "cierre_acceso",
+        "acceso_id": "A2",
+        "ts_sim": "2026-11-12T09:10:00-06:00",
+        "payload": {}
+      }
+    ],
+    "etiqueta": "SIMULACIÓN"
+  }
+}

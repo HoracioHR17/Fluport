@@ -1,0 +1,105 @@
+"""Enumeraciones compartidas por BD, API y WebSocket (contrato M0)."""
+from enum import StrEnum
+
+
+class EstadoAcceso(StrEnum):
+    abierto = "abierto"
+    cerrado = "cerrado"
+
+
+class TipoCarga(StrEnum):
+    contenedor_20 = "contenedor_20"
+    contenedor_40 = "contenedor_40"
+    refrigerado = "refrigerado"
+    peligroso = "peligroso"
+    granel = "granel"
+    carga_general = "carga_general"
+
+
+class EstadoCita(StrEnum):
+    agendada = "agendada"
+    en_ruta = "en_ruta"
+    cumplida = "cumplida"
+    no_show = "no_show"
+    reprogramada = "reprogramada"
+    cancelada = "cancelada"
+
+
+class OrigenCita(StrEnum):
+    web = "web"
+    whatsapp = "whatsapp"
+    telegram = "telegram"
+    asistente = "asistente"
+    simulador = "simulador"
+
+
+class Mundo(StrEnum):
+    A = "A"  # sin Fluport (llegada libre)
+    B = "B"  # con Fluport (llegada según cita sugerida)
+
+
+class EstadoCamion(StrEnum):
+    en_ruta = "en_ruta"
+    en_fila = "en_fila"
+    en_revision = "en_revision"
+    dentro = "dentro"
+    saliendo = "saliendo"
+
+
+class Semaforo(StrEnum):
+    verde = "verde"
+    amarillo = "amarillo"
+    rojo = "rojo"
+
+
+class EstadoBuque(StrEnum):
+    programado = "programado"
+    atracado = "atracado"
+    zarpado = "zarpado"
+
+
+class TipoEventoSim(StrEnum):
+    buque_atraca = "buque_atraca"
+    norte = "norte"
+    cierre_acceso = "cierre_acceso"
+    reapertura = "reapertura"
+    carga_urgente = "carga_urgente"
+    personalizado = "personalizado"  # reservado para el giro del jueves
+
+
+class EstadoSim(StrEnum):
+    corriendo = "corriendo"
+    pausada = "pausada"
+    detenida = "detenida"
+
+
+class TipoCorrida(StrEnum):
+    vivo = "vivo"
+    historico = "historico"
+
+
+class Canal(StrEnum):
+    whatsapp = "whatsapp"
+    telegram = "telegram"
+    web = "web"
+
+
+class EstadoAviso(StrEnum):
+    pendiente = "pendiente"
+    enviado = "enviado"
+    fallido = "fallido"
+
+
+class Clima(StrEnum):
+    normal = "normal"
+    lluvia = "lluvia"
+    norte = "norte"
+
+
+def semaforo_de(espera_min: float, amarillo: float = 20.0, rojo: float = 45.0) -> Semaforo:
+    """Regla única del semáforo: <amarillo verde, <=rojo amarillo, >rojo rojo."""
+    if espera_min < amarillo:
+        return Semaforo.verde
+    if espera_min <= rojo:
+        return Semaforo.amarillo
+    return Semaforo.rojo

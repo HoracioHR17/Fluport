@@ -1,0 +1,19 @@
+# Fluport — dependencias del backend (instalar solo con pip dentro de .venv)
+# API y tiempo real
+fastapi==0.162.4
+uvicorn[standard]==0.54.0
+# Simulación
+simpy==4.1.2
+# Base de datos (PostgreSQL)
+SQLAlchemy==2.1.8
+alembic==1.20.1
+psycopg[binary]==3.3.8
+# Configuración
+pydantic-settings==2.16.2
+python-dotenv==1.2.4
+# Predicción
+pandas==3.1.1
+scikit-learn==1.9.1
+# HTTP saliente (WhatsApp Cloud API) y asistente IA
+httpx==0.28.1
+anthropic==2.8.0

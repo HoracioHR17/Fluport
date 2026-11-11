@@ -1,0 +1,289 @@
+"""Payloads REST y WebSocket de Fluport (contrato M0).
+
+Convenciones:
+- Fechas en ISO 8601 con zona horaria (hora de Veracruz, -06:00). Los tiempos `*_sim` son tiempo simulado.
+- Minutos como float. Distancias/progreso de ruta 0..1.
+- Nombres en español y snake_case.
+"""
+from datetime import datetime
+from typing import Annotated, Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.contracts.enums import (
+    Canal,
+    Clima,
+    EstadoAcceso,
+    EstadoCamion,
+    EstadoCita,
+    EstadoSim,
+    Mundo,
+    OrigenCita,
+    Semaforo,
+    TipoCarga,
+    TipoEventoSim,
+)
+
+
+class Modelo(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+
+# ───────────────────────────── Accesos ─────────────────────────────
+class AccesoOut(Modelo):
+    id: str
+    nombre: str
+    zona: str
+    lat: float
+    lon: float
+    carriles: int
+    tiempo_servicio_min: float
+    capacidad_hora: int
+    estado: EstadoAcceso
+
+
+class AccesoEstado(Modelo):
+    """Estado instantáneo de un acceso en un mundo de la simulación."""
+
+    acceso_id: str
+    estado: EstadoAcceso
+    en_fila: int
+    en_revision: int
+    espera_min: float
+    semaforo: Semaforo
+    atendidos_hora: float
+
+
+# ───────────────────────────── Pronóstico (M2) ─────────────────────────────
+class FranjaPronostico(Modelo):
+    inicio: datetime
+    espera_min: float
+    semaforo: Semaforo
+
+
+class PronosticoOut(Modelo):
+    acceso_id: str
+    generado_en: datetime
+    modelo_version: str
+    franja_min: int = 30
+    franjas: list[FranjaPronostico]  # próximas 12 h
+
+
+# ───────────────────────────── Citas (M3) ─────────────────────────────
+class CitaCreate(Modelo):
+    telefono: str | None = Field(None, description="Identifica/crea al transportista (solo números del equipo)")
+    transportista_id: int | None = None
+    alias: str | None = None
+    acceso_id: str
+    ventana_inicio: datetime
+    ventana_fin: datetime
+    tipo_carga: TipoCarga
+    origen: OrigenCita = OrigenCita.web
+
+    @model_validator(mode="after")
+    def _validar(self) -> "CitaCreate":
+        if self.ventana_fin <= self.ventana_inicio:
+            raise ValueError("ventana_fin debe ser posterior a ventana_inicio")
+        if self.telefono is None and self.transportista_id is None:
+            raise ValueError("se requiere telefono o transportista_id")
+        return self
+
+
+class CitaReprogramar(Modelo):
+    acceso_id: str | None = None
+    ventana_inicio: datetime
+    ventana_fin: datetime
+
+
+class CitaOut(Modelo):
+    id: int
+    transportista_id: int
+    acceso_id: str
+    ventana_inicio: datetime
+    ventana_fin: datetime
+    tipo_carga: TipoCarga
+    prioridad: int
+    estado: EstadoCita
+    origen: OrigenCita
+    espera_estimada_min: float | None
+    cita_anterior_id: int | None
+
+
+class SugerenciaRequest(Modelo):
+    acceso_id: str | None = Field(None, description="None = considerar todos los accesos abiertos")
+    desde: datetime
+    hasta: datetime
+    tipo_carga: TipoCarga
+    duracion_min: int = 30
+    max_resultados: int = Field(3, ge=1, le=10)
+
+
+class Sugerencia(Modelo):
+    acceso_id: str
+    inicio: datetime
+    fin: datetime
+    espera_min_est: float
+    semaforo: Semaforo
+    ahorro_vs_pico_min: float | None = None
+
+
+# ───────────────────────────── Simulación (M1) ─────────────────────────────
+class CamionEstado(Modelo):
+    id: str
+    acceso_id: str
+    ruta_id: str
+    progreso: float = Field(ge=0, le=1)  # 0..1 sobre la polilínea de la ruta; el front interpola
+    estado: EstadoCamion
+    tipo_carga: TipoCarga
+    cita_id: int | None = None
+    es_demo: bool = False
+
+
+class Kpis(Modelo):
+    espera_prom_min: float
+    espera_max_min: float
+    horas_camion_espera: float
+    camiones_atendidos: int
+    pico_fila: int
+
+
+class KpisComparacion(Modelo):
+    """Diferencia A − B, calculada (no supuesta)."""
+
+    horas_ahorradas: float
+    diesel_l_evitado: float
+    costo_mxn_evitado: float
+    co2_kg_evitado: float
+    reduccion_espera_pct: float
+    reduccion_pico_fila_pct: float
+
+
+class MundoEstado(Modelo):
+    camiones: list[CamionEstado]  # tope = sim_max_camiones_visibles
+    camiones_ocultos: int = 0
+    accesos: list[AccesoEstado]
+    kpis: Kpis
+
+
+class EventoOut(Modelo):
+    id: int | None = None
+    tipo: TipoEventoSim
+    acceso_id: str | None = None
+    ts_sim: datetime
+    payload: dict[str, Any] = {}
+
+
+class SimSnapshot(Modelo):
+    corrida_id: int
+    tick: int
+    ts_sim: datetime
+    velocidad: float
+    estado: EstadoSim
+    clima: Clima
+    mundos: dict[Mundo, MundoEstado]  # claves "A" y "B"
+    comparacion: KpisComparacion
+    eventos_recientes: list[EventoOut] = []
+    etiqueta: str = "SIMULACIÓN"
+
+
+class SimControl(Modelo):
+    accion: Literal["play", "pause", "velocidad", "reset"]
+    velocidad: float | None = Field(None, gt=0)
+    semilla: int | None = None
+
+
+class SimEstadoOut(Modelo):
+    corrida_id: int
+    estado: EstadoSim
+    velocidad: float
+    semilla: int
+    ts_sim: datetime
+
+
+class EventoCreate(Modelo):
+    tipo: TipoEventoSim
+    acceso_id: str | None = None
+    payload: dict[str, Any] = Field(
+        default_factory=dict,
+        description="buque_atraca: {contenedores, terminal}; norte: {duracion_h, factor_servicio}; "
+        "cierre_acceso/reapertura: {}; carga_urgente: {camiones, tipo_carga}",
+    )
+
+
+class KpisResponse(Modelo):
+    ts_sim: datetime
+    A: Kpis
+    B: Kpis
+    comparacion: KpisComparacion
+
+
+# ───────────────────────────── Mensajes WebSocket ─────────────────────────────
+class WsSnapshot(Modelo):
+    tipo: Literal["snapshot"] = "snapshot"
+    data: SimSnapshot
+
+
+class WsEvento(Modelo):
+    tipo: Literal["evento"] = "evento"
+    data: EventoOut
+
+
+class WsAviso(Modelo):
+    tipo: Literal["aviso"] = "aviso"
+    data: "AvisoOut"
+
+
+WsMensaje = Annotated[WsSnapshot | WsEvento | WsAviso, Field(discriminator="tipo")]
+
+
+# ───────────────────────────── Asistente (M4) y avisos (M5) ─────────────────────────────
+class AsistenteRequest(Modelo):
+    canal: Canal
+    remitente: str  # teléfono o id de chat
+    texto: str
+
+
+class AccionAsistente(Modelo):
+    herramienta: str  # consultar_espera | sugerir_horario | crear_cita | reprogramar_cita | cancelar_cita
+    resultado: dict[str, Any]
+
+
+class AsistenteResponse(Modelo):
+    respuesta: str
+    acciones: list[AccionAsistente] = []
+
+
+class AvisoOut(Modelo):
+    id: int
+    transportista_id: int
+    cita_id: int | None
+    canal: Canal
+    tipo: str
+    mensaje: str
+    creado_en: datetime
+
+
+WsAviso.model_rebuild()
+
+
+# ───────────────────────────── Vista pública (M7) ─────────────────────────────
+class HoraPico(Modelo):
+    inicio: datetime
+    fin: datetime
+    semaforo: Semaforo
+
+
+class ZonaPublica(Modelo):
+    zona: str
+    semaforo: Semaforo
+    espera_min: float
+    horas_pico: list[HoraPico]
+    actualizado_en: datetime
+    etiqueta: str = "SIMULACIÓN"
+
+
+class Salud(Modelo):
+    estado: Literal["ok"] = "ok"
+    bd: bool
+    simulador: EstadoSim
+    version: str
