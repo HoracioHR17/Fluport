@@ -49,7 +49,7 @@ def entrenar(dias: int = 14, semilla: int = 100, persistir: bool = True, ruta: P
     mae_modelo = float(np.mean(np.abs(pred - y_pru)))
     mae_fluido = float(np.mean(np.abs(x_pru["espera_fluida_obj"] - y_pru)))
     mae_persistencia = float(np.mean(np.abs(x_pru["espera_actual"] - y_pru)))
-    congestion = y_pru >= 20  # error cuando importa: esperas de 20 min o más (semáforo amarillo/rojo)
+    congestion = y_pru >= 30  # error cuando importa: esperas de 30 min o más (semáforo Lento/Saturado)
     mae_congestion = float(np.mean(np.abs(pred[congestion] - y_pru[congestion]))) if congestion.any() else 0.0
 
     version = f"hgb-{datetime.now():%Y%m%d%H%M}-s{semilla}"
@@ -75,7 +75,7 @@ def main() -> None:
     a = ap.parse_args()
     m = entrenar(a.dias, a.semilla, persistir=not a.sin_bd)
     print(f"Modelo {m['version']}: error medio {m['mae_modelo_min']} min, "
-          f"{m['mae_modelo_congestion_min']} min con espera ≥ 20 ({m['pct_prueba_congestion']} % de casos) "
+          f"{m['mae_modelo_congestion_min']} min con espera ≥ 30 ({m['pct_prueba_congestion']} % de casos) "
           f"(balance de flujo {m['mae_balance_flujo_min']}, persistencia {m['mae_persistencia_min']}).")
 
 

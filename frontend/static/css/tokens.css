@@ -1,0 +1,67 @@
+/* Fluport · tokens de diseño (ver docs/diseno.md) */
+:root {
+  /* Base clara (~80 % de la superficie) */
+  --arena: #F4EFE6;     /* fondo principal de pantallas y tarjetas */
+  --bruma: #E3EEF6;     /* fondo de secciones, tablas y paneles */
+  /* Único color oscuro: texto, títulos y botones */
+  --abismo: #0A2238;
+  /* Semáforo: solo estados de los accesos */
+  --fluye: #3FAE7A;     /* < 30 min   · API: "verde"    */
+  --lento: #E9B03B;     /* 30–90 min  · API: "amarillo" */
+  --saturado: #D9574B;  /* > 90 min   · API: "rojo"     */
+
+  /* Tipografía: una sola familia del sistema */
+  --fuente: Arial, Helvetica, sans-serif;
+  --titulo-min: 28px;
+  --titulo-max: 40px;
+  --texto: 16px;
+  --texto-chico: 14px;
+}
+
+html, body {
+  background: var(--arena);
+  color: var(--abismo);
+  font-family: var(--fuente);
+  font-size: var(--texto);
+}
+
+h1, h2, h3, .titulo { font-weight: 700; }
+h1 { font-size: var(--titulo-max); }
+h2 { font-size: var(--titulo-min); }
+
+/* Cifras, horarios y placas */
+.cifra { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.panel { background: var(--bruma); }
+
+.boton {
+  background: var(--abismo);
+  color: var(--arena);
+  font: 700 var(--texto) var(--fuente);
+  border: 0;
+  cursor: pointer;
+}
+
+/* Semáforo: color + símbolo + texto (accesible para daltonismo) */
+.semaforo { font-weight: 700; }
+.semaforo--verde::before    { content: "● "; color: var(--fluye); }
+.semaforo--amarillo::before { content: "● "; color: var(--lento); }
+.semaforo--rojo::before     { content: "▲ "; color: var(--saturado); }
+
+/* Logotipo: FLU bold + PORT delgado + tres puntos */
+.logo { font-family: var(--fuente); color: var(--abismo); letter-spacing: .02em; }
+.logo__flu { font-weight: 700; }
+.logo__port { font-weight: 400; }
+.logo__puntos::after {
+  content: " ●●●";
+  background: linear-gradient(90deg, var(--fluye) 0 33%, var(--lento) 33% 66%, var(--saturado) 66% 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+.etiqueta-simulacion {
+  background: var(--abismo);
+  color: var(--arena);
+  font: 700 var(--texto-chico) var(--fuente);
+  letter-spacing: .08em;
+  padding: 2px 8px;
+}

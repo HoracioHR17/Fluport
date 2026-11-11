@@ -96,8 +96,8 @@ class Clima(StrEnum):
     norte = "norte"
 
 
-def semaforo_de(espera_min: float, amarillo: float = 20.0, rojo: float = 45.0) -> Semaforo:
-    """Regla única del semáforo: <amarillo verde, <=rojo amarillo, >rojo rojo."""
+def semaforo_de(espera_min: float, amarillo: float = 30.0, rojo: float = 90.0) -> Semaforo:
+    """Regla única del semáforo: verde (Fluye) < 30 min · amarillo (Lento) 30–90 · rojo (Saturado) > 90."""
     if espera_min < amarillo:
         return Semaforo.verde
     if espera_min <= rojo:

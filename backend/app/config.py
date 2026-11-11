@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     sim_max_camiones_visibles: int = 300
     sim_cumplimiento_sugerencia: float = 0.70  # % de transportistas que siguen la cita sugerida (Mundo B)
 
-    # Semáforo (minutos de espera)
-    semaforo_amarillo_min: float = 20.0
-    semaforo_rojo_min: float = 45.0
+    # Semáforo (minutos de espera) según la identidad visual: Fluye < 30 · Lento 30–90 · Saturado > 90
+    semaforo_amarillo_min: float = 30.0
+    semaforo_rojo_min: float = 90.0
 
     # Pronóstico
     pronostico_autoentrenar: bool = True  # entrenar al arrancar si no existe modelos/pronostico.joblib

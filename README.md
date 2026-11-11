@@ -213,3 +213,25 @@ pytest -m "not lento"  # sin la prueba de entrenamiento
   - `sqlalchemy.schema.CreateTable` con el dialecto de PostgreSQL: genera el DDL sin conexión. **Por qué:** comprueba que el esquema es válido para PostgreSQL aun sin base de datos disponible.
 
 - **Herramientas de IA:** Claude (Opus 5.5) diseñó y escribió las pruebas, detectó con ellas los dos errores, los corrigió y verificó que las 75 pasan y que la calibración del simulador no cambió.
+
+### 2026-11-11 17:50 · `#006` · Plan de diseño y semáforo alineado a la identidad visual
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `docs/diseno.md` | Plan de diseño para el frontend, tomado del documento de identidad visual. | Paleta (Arena `#F4EFE6`, Bruma `#E3EEF6`, Abismo `#0A2238`, Fluye `#3FAE7A`, Lento `#E9B03B`, Saturado `#D9574B`) y su uso; reglas de accesibilidad (color siempre con texto y símbolo ●/▲); tabla de correspondencia entre el valor del semáforo en la API (`verde`/`amarillo`/`rojo`) y su etiqueta visible (Fluye/Lento/Saturado); tipografía Arial/Helvetica con jerarquía por tamaño y grosor; logotipo; elementos obligatorios en pantalla. |
+  | `frontend/static/css/tokens.css` | Variables CSS listas para todas las pantallas. | `--arena`, `--bruma`, `--abismo`, `--fluye`, `--lento`, `--saturado`, `--fuente`; clases base `.panel`, `.boton`, `.cifra` (números tabulares), `.semaforo--verde/amarillo/rojo` (agregan ● o ▲ con su color), `.logo` y `.etiqueta-simulacion`. |
+  | `backend/app/config.py`, `backend/app/contracts/enums.py` (modificados) | Umbrales del semáforo. | De 20/45 min a **30/90 min** (Fluye < 30 · Lento 30–90 · Saturado > 90), como define la identidad visual; afecta estado de accesos, pronóstico y vista pública. |
+  | `backend/app/prediction/entrenar.py` (modificado) | Métrica de congestión. | El error "en congestión" ahora se mide con esperas ≥ 30 min, coherente con el nuevo umbral. |
+  | `backend/tests/test_contratos.py`, `docs/contracts.md` (actualizados) | — | Casos de prueba y documentación con los nuevos umbrales. |
+
+- **Funcionalidad:** el sistema ya clasifica los accesos con los mismos umbrales que verá el usuario (Fluye, Lento, Saturado) y el frontend cuenta con una hoja de estilos base con la paleta, la tipografía y el semáforo accesible. Las 75 pruebas siguen pasando.
+
+- **Tecnologías usadas:**
+  - **CSS Custom Properties** (variables `--nombre`): valores reutilizables en toda la hoja de estilos. **Por qué:** un solo lugar para la paleta y la tipografía; cambiar un color se refleja en todas las pantallas sin compilar nada.
+  - **Pseudo-elementos `::before` / `::after`**: insertan contenido visual desde CSS. **Por qué:** añaden automáticamente el símbolo ● o ▲ junto al estado, así el semáforo nunca depende solo del color.
+  - `font-variant-numeric: tabular-nums`: dígitos de ancho fijo. **Por qué:** las cifras y horarios no "bailan" al actualizarse cada segundo.
+  - Fuente del sistema (Arial/Helvetica): **Por qué:** no requiere descargas ni CDN, carga al instante y se lee bien en pantallas pequeñas.
+
+- **Herramientas de IA:** Claude (Opus 5.5) extrajo del documento de identidad solo lo relativo al diseño, lo tradujo a tokens CSS y a la correspondencia con la API, alineó los umbrales del backend y verificó las pruebas.

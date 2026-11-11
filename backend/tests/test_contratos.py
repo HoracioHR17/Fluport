@@ -14,8 +14,8 @@ from app.db.models import Acceso  # importar los modelos registra las tablas en 
 T = datetime(2026, 11, 12, 10, tzinfo=timezone(timedelta(hours=-6)))
 
 
-@pytest.mark.parametrize("espera,esperado", [(0, "verde"), (19.9, "verde"), (20, "amarillo"),
-                                            (45, "amarillo"), (45.1, "rojo")])
+@pytest.mark.parametrize("espera,esperado", [(0, "verde"), (29.9, "verde"), (30, "amarillo"),
+                                            (90, "amarillo"), (90.1, "rojo")])
 def test_semaforo(espera, esperado):
     assert semaforo_de(espera) == Semaforo(esperado)
 

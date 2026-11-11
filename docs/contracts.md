@@ -9,7 +9,7 @@
 - Tiempos en minutos (`float`). Progreso de ruta `0..1`.
 - Identificadores de acceso tipo `"A1"`, rutas `"R-A1-norte"`, camiones `"T-0001"`.
 - Mundo `A` = sin Fluport (llegada libre) · Mundo `B` = con Fluport (llegada según cita sugerida).
-- Semáforo único (`semaforo_de`): `< 20` verde · `20–45` amarillo · `> 45` rojo (configurable).
+- Semáforo único (`semaforo_de`): `< 30` verde (Fluye) · `30–90` amarillo (Lento) · `> 90` rojo (Saturado) (configurable). Los valores del enum no cambian; las etiquetas visibles se definen en `docs/diseno.md`.
 - Errores: `422` validación, `404` no existe, `409` conflicto (acceso cerrado / ventana llena), `501` pendiente.
 
 ## 2. Base de datos (PostgreSQL)
