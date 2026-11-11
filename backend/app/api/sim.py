@@ -1,35 +1,61 @@
-"""Control de la simulación y stream en vivo (M1)."""
-from fastapi import APIRouter, WebSocket, status
+"""Control de la simulación y stream en vivo (M1).
 
-from app.api._stub import pendiente
-from app.contracts.schemas import EventoCreate, EventoOut, KpisResponse, SimControl, SimEstadoOut, SimSnapshot
+Todos los handlers son `async` para ejecutarse en el mismo event loop que el simulador
+(sin hilos concurrentes modificando su estado).
+"""
+import logging
+
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect, status
+
+from app.contracts.schemas import EventoCreate, EventoOut, KpisResponse, SimControl, SimEstadoOut, SimSnapshot, WsSnapshot
+from app.sim.servicio import SimNoIniciada, servicio
 
 router = APIRouter(tags=["simulacion"])
+log = logging.getLogger("fluport.ws")
+
+
+@router.get("/api/sim/estado", response_model=SimEstadoOut)
+async def estado() -> SimEstadoOut:
+    return servicio.requerir().estado_out()
 
 
 @router.post("/api/sim/control", response_model=SimEstadoOut)
-def control(body: SimControl) -> SimEstadoOut:
-    raise pendiente("M1")
+async def control(body: SimControl) -> SimEstadoOut:
+    try:
+        return await servicio.control(body)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
 
 
 @router.post("/api/sim/eventos", response_model=EventoOut, status_code=status.HTTP_201_CREATED)
-def inyectar_evento(body: EventoCreate) -> EventoOut:
-    raise pendiente("M1")
+async def inyectar_evento(body: EventoCreate) -> EventoOut:
+    try:
+        return servicio.evento(body)
+    except ValueError as e:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(e)) from e
 
 
 @router.get("/api/sim/kpis", response_model=KpisResponse)
-def kpis() -> KpisResponse:
-    raise pendiente("M1")
+async def kpis() -> KpisResponse:
+    return servicio.requerir().kpis_response()
 
 
 @router.get("/api/sim/snapshot", response_model=SimSnapshot)
-def snapshot() -> SimSnapshot:
+async def snapshot() -> SimSnapshot:
     """Respaldo por polling (cada 1 s) si el WebSocket falla."""
-    raise pendiente("M1")
+    return servicio.requerir().snapshot()
 
 
 @router.websocket("/ws/sim")
 async def ws_sim(ws: WebSocket) -> None:
     """Envía mensajes `WsMensaje` (snapshot | evento | aviso) en JSON, uno por tick."""
     await ws.accept()
-    await ws.close(code=1013, reason="Pendiente de implementar en M1")
+    cola = servicio.suscribir()
+    try:
+        await ws.send_text(WsSnapshot(data=servicio.requerir().snapshot()).model_dump_json())  # estado inicial
+        while True:
+            await ws.send_text(await cola.get())
+    except (WebSocketDisconnect, RuntimeError, SimNoIniciada):
+        pass
+    finally:
+        servicio.desuscribir(cola)

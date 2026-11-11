@@ -1,0 +1,181 @@
+{
+  "_nota": "VALORES PROVISIONALES. El equipo de Datos debe reemplazarlos con datos públicos y citar la fuente en la bitácora. Coordenadas aproximadas.",
+  "inicio_hora": 4,
+  "camiones_dia": 1300,
+  "perfil_horario": [
+    0.3,
+    0.25,
+    0.2,
+    0.2,
+    0.3,
+    0.6,
+    1.0,
+    1.5,
+    1.9,
+    2.0,
+    1.8,
+    1.5,
+    1.2,
+    1.2,
+    1.4,
+    1.7,
+    1.8,
+    1.5,
+    1.1,
+    0.8,
+    0.6,
+    0.5,
+    0.4,
+    0.35
+  ],
+  "mezcla_carga": {
+    "contenedor_20": 0.25,
+    "contenedor_40": 0.4,
+    "refrigerado": 0.1,
+    "peligroso": 0.05,
+    "granel": 0.1,
+    "carga_general": 0.1
+  },
+  "cargas_prioritarias": [
+    "refrigerado",
+    "peligroso"
+  ],
+  "servicio_sigma": 0.35,
+  "ruta_min": [
+    15,
+    35
+  ],
+  "estancia_min": [
+    45,
+    120
+  ],
+  "retraso_sigma_min": 10,
+  "no_show": 0.08,
+  "cumplimiento_sugerencia": 0.7,
+  "ventana_reprogramacion_min": [
+    -60,
+    180
+  ],
+  "ocupacion_objetivo_franja": 0.85,
+  "buques": {
+    "por_dia": [
+      0,
+      1
+    ],
+    "contenedores": [
+      200,
+      600
+    ],
+    "camiones_por_contenedor": 0.3,
+    "ola_horas": [
+      2,
+      10
+    ]
+  },
+  "norte": {
+    "prob_dia": 0.1,
+    "duracion_h": 6,
+    "factor_servicio": 1.4
+  },
+  "accesos": [
+    {
+      "id": "A1",
+      "nombre": "Acceso 1 (provisional)",
+      "zona": "Zona Norte",
+      "lat": 19.214,
+      "lon": -96.153,
+      "carriles": 4,
+      "tiempo_servicio_min": 6.0,
+      "participacion": 0.47,
+      "rutas": [
+        {
+          "id": "R-A1-1",
+          "coords": [
+            [
+              19.245,
+              -96.19
+            ],
+            [
+              19.233,
+              -96.175
+            ],
+            [
+              19.222,
+              -96.163
+            ],
+            [
+              19.214,
+              -96.153
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "A2",
+      "nombre": "Acceso 2 (provisional)",
+      "zona": "Zona Centro",
+      "lat": 19.203,
+      "lon": -96.141,
+      "carriles": 3,
+      "tiempo_servicio_min": 6.5,
+      "participacion": 0.32,
+      "rutas": [
+        {
+          "id": "R-A2-1",
+          "coords": [
+            [
+              19.18,
+              -96.175
+            ],
+            [
+              19.19,
+              -96.16
+            ],
+            [
+              19.198,
+              -96.149
+            ],
+            [
+              19.203,
+              -96.141
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "A3",
+      "nombre": "Acceso 3 (provisional)",
+      "zona": "Zona Sur",
+      "lat": 19.195,
+      "lon": -96.133,
+      "carriles": 2,
+      "tiempo_servicio_min": 7.0,
+      "participacion": 0.21,
+      "rutas": [
+        {
+          "id": "R-A3-1",
+          "coords": [
+            [
+              19.165,
+              -96.15
+            ],
+            [
+              19.176,
+              -96.144
+            ],
+            [
+              19.187,
+              -96.138
+            ],
+            [
+              19.195,
+              -96.133
+            ]
+          ]
+        }
+      ]
+    }
+  ]
+}

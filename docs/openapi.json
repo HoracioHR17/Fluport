@@ -31,6 +31,30 @@
     }
    }
   },
+  "/api/accesos/rutas": {
+   "get": {
+    "tags": [
+     "accesos"
+    ],
+    "summary": "Rutas",
+    "description": "GeoJSON (FeatureCollection) con los accesos (Point) y sus rutas (LineString, coordenadas [lon, lat]).\n\n`CamionEstado.progreso` (0..1) se mide sobre la LineString con el mismo `ruta_id`.",
+    "operationId": "rutas_api_accesos_rutas_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Rutas Api Accesos Rutas Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/accesos/estado": {
    "get": {
     "tags": [
@@ -466,6 +490,27 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/sim/estado": {
+   "get": {
+    "tags": [
+     "simulacion"
+    ],
+    "summary": "Estado",
+    "operationId": "estado_api_sim_estado_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/SimEstadoOut"
         }
        }
       }
