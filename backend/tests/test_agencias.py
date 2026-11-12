@@ -4,6 +4,7 @@ from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from app.contracts.enums import EstadoCamion, Mundo, TipoCarga, TipoEventoSim
 from app.contracts.schemas import EventoCreate
@@ -17,22 +18,22 @@ TEL = "+522290007001"
 
 # ───────────── Simulación (sin BD) ─────────────
 def test_escenario_trae_agencias(esc):
-    assert [a.id for a in esc.agencias] == ["AG01", "AG02", "AG03"]
+    assert [a.id for a in esc.agencias] == ["AG01", "AG02", "AG03", "AG04", "AG05", "AG06"]
 
 
 def test_reparto_fijo_y_proporcional(esc):
     assert esc.agencia_de("T00-0001") == esc.agencia_de("T00-0001")  # determinista por id
-    conteo = Counter(esc.agencia_de(f"T00-{i:04d}") for i in range(6000))
+    conteo = Counter(esc.agencia_de(f"T00-{i:04d}") for i in range(12000))
     total = sum(a.participacion for a in esc.agencias)
     for a in esc.agencias:
-        assert abs(conteo[a.id] / 6000 - a.participacion / total) < 0.03
+        assert abs(conteo[a.id] / 12000 - a.participacion / total) < 0.03
 
 
 def test_snapshot_trae_agencia_y_flota(sim):
     sim.avanzar(6 * 60)  # 10:00: hay camiones en ruta y en fila
     mb = sim.snapshot().mundos[Mundo.B]
-    assert mb.camiones and all(c.agencia_id in {"AG01", "AG02", "AG03"} for c in mb.camiones)
-    assert set(mb.flota) == {"AG01", "AG02", "AG03"}
+    assert mb.camiones and all(c.agencia_id in {"AG01", "AG02", "AG03", "AG04", "AG05", "AG06"} for c in mb.camiones)
+    assert set(mb.flota) == {"AG01", "AG02", "AG03", "AG04", "AG05", "AG06"}
     # la flota cuenta todos los camiones activos, no solo los dibujados
     ms = sim.mundos[Mundo.B]
     en_fila = sum(1 for c in ms.camiones.values() if c.estado == EstadoCamion.en_fila)
@@ -74,7 +75,7 @@ def _ts(c, horas: float) -> str:
 
 def test_listar_agencias(cliente):
     r = cliente.get("/api/agencias").json()
-    assert [a["id"] for a in r] == ["AG01", "AG02", "AG03"] and r[0]["nombre"]
+    assert [a["id"] for a in r] == ["AG01", "AG02", "AG03", "AG04", "AG05", "AG06"] and r[0]["nombre"]
 
 
 def test_cita_de_agencia_y_filtros(cliente):
@@ -114,7 +115,16 @@ def _msg(texto=None, contacto=None, chat=888000222):
     return {"update_id": 1, "message": m}
 
 
-def test_enlace_de_agencia_en_el_bot(cliente, monkeypatch):
+def test_alta_de_transportista(cliente):
+    r = cliente.post("/api/agencias/AG02/transportistas",
+                     json={"alias": "Lupe Ramos", "telefono": "+522290007003", "placas": "xkl-45-21"})
+    assert r.status_code == 201 and r.json()["placas"] == "XKL-45-21" and r.json()["telegram"] is False
+    otra = cliente.post("/api/agencias/AG03/transportistas", json={"alias": "Otra", "telefono": "+522290007003"})
+    assert otra.status_code == 409
+    assert cliente.post("/api/agencias/XX99/transportistas", json={"alias": "Xavier", "telefono": "+522290007004"}).status_code == 404
+
+
+def test_bot_solo_vincula_numeros_dados_de_alta(cliente, monkeypatch):
     from app.db.base import SessionLocal
     from app.sim.servicio import servicio
 
@@ -122,15 +132,63 @@ def test_enlace_de_agencia_en_el_bot(cliente, monkeypatch):
         return True, "1"
 
     monkeypatch.setattr(telegram, "enviar", falso)
-    sim, chat = servicio.sim, 888000222
-    assert cliente.portal.call(bot.procesar_update, sim, _msg("/start AG02")) == bot.BIENVENIDA
+    sim = servicio.sim
+    # un número sin alta se rechaza
+    r = cliente.portal.call(bot.procesar_update, sim,
+                            _msg(contacto={"phone_number": "5212290007999", "user_id": 888000333}, chat=888000333))
+    assert r == bot.NO_REGISTRADO
+    # el que dio de alta AG02 se vincula a AG02; un enlace de otra agencia no lo cambia
+    chat = 888000222
+    assert cliente.portal.call(bot.procesar_update, sim, _msg("/start AG03")) == bot.BIENVENIDA
     r = cliente.portal.call(bot.procesar_update, sim,
                             _msg(contacto={"phone_number": "5212290007003", "user_id": chat, "first_name": "Lupe"}))
-    assert "Logística Sotavento" in r
+    assert "Consorcio Aduanero del Atlántico" in r
+    cliente.portal.call(bot.procesar_update, sim, _msg("/start AG03"))
     with SessionLocal() as db:
-        assert bot.transportista_de_chat(db, chat).agencia_id == "AG02"
-    # ya registrado: un enlace de otra agencia lo cambia de agencia; un código inválido no
-    assert "Fletes Jarochos" in cliente.portal.call(bot.procesar_update, sim, _msg("/start ag03"))
-    cliente.portal.call(bot.procesar_update, sim, _msg("/start NOEXISTE"))
+        t = bot.transportista_de_chat(db, chat)
+        assert t.agencia_id == "AG02" and t.alias == "Lupe Ramos"
+
+
+def test_cita_asignada_se_confirma_o_rechaza_en_el_bot(cliente, monkeypatch):
+    from app.db.base import SessionLocal
+    from app.db.models import Aviso, Cita
+    from app.messaging.servicio import notificar_asignacion
+    from app.sim.servicio import servicio
+
+    enviados = []
+
+    async def falso(chat_id, texto, teclado=None):
+        enviados.append((chat_id, texto))
+        return True, "1"
+
+    monkeypatch.setattr(telegram, "enviar", falso)
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "telegram_token", "123:ABC")
+    sim, chat = servicio.sim, 888000222
     with SessionLocal() as db:
-        assert bot.transportista_de_chat(db, chat).agencia_id == "AG03"
+        tid = bot.transportista_de_chat(db, chat).id
+
+    def asignar(horas):
+        r = cliente.post("/api/citas", json={"transportista_id": tid, "acceso_id": "A1", "origen": "web",
+                                             "ventana_inicio": _ts(cliente, horas), "ventana_fin": _ts(cliente, horas + 0.5),
+                                             "tipo_carga": "contenedor_40"})
+        assert r.status_code == 201
+        cita = r.json()
+        cliente.portal.call(notificar_asignacion, sim, cita["id"], lambda _: None)
+        return cita
+
+    c1 = asignar(3)
+    assert enviados[-1][0] == chat and "Nueva cita" in enviados[-1][1] and "SÍ" in enviados[-1][1]
+    r = cliente.portal.call(bot.procesar_update, sim, _msg("Sí"))
+    assert r.startswith("Cita confirmada")
+    with SessionLocal() as db:
+        assert db.get(Cita, c1["id"]).confirmada_en is not None
+    c2 = asignar(5)
+    assert cliente.portal.call(bot.procesar_update, sim, _msg("no")) == bot.RECHAZADA
+    with SessionLocal() as db:
+        assert db.get(Cita, c2["id"]).confirmada_en is None
+        assert db.scalar(select(Aviso.tipo).where(Aviso.cita_id == c2["id"], Aviso.tipo == "cita_rechazada"))
+    # la agencia ve la cita confirmada
+    citas = {c["id"]: c for c in cliente.get("/api/citas?agencia_id=AG02").json()}
+    assert citas[c1["id"]]["confirmada_en"] is not None and citas[c2["id"]]["confirmada_en"] is None

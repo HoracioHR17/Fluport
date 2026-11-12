@@ -80,6 +80,7 @@ class Transportista(Base):
     agencia_id: Mapped[str | None] = mapped_column(ForeignKey("agencia.id", ondelete="SET NULL"), index=True)
     telefono: Mapped[str | None] = mapped_column(String(20), unique=True)  # solo teléfonos de prueba con consentimiento
     telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)  # chat del bot, si se registró ahí
+    placas: Mapped[str | None] = mapped_column(String(20))  # placas de la unidad (alta por la agencia)
     es_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     creado_en: Mapped[datetime] = mapped_column(TS, server_default=func.now())
 
@@ -101,6 +102,7 @@ class Cita(Base):
     origen: Mapped[OrigenCita] = mapped_column(pg_enum(OrigenCita, "origen_cita"))
     espera_estimada_min: Mapped[float | None] = mapped_column(Float)
     cita_anterior_id: Mapped[int | None] = mapped_column(ForeignKey("cita.id"))  # traza de reprogramación
+    confirmada_en: Mapped[datetime | None] = mapped_column(TS)  # el transportista confirmó la cita asignada
     creada_en: Mapped[datetime] = mapped_column(TS, server_default=func.now())
     actualizada_en: Mapped[datetime] = mapped_column(TS, server_default=func.now(), onupdate=func.now())
 

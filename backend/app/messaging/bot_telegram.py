@@ -5,22 +5,29 @@ Flujo:
 2. Comparte su propio contacto → se registra (`transportista.telegram_chat_id`) y queda identificado.
 3. Mensajes de texto → asistente (mismo que WhatsApp y web) → respuesta en el chat.
 
-Enlace de agencia: `t.me/<bot>?start=AG01` abre el chat con `/start AG01`; el transportista queda ligado a
-esa agencia (al registrarse, o de inmediato si ya estaba registrado).
+Enlace de agencia: `t.me/<bot>?start=AG01` abre el chat con `/start AG01`; si el transportista aún no tiene
+agencia, queda ligado a esa.
+
+Operación real (`telegram_solo_registrados`, activo por defecto): solo se vinculan números que una agencia dio de
+alta. Cuando la agencia asigna una cita, el transportista la confirma o la rechaza respondiendo SÍ o NO.
 """
 import asyncio
 import logging
+import unicodedata
+from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.assistant.agente import asistente
 from app.citas.servicio import ErrorCita, normalizar_telefono
-from app.contracts.enums import Canal
+from app.config import get_settings
+from app.contracts.enums import Canal, EstadoAviso, EstadoCita, OrigenCita
 from app.contracts.schemas import AsistenteRequest
 from app.db.base import SessionLocal
-from app.db.models import Agencia, Transportista
+from app.assistant.agente import guardar_turnos
+from app.db.models import Agencia, Aviso, Cita, Transportista
 from app.messaging import telegram
 from app.sim.motor import Simulador
 
@@ -32,6 +39,56 @@ REGISTRADO = ("Listo ✅ Ya te identifiqué con el número terminado en {fin}.\n
               "Escríbeme, por ejemplo: _llego mañana a las 9 con un contenedor de 40_ o _¿cómo está la fila?_")
 CONTACTO_AJENO = "Por seguridad solo puedo registrar *tu propio* número. Usa el botón para compartirlo."
 LIGADO = "Quedaste ligado a la agencia *{nombre}*; ahí verán tus citas y tu camión."
+NO_REGISTRADO = ("Tu número aún no está dado de alta en Fluport. Pide a tu agencia aduanal que te registre "
+                 "y vuelve a compartirlo.")
+CONFIRMADA = "Cita confirmada ✅ {dia} a las {hora} · {caseta}. Te aviso 30 min antes."
+RECHAZADA = "Entendido. Le aviso a tu agencia que no puedes asistir para que reasigne la cita."
+SI = {"si", "confirmo", "confirmar", "acepto", "ok", "va", "claro"}
+NO = {"no", "rechazo", "no puedo"}
+
+
+class NoRegistrado(Exception):
+    """El número no fue dado de alta por ninguna agencia."""
+
+
+def _normal(texto: str) -> str:
+    sin_acentos = unicodedata.normalize("NFD", texto.lower())
+    return "".join(c for c in sin_acentos if unicodedata.category(c) != "Mn").strip(" .!¡?¿,")
+
+
+def cita_por_confirmar(db: Session, t: Transportista) -> Cita | None:
+    """Última cita asignada por la agencia sin confirmar, si no hay un aviso más reciente que el SÍ deba responder."""
+    c = db.scalar(select(Cita).where(Cita.transportista_id == t.id, Cita.estado == EstadoCita.agendada,
+                                     Cita.confirmada_en.is_(None), Cita.origen == OrigenCita.web)
+                  .order_by(Cita.creada_en.desc(), Cita.id.desc()).limit(1))
+    if c is None:
+        return None
+    ultimo = db.scalar(select(func.max(Aviso.creado_en)).where(Aviso.transportista_id == t.id,
+                                                               Aviso.tipo != "cita_asignada"))
+    return None if ultimo is not None and ultimo > c.creada_en else c
+
+
+def responder_asignacion(db: Session, sim: Simulador, t: Transportista, texto: str) -> str | None:
+    """SÍ / NO a una cita asignada. Devuelve la respuesta, o None si el mensaje no es para eso."""
+    n = _normal(texto)
+    if n not in SI and n not in NO:
+        return None
+    c = cita_por_confirmar(db, t)
+    if c is None:
+        return None
+    if n in SI:
+        c.confirmada_en = datetime.now().astimezone()
+        ini = c.ventana_inicio.astimezone(sim.ts().tzinfo)
+        respuesta = CONFIRMADA.format(dia=f"{ini:%d/%m}", hora=f"{ini:%H:%M}", caseta=sim.esc.acceso(c.acceso_id).nombre)
+    else:
+        db.add(Aviso(transportista_id=t.id, cita_id=c.id, canal=Canal.telegram, tipo="cita_rechazada",
+                     mensaje=f"{t.alias} no puede asistir a la cita #{c.id}; reasígnala.", estado=EstadoAviso.enviado,
+                     enviado_en=datetime.now().astimezone()))
+        respuesta = RECHAZADA
+    db.commit()
+    guardar_turnos(db, Canal.telegram, t.telefono, [{"role": "user", "parts": [{"text": texto}]},
+                                                    {"role": "model", "parts": [{"text": respuesta}]}])
+    return respuesta
 
 # código de agencia recibido con /start antes de que el chat comparta su número
 _agencia_pendiente: dict[int, str] = {}
@@ -59,10 +116,12 @@ def registrar_contacto(db: Session, chat_id: int, telefono: str, nombre: str | N
         db.flush()
     t = db.scalar(select(Transportista).where(Transportista.telefono == tel))
     if t is None:
+        if get_settings().telegram_solo_registrados:
+            raise NoRegistrado(tel)
         t = Transportista(alias=nombre or f"Transportista {tel[-4:]}", telefono=tel, es_demo=True)
         db.add(t)
     t.telegram_chat_id = chat_id
-    if agencia_id is not None:
+    if agencia_id is not None and t.agencia_id is None:  # la agencia que lo dio de alta no se reemplaza
         t.agencia_id = agencia_id
     db.commit()
     return t
@@ -91,6 +150,9 @@ async def procesar_update(sim: Simulador, update: dict[str, Any]) -> str | None:
             await telegram.enviar(chat_id, "No pude leer ese número. Inténtalo de nuevo con el botón.",
                                   telegram.TECLADO_CONTACTO)
             return None
+        except NoRegistrado:
+            await telegram.enviar(chat_id, NO_REGISTRADO, telegram.QUITAR_TECLADO)
+            return NO_REGISTRADO
         texto = REGISTRADO.format(fin=fin) + ("\n" + LIGADO.format(nombre=agencia) if agencia else "")
         await telegram.enviar(chat_id, texto, telegram.QUITAR_TECLADO)
         return texto
@@ -106,7 +168,7 @@ async def procesar_update(sim: Simulador, update: dict[str, Any]) -> str | None:
                 await telegram.enviar(chat_id, BIENVENIDA, telegram.TECLADO_CONTACTO)
                 return BIENVENIDA
             texto = REGISTRADO.format(fin=(t.telefono or "")[-4:])
-            if agencia is not None:
+            if agencia is not None and t.agencia_id is None:
                 t.agencia_id = agencia.id
                 db.commit()
                 texto += "\n" + LIGADO.format(nombre=agencia.nombre)
@@ -114,6 +176,10 @@ async def procesar_update(sim: Simulador, update: dict[str, Any]) -> str | None:
             return texto
         if not texto_usuario:
             return None
+        directa = responder_asignacion(db, sim, t, texto_usuario)
+        if directa is not None:
+            await telegram.enviar(chat_id, directa)
+            return directa
         r = await asistente.responder(db, sim, AsistenteRequest(canal=Canal.telegram, remitente=t.telefono,
                                                                   texto=texto_usuario))
     await telegram.enviar(chat_id, r.respuesta)

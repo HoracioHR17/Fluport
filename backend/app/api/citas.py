@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.citas import servicio as citas
 from app.citas.servicio import ErrorCita
-from app.contracts.enums import EstadoCita
+from app.contracts.enums import EstadoCita, OrigenCita
 from app.contracts.schemas import CitaCreate, CitaOut, CitaReprogramar, ResumenCitas, Sugerencia, SugerenciaRequest
 from app.db.base import get_db
 from app.sim.servicio import servicio
@@ -21,10 +21,16 @@ def _http(e: ErrorCita) -> HTTPException:
 
 @router.post("", response_model=CitaOut, status_code=status.HTTP_201_CREATED)
 async def crear_cita(body: CitaCreate, db: Session = Depends(get_db)) -> CitaOut:
+    """Crea la cita. Si la asigna la agencia (origen web), el transportista la recibe en Telegram para confirmarla."""
     try:
-        return citas.crear(db, servicio.requerir(), body)
+        cita = citas.crear(db, servicio.requerir(), body)
     except ErrorCita as e:
         raise _http(e) from e
+    if body.origen == OrigenCita.web:
+        from app.messaging.servicio import en_segundo_plano, notificar_asignacion
+
+        en_segundo_plano(notificar_asignacion(servicio.requerir(), cita.id, servicio.publicar))
+    return cita
 
 
 @router.get("", response_model=list[CitaOut])

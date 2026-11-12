@@ -2,12 +2,12 @@
 from collections import defaultdict
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.citas.servicio import ACTIVAS
-from app.contracts.schemas import AgenciaOut, TransportistaOut
+from app.citas.servicio import ACTIVAS, ErrorCita, normalizar_telefono
+from app.contracts.schemas import AgenciaOut, TransportistaCreate, TransportistaOut
 from app.db.base import get_db
 from app.db.models import Agencia, Cita, Transportista
 
@@ -34,6 +34,31 @@ async def transportistas(agencia_id: str, db: Session = Depends(get_db)) -> list
             Cita.transportista_id.in_([t.id for t in filas]), Cita.estado.in_(ACTIVAS))
         for tid, inicio in db.execute(q):
             activas[tid].append(inicio)
-    return [TransportistaOut(id=t.id, alias=t.alias, telefono_fin=(t.telefono or "")[-4:] or None,
-                             telegram=t.telegram_chat_id is not None, citas_activas=len(activas[t.id]),
-                             proxima_cita=min(activas[t.id]) if activas[t.id] else None) for t in filas]
+    return [_out(t, activas[t.id]) for t in filas]
+
+
+def _out(t: Transportista, activas: list[datetime] | None = None) -> TransportistaOut:
+    activas = activas or []
+    return TransportistaOut(id=t.id, alias=t.alias, telefono_fin=(t.telefono or "")[-4:] or None,
+                            telegram=t.telegram_chat_id is not None, placas=t.placas, citas_activas=len(activas),
+                            proxima_cita=min(activas) if activas else None)
+
+
+@router.post("/{agencia_id}/transportistas", response_model=TransportistaOut, status_code=status.HTTP_201_CREATED)
+async def alta_transportista(agencia_id: str, body: TransportistaCreate, db: Session = Depends(get_db)) -> TransportistaOut:
+    """La agencia da de alta a un transportista; solo los números dados de alta pueden vincularse al bot."""
+    if db.get(Agencia, agencia_id) is None:
+        raise HTTPException(404, f"agencia {agencia_id} no existe")
+    try:
+        tel = normalizar_telefono(body.telefono)
+    except ErrorCita as e:
+        raise HTTPException(e.codigo, e.mensaje) from e
+    t = db.scalar(select(Transportista).where(Transportista.telefono == tel))
+    if t is not None and t.agencia_id not in (None, agencia_id):
+        raise HTTPException(409, "ese número ya está dado de alta en otra agencia")
+    if t is None:
+        t = Transportista(telefono=tel, es_demo=True, alias=body.alias)
+        db.add(t)
+    t.alias, t.placas, t.agencia_id = body.alias, (body.placas or "").strip().upper() or None, agencia_id
+    db.commit()
+    return _out(t)

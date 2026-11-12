@@ -108,6 +108,7 @@ class CitaOut(Modelo):
     origen: OrigenCita
     espera_estimada_min: float | None
     cita_anterior_id: int | None
+    confirmada_en: datetime | None = None
 
 
 class ResumenCitas(Modelo):
@@ -126,6 +127,9 @@ class SugerenciaRequest(Modelo):
     tipo_carga: TipoCarga
     duracion_min: int = 30
     max_resultados: int = Field(3, ge=1, le=10)
+    preferencia: Literal["centro", "temprano"] = Field(
+        "centro", description="Desempate entre esperas similares: la hora más cercana al centro de la ventana "
+        "(el transportista dio una hora) o la más próxima (no dio hora)")
 
     @model_validator(mode="after")
     def _validar(self) -> "SugerenciaRequest":
@@ -332,8 +336,17 @@ class TransportistaOut(Modelo):
     alias: str
     telefono_fin: str | None = None  # solo los últimos 4 dígitos
     telegram: bool = False
+    placas: str | None = None
     citas_activas: int = 0
     proxima_cita: datetime | None = None
+
+
+class TransportistaCreate(Modelo):
+    """Alta de un transportista por su agencia (solo números de prueba con consentimiento)."""
+
+    alias: str = Field(min_length=2, max_length=80)
+    telefono: str
+    placas: str | None = Field(None, max_length=20)
 
 
 class Salud(Modelo):

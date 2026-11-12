@@ -5,6 +5,7 @@ Los avisos se envían por Telegram si el transportista se registró en el bot; s
 import asyncio
 import logging
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
@@ -92,6 +93,37 @@ def marcar_aviso(aviso_id: int, enviado: bool) -> None:
             fila.estado = EstadoAviso.enviado if enviado else EstadoAviso.fallido
             fila.enviado_en = datetime.now().astimezone() if enviado else None
             db.commit()
+
+
+# ───────────────────────────── Citas asignadas por la agencia ─────────────────────────────
+def mensaje_asignacion(sim: Simulador, cita_id: int) -> AvisoNuevo | None:
+    """Aviso de cita nueva para el transportista (solo si está conectado a Telegram)."""
+    with SessionLocal() as db:
+        c = db.get(Cita, cita_id)
+        t = c.transportista if c else None
+        if t is None or t.telegram_chat_id is None or not t.telefono:
+            return None
+        zona = ZoneInfo(sim.cfg.zona_horaria)
+        ini, fin = c.ventana_inicio.astimezone(zona), c.ventana_fin.astimezone(zona)
+        agencia = t.agencia.nombre if t.agencia else "Tu agencia"
+        espera = f"\nEspera prevista: ~{round(c.espera_estimada_min)} min." if c.espera_estimada_min is not None else ""
+        texto = (f"*Nueva cita* asignada por {agencia}:\n{ini:%d/%m} de {ini:%H:%M} a {fin:%H:%M} · "
+                 f"{sim.esc.acceso(c.acceso_id).nombre}{espera}\n¿La confirmas? Responde *SÍ* o *NO*.")
+        return AvisoNuevo(c.id, t.id, t.telefono, "cita_asignada", texto, t.telegram_chat_id)
+
+
+async def notificar_asignacion(sim: Simulador, cita_id: int, publicar) -> AvisoOut | None:
+    """Envía al transportista la cita que le asignó su agencia y la deja en los avisos del tablero."""
+    a = await asyncio.to_thread(mensaje_asignacion, sim, cita_id)
+    if a is None:
+        return None
+    out = await asyncio.to_thread(registrar_aviso, a)
+    publicar(WsAviso(data=out).model_dump_json())
+    enviado, detalle = await enviar_aviso(a)
+    if not enviado:
+        log.warning("Cita asignada %s no enviada: %s", cita_id, detalle)
+    await asyncio.to_thread(marcar_aviso, out.id, enviado)
+    return out
 
 
 async def ciclo_avisos(sim: Simulador, publicar) -> list[AvisoOut]:

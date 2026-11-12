@@ -19,6 +19,7 @@ CHAT = 777000111
 def tg_conf(monkeypatch):
     cfg = get_settings()
     monkeypatch.setattr(cfg, "telegram_token", "123:ABC")
+    monkeypatch.setattr(cfg, "telegram_solo_registrados", False)  # modo abierto; el modo con alta previa: test_agencias
     return cfg
 
 

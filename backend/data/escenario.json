@@ -195,18 +195,33 @@
   "agencias": [
     {
       "id": "AG01",
-      "nombre": "Transportes del Golfo",
-      "participacion": 0.4
+      "nombre": "AduanaTech Solutions",
+      "participacion": 0.22
     },
     {
       "id": "AG02",
-      "nombre": "Logística Sotavento",
-      "participacion": 0.35
+      "nombre": "Consorcio Aduanero del Atlántico",
+      "participacion": 0.2
     },
     {
       "id": "AG03",
-      "nombre": "Fletes Jarochos",
-      "participacion": 0.25
+      "nombre": "Despachos Aduanales Meridiano",
+      "participacion": 0.17
+    },
+    {
+      "id": "AG04",
+      "nombre": "Grupo Aduanal Altamar",
+      "participacion": 0.15
+    },
+    {
+      "id": "AG05",
+      "nombre": "Corporativo Aduanero Peninsular",
+      "participacion": 0.14
+    },
+    {
+      "id": "AG06",
+      "nombre": "Agencia Aduanal Horizonte",
+      "participacion": 0.12
     }
   ]
 }

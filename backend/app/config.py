@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     # Telegram (bot creado con @BotFather)
     telegram_token: str = ""
     telegram_modo: str = "polling"  # polling (sin URL pública) | webhook | off
+    telegram_solo_registrados: bool = True  # el bot solo vincula números que una agencia dio de alta
     telegram_webhook_secret: str = ""  # valor de X-Telegram-Bot-Api-Secret-Token en modo webhook
 
     # General
