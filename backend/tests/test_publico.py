@@ -76,3 +76,11 @@ def test_websocket_publico_sin_camiones_ni_avisos():
         for prohibido in ("camiones", "agencia", "cita", "comparacion", "telefono"):
             assert prohibido not in texto
         assert c.get("/api/publico/snapshot").json()["tipo"] == "snapshot"
+
+
+def test_mejor_hora_nunca_es_pasada(sim):
+    """Aunque el pronóstico esté en caché (hasta 15 min simulados), la mejor hora es igual o posterior a ahora."""
+    sim.avanzar(6 * 60)
+    zonas(sim)  # llena la caché del pronóstico
+    sim.avanzar(14)
+    assert all(x.mejor_hora is None or x.mejor_hora >= sim.ts() for x in zonas(sim))

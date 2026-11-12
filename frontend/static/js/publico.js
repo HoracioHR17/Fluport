@@ -18,10 +18,23 @@
   function est(z) { return F.estadoDe(z.semaforo, z.abierto); }
   function tono(min) { return min < 30 ? "verde" : min <= 90 ? "amarillo" : "rojo"; }
 
+  // ───────────── Tiempo simulado y franjas vigentes ─────────────
+  // El pronóstico se carga cada 15 s pero el reloj avanza con cada snapshot: se descartan las franjas que ya pasaron.
+  var FRANJA_MS = 30 * 60000;
+  function ahoraMs() { var z = estado.zonas[0]; return z ? new Date(z.actualizado_en).getTime() : Date.now(); }
+  /** Franjas que aún no terminan (incluye la que está en curso). */
+  function franjasVigentes(p) { var t = ahoraMs(); return p ? p.franjas.filter(function (f) { return new Date(f.inicio).getTime() + FRANJA_MS > t; }) : []; }
+  /** Mejor hora para pasar: la franja futura con menor espera (la más próxima si empatan). */
+  function mejorHora(z) {
+    var t = ahoraMs(), fs = (estado.pron[z.acceso_id] || { franjas: [] }).franjas.filter(function (f) { return new Date(f.inicio).getTime() >= t; });
+    if (!fs.length) return z.mejor_hora && new Date(z.mejor_hora).getTime() >= t ? z.mejor_hora : null;
+    return fs.reduce(function (m, f) { return f.espera_min < m.espera_min ? f : m; }).inicio;
+  }
+
   function tendencia(z) {
-    var p = estado.pron[z.acceso_id];
-    if (!z.abierto || !p || p.franjas.length < 3) return "";
-    var luego = p.franjas[2].espera_min, ahora = z.espera_min;
+    var fs = franjasVigentes(estado.pron[z.acceso_id]);
+    if (!z.abierto || fs.length < 3) return "";
+    var luego = fs[2].espera_min, ahora = z.espera_min;
     if (Math.abs(luego - ahora) < 5) return "estable";
     return luego > ahora ? "subiendo" : "bajando";
   }
@@ -56,26 +69,59 @@
     F.reemplazar($("velocimetro"), [F.velocimetro(prom, ESCALA, "Espera promedio de " + F.num(prom) + " minutos")]);
   }
 
+  // Tarjetas fijas: se crean una vez por entrada, en orden de id, y en cada tick solo cambia su contenido.
+  function crearTarjeta(z) {
+    var t = {
+      art: el("article", { class: "entrada" }), simbolo: el("span"), pastilla: el("span"),
+      espera: el("div", { class: "entrada__espera" }), tendencia: el("div", { class: "entrada__tendencia oculto" }),
+      fila: el("dd", { class: "cifra" }), mejor: el("dd", { class: "cifra" })
+    };
+    [el("div", { class: "entrada__cab" }, [t.simbolo, el("div", {}, [el("h2", {}, corto(z.nombre)), el("span", { class: "tenue", style: { fontSize: "13px" } }, z.zona)])]),
+      t.espera, t.pastilla, t.tendencia,
+      el("dl", { class: "entrada__datos" }, [
+        el("div", {}, [el("dt", {}, "Camiones en fila"), t.fila]),
+        el("div", {}, [el("dt", {}, "Mejor hora"), t.mejor])
+      ])].forEach(function (n) { t.art.appendChild(n); });
+    return t;
+  }
+
+  function cambiarNodo(t, clave, nuevo) { t[clave].parentNode.replaceChild(nuevo, t[clave]); t[clave] = nuevo; }
+
+  function actualizarTarjeta(t, z) {
+    var e = est(z);
+    if (t.estado !== e) { t.art.className = "entrada entrada--" + e; cambiarNodo(t, "simbolo", F.simbolo(e, 22)); }
+    var tend = tendencia(z);
+    if (t.estado !== e || t.tend !== tend) cambiarNodo(t, "pastilla", F.pastilla(e, tend));
+    t.estado = e; t.tend = tend;
+    var espera = z.abierto ? F.num(z.espera_min) : "—";
+    if (t.esperaTxt !== espera) {
+      F.reemplazar(t.espera, z.abierto ? [el("span", { class: "cifra" }, espera), el("span", {}, "min de espera")]
+        : [el("span", { class: "cifra" }, "—"), el("span", {}, "sin paso por ahora")]);
+      t.esperaTxt = espera;
+    }
+    var proximas = franjasVigentes(estado.pron[z.acceso_id]).slice(0, 7).map(function (f) { return f.espera_min; });
+    var clave = proximas.join(",");
+    if (t.proximas !== clave) {
+      t.tendencia.classList.toggle("oculto", proximas.length < 2);
+      F.reemplazar(t.tendencia, proximas.length > 1 ? [
+        F.sparkline(proximas, { max: ESCALA, umbral: 30, etiqueta: "Espera prevista en las próximas 3 horas en " + corto(z.nombre) }),
+        el("span", { class: "tenue" }, "Próximas 3 h")] : []);
+      t.proximas = clave;
+    }
+    t.fila.textContent = F.num(z.en_fila);
+    var mejor = mejorHora(z);
+    t.mejor.textContent = mejor ? F.hora(mejor) : "—";
+  }
+
   function renderZonas(zonas) {
-    F.reemplazar($("zonas"), zonas.map(function (z) {
-      var e = est(z), p = estado.pron[z.acceso_id], t = tendencia(z);
-      var proximas = p ? p.franjas.slice(0, 7).map(function (f) { return f.espera_min; }) : [];
-      return el("article", { class: "entrada entrada--" + e }, [
-        el("div", { class: "entrada__cab" }, [F.simbolo(e, 22), el("div", {}, [el("h2", {}, corto(z.nombre)), el("span", { class: "tenue", style: { fontSize: "13px" } }, z.zona)])]),
-        el("div", { class: "entrada__espera" }, z.abierto
-          ? [el("span", { class: "cifra" }, F.num(z.espera_min)), el("span", {}, "min de espera")]
-          : [el("span", { class: "cifra" }, "—"), el("span", {}, "sin paso por ahora")]),
-        F.pastilla(e, t),
-        proximas.length > 1 ? el("div", { class: "entrada__tendencia" }, [
-          F.sparkline(proximas, { max: ESCALA, umbral: 30, etiqueta: "Espera prevista en las próximas 3 horas en " + corto(z.nombre) }),
-          el("span", { class: "tenue" }, "Próximas 3 h")
-        ]) : null,
-        el("dl", { class: "entrada__datos" }, [
-          el("div", {}, [el("dt", {}, "Camiones en fila"), el("dd", { class: "cifra" }, F.num(z.en_fila))]),
-          el("div", {}, [el("dt", {}, "Mejor hora"), el("dd", { class: "cifra" }, F.hora(z.mejor_hora))])
-        ])
-      ]);
-    }));
+    var orden = zonas.slice().sort(function (a, b) { return a.acceso_id < b.acceso_id ? -1 : 1; });
+    var ids = orden.map(function (z) { return z.acceso_id; }).join(",");
+    if (estado.idsTarjetas !== ids) { // primera vez (o cambió el catálogo de entradas): se arman las tarjetas
+      estado.tarjetas = {};
+      F.reemplazar($("zonas"), orden.map(function (z) { var t = crearTarjeta(z); estado.tarjetas[z.acceso_id] = t; return t.art; }));
+      estado.idsTarjetas = ids;
+    }
+    orden.forEach(function (z) { actualizarTarjeta(estado.tarjetas[z.acceso_id], z); });
   }
 
   // ───────────── Ranking de espera por entrada ─────────────
@@ -135,7 +181,7 @@
   function renderPronostico() {
     var p = estado.pron[estado.sel], z = estado.zonas.filter(function (x) { return x.acceso_id === estado.sel; })[0];
     if (!p || !z) { F.reemplazar($("pron-grafica"), [el("p", { class: "vacio" }, "Pronóstico no disponible por ahora.")]); return; }
-    var franjas = p.franjas.slice(0, 24);
+    var franjas = franjasVigentes(p).slice(0, 24);
     $("pron-sub").textContent = "Espera estimada cada 30 minutos en " + corto(z.nombre);
     var mejor = 0, mejorMedia = Infinity;
     for (var i = 0; i + 3 < franjas.length; i++) {
@@ -177,6 +223,7 @@
       dibujar();
       renderPildoras(estado.zonas); renderPronostico();
     } catch (e) {
+      estado.idsTarjetas = null; // se volverán a armar las tarjetas
       F.reemplazar($("zonas"), [el("p", { class: "tarjeta", role: "alert" }, "No se pudo cargar la información. Reintentando…")]);
     }
   }
@@ -209,7 +256,6 @@
       mejor ? el("p", { class: "ventana" }, [F.simbolo(est(mejor.z), 20),
         el("span", {}, [el("b", {}, "Te conviene " + corto(mejor.z.nombre)), " · ~" + F.num(mejor.total) + " min entre manejo y fila"])])
         : el("p", { class: "ventana" }, "Todas las entradas están cerradas por ahora."),
-      el("p", { class: "tenue cerca__nota" }, "Distancia en línea recta. Tu ubicación se usa solo en este navegador; no se envía a Fluport.")
     ]);
     if (estado.mapa && window.L) {
       if (!estado.marcaYo) estado.marcaYo = L.circleMarker([estado.yo.lat, estado.yo.lon], { radius: 8, color: "#FFFFFF", weight: 3, fillColor: "#2F6FDE", fillOpacity: 1 }).addTo(estado.mapa.mapa).bindTooltip("Estás aquí");
@@ -305,5 +351,5 @@
       function (e) { estado.conexion = e; }, { ws: "/ws/publico", sondeo: "/api/publico/snapshot" });
   });
   cargarBot();
-  setInterval(cargar, 60000); // pronóstico, mejor hora y nombres: cambian más lento que la fila
+  setInterval(cargar, 15000); // pronóstico y mejor hora (el estado de la fila llega en vivo por el WebSocket)
 })();

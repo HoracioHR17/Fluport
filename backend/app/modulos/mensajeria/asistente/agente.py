@@ -173,7 +173,8 @@ class Herramientas:
             if acceso_id and p.acceso_id != acceso_id:
                 continue
             e = estados[p.acceso_id]
-            mejor = min(p.franjas, key=lambda f: f.espera_min) if p.franjas else None
+            futuras = [f for f in p.franjas if f.inicio >= self.sim.ts()]  # sin franjas que ya pasaron
+            mejor = min(futuras, key=lambda f: f.espera_min) if futuras else None
             res.append({
                 "acceso_id": p.acceso_id, "nombre": self.sim.esc.acceso(p.acceso_id).nombre,
                 "abierta": e.estado.value == "abierto", "espera_actual_min": e.espera_min, "semaforo": e.semaforo.value,

@@ -52,7 +52,8 @@ def zonas(sim: Operacion) -> list[ZonaPublica]:
     res = []
     for a in sim.esc.accesos:
         e, p = estados[a.id], pron[a.id]
-        mejor = min(p.franjas, key=lambda f: (f.espera_min, f.inicio)) if p.franjas else None
+        futuras = [f for f in p.franjas if f.inicio >= sim.ts()]  # el pronóstico en caché puede tener franjas ya pasadas
+        mejor = min(futuras, key=lambda f: (f.espera_min, f.inicio)) if futuras else None
         abierto = e.estado == EstadoAcceso.abierto
         res.append(ZonaPublica(
             acceso_id=a.id, nombre=a.nombre, zona=a.zona, semaforo=e.semaforo, espera_min=e.espera_min,
