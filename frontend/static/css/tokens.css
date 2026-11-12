@@ -48,15 +48,10 @@ h2 { font-size: var(--titulo-min); }
 .semaforo--amarillo::before { content: "● "; color: var(--lento); }
 .semaforo--rojo::before     { content: "▲ "; color: var(--saturado); }
 
-/* Logotipo: FLU bold + PORT delgado + tres puntos */
+/* Logotipo: FLU bold + PORT delgado + tres puntos (tres <span> con .p-fluye/.p-lento/.p-saturado) */
 .logo { font-family: var(--fuente); color: var(--abismo); letter-spacing: .02em; }
 .logo__flu { font-weight: 700; }
 .logo__port { font-weight: 400; }
-.logo__puntos::after {
-  content: " ●●●";
-  background: linear-gradient(90deg, var(--fluye) 0 33%, var(--lento) 33% 66%, var(--saturado) 66% 100%);
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-}
 
 .etiqueta-simulacion {
   background: var(--abismo);

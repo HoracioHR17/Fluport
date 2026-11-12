@@ -288,3 +288,34 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `datetime.timedelta` (biblioteca estándar): aritmética de fechas. **Por qué:** calcula el fin de cada franja y detecta franjas consecutivas para unirlas en un solo intervalo de hora pico.
 
 - **Herramientas de IA:** Claude (Opus 5.5) diseñó e implementó la vista pública, amplió el contrato con los campos que necesita la pantalla y escribió 5 pruebas, incluida una de privacidad de la respuesta.
+
+### 2026-11-11 19:05 · `#009` · M6 y M7 Frontend: tablero del operador y vista pública
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `frontend/operador/index.html` | Tablero del operador (`/operador/`, también en `/`). | Encabezado con logotipo, etiqueta SIMULACIÓN, reloj simulado, pausa/reanudar y velocidad; tarjetas por caseta; mapa en vivo (sin Fluport, con Fluport o lado a lado); inyección de eventos y eventos recientes; pronóstico de 12 h; impacto de Fluport; citas (estados, % de cumplimiento, formulario para agendar y tabla). Estructura accesible: `<header>`, `<nav>`, `<main>`, secciones con título, botones y campos reales con etiqueta. |
+  | `frontend/publico/index.html` | Vista pública para vecinos (`/publico/`), pensada para celular. | Una tarjeta por caseta con estado, espera actual, horas pico y mejor hora para pasar; ordenadas de la más saturada a la más libre. |
+  | `frontend/static/js/comun.js` | Utilidades compartidas. | `el()` crea elementos sin interpretar texto como HTML (evita inyección de código); `chip()` dibuja el semáforo con símbolo y texto; `hora()` y `fecha()` muestran todo en hora de Veracruz; `api()` llama a la API y traduce errores a mensajes legibles; `conectarSimulacion()` usa el WebSocket y, si falla, consulta `/api/sim/snapshot` cada segundo y reintenta el WebSocket cada 5 s; `horasPico()`. |
+  | `frontend/static/js/operador.js` | Lógica del tablero. | `crearMapa()` con Leaflet: dibuja las rutas del GeoJSON y las casetas; `posicion()` interpola la ubicación de cada camión sobre su ruta a partir de su progreso 0–1; la fila se dibuja hacia atrás sobre la ruta; los marcadores se reutilizan entre actualizaciones; `render()` actualiza casetas, impacto, eventos y mapas con cada snapshot; `cargarPronostico()` (cada 15 s) dibuja las barras con los umbrales de 30 y 90 min, las horas pico y la mejor hora; `cargarCitas()` (cada 10 s); `buscarHorarios()` y `agendar()` usan las sugerencias y crean la cita; `inyectarEvento()` y `control()`. |
+  | `frontend/static/js/publico.js` | Lógica de la vista pública. | Consulta `/api/publico/zonas` cada 30 s y arma las tarjetas. |
+  | `frontend/static/css/app.css` | Estilos de las pantallas. | Diseño fluido: en celular las columnas se apilan y la tabla se desplaza dentro de su caja; botones de al menos 44 px; foco visible para teclado; números tabulares en cifras y horas. |
+  | `frontend/static/css/tokens.css` (modificado) | Tokens. | Se retira el pseudo-elemento de puntos del logotipo (se dibujaban dos veces); los puntos son `<span>` en el HTML. |
+  | `frontend/static/favicon.svg` | Ícono de la pestaña con los tres puntos del semáforo. | — |
+  | `frontend/static/vendor/leaflet/` | Leaflet 1.9.4 (JS, CSS e imágenes), servido localmente. | Descargado del release oficial en GitHub (`leaflet.zip`), sin npm. |
+  | `backend/app/db/base.py` (modificado) | Conexión a PostgreSQL. | La sesión usa la zona horaria `America/Mexico_City`: las fechas de las citas salían en UTC (16:00 en vez de 10:00). |
+  | `backend/tests/test_frontend.py` (11) | Pruebas. | Las dos páginas y sus 8 archivos estáticos se sirven; ninguna página carga scripts o estilos externos. |
+
+- **Funcionalidad:** con `uvicorn app.main:app` y el navegador en `http://localhost:8000` el operador ve el puerto en vivo: casetas con su semáforo, camiones moviéndose por las rutas hacia cada caseta, la comparación con y sin Fluport, el pronóstico, el ahorro acumulado y las citas. Desde la misma pantalla puede pausar o acelerar la simulación, cerrar o reabrir una caseta, provocar un buque, un norte o carga urgente, y agendar una cita eligiendo entre los 3 mejores horarios. Los vecinos tienen su propia página en `/publico/`. Verificado en Chrome de escritorio y de celular: cita agendada desde la página, evento aplicado, vista lado a lado y sin errores de JavaScript. Pruebas: 105 con PostgreSQL de prueba, 96 sin él.
+
+- **Tecnologías usadas:**
+  - `Leaflet`: biblioteca de mapas interactivos en JavaScript. **Por qué:** ligera (~150 KB), funciona con un archivo local sin compilación y dibuja directamente GeoJSON, líneas y marcadores; se sirve desde el propio servidor para no depender de un CDN.
+  - Mosaicos de **OpenStreetMap**: fondo del mapa con su atribución obligatoria. **Por qué:** gratuitos para uso ligero; si no hay internet, el mapa sigue mostrando rutas, casetas y camiones sobre el fondo de color.
+  - **JavaScript sin framework ni compilación** (DOM + `fetch` + `WebSocket`): **Por qué:** cumple la restricción de no usar npm y basta para pantallas que solo muestran datos de la API; se actualiza al guardar el archivo.
+  - `Intl.DateTimeFormat` / `Intl.NumberFormat` (APIs estándar del navegador): **Por qué:** muestran horas en la zona de Veracruz y cifras con el formato de México sin librerías.
+  - `L.circleMarker` y `L.divIcon` de Leaflet: **Por qué:** cientos de camiones se dibujan como círculos vectoriales (rápidos) y las casetas como etiquetas con el estilo del semáforo.
+  - `playwright` con Chrome: navegador automatizado. **Por qué:** se usó solo para verificar las pantallas durante el desarrollo (capturas y flujo de cita); no forma parte de la aplicación ni de sus dependencias.
+  - PostgreSQL `timezone` por conexión (`options=-c timezone=…`): **Por qué:** que la base devuelva las fechas en la misma zona que el simulador.
+
+- **Herramientas de IA:** Claude (Opus 5.5) diseñó las pantallas (lienzo de diseño aprobado), las implementó en HTML, CSS y JavaScript conectadas a la API, las probó en Chrome automatizado en escritorio y celular, corrigió tres defectos encontrados (logotipo duplicado, horas en UTC, porcentaje engañoso al arrancar) y escribió 11 pruebas.

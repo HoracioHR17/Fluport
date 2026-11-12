@@ -46,6 +46,6 @@ Una sola familia sans serif del sistema, sin descargas: `font-family: Arial, Hel
 - Etiqueta **SIMULACIÓN** visible (campo `etiqueta` del snapshot).
 - Leyenda del semáforo con texto y símbolo.
 
-## 6. Pendiente de definir en el frontend
-- Pantallas: tablero del operador y vista pública (mapa, semáforos, pronóstico 12 h, comparación A/B, KPIs).
-- Implementación sin npm: HTML + CSS + JS servidos por FastAPI, con Leaflet y Chart.js como archivos estáticos (el documento de identidad menciona React y Recharts; se sustituyen por equivalentes sin paso de compilación).
+## 6. Implementación
+- Pantallas: tablero del operador (`frontend/operador/`) y vista pública (`frontend/publico/`), según el lienzo de diseño aprobado.
+- Sin npm: HTML + CSS + JS servidos por FastAPI, con Leaflet como archivo local; la gráfica del pronóstico son barras HTML/CSS (el documento de identidad menciona React y Recharts; se sustituyen por equivalentes sin paso de compilación).

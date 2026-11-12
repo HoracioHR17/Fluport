@@ -19,7 +19,12 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING)
 
 
-engine = create_engine(get_settings().database_url, pool_pre_ping=True)
+# las fechas salen de PostgreSQL en hora de Veracruz (igual que el reloj del simulador)
+engine = create_engine(
+    get_settings().database_url,
+    pool_pre_ping=True,
+    connect_args={"options": f"-c timezone={get_settings().zona_horaria}"},
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
 

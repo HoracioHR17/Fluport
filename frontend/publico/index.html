@@ -1,6 +1,32 @@
-<!DOCTYPE html>
-<html lang="es"><head><meta charset="utf-8"><title>Fluport · Vista pública</title></head>
-<body style="font-family:system-ui;padding:2rem">
-<h1>Fluport · Vista pública</h1>
-<p><strong>SIMULACIÓN</strong> · En construcción. API: <a href="/docs">/docs</a></p>
-</body></html>
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fluport · ¿Cómo están las casetas?</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/css/tokens.css">
+<link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<div class="publico">
+  <header style="display:flex;flex-direction:column;gap:12px">
+    <div class="publico__cab">
+      <a class="logo" href="/publico/" aria-label="Fluport" style="font-size:26px">
+        <span><b>FLU</b><span style="font-weight:400">PORT</span></span>
+        <span class="logo__puntos" aria-hidden="true"><span class="p-fluye"></span><span class="p-lento"></span><span class="p-saturado"></span></span>
+      </a>
+      <span class="etiqueta-simulacion" id="etiqueta">SIMULACIÓN</span>
+    </div>
+    <div>
+      <h1>¿Cómo están las casetas?</h1>
+      <p class="tenue" style="margin:6px 0 0;font-size:15px" id="actualizado">Cargando…</p>
+    </div>
+  </header>
+  <main id="zonas" aria-live="polite" style="display:flex;flex-direction:column;gap:12px"></main>
+  <p class="tenue" style="margin:4px 0 0;font-size:13px;line-height:1.45">● Fluye · menos de 30 min &nbsp;● Lento · 30 a 90 min &nbsp;▲ Saturado · más de 90 min. Datos de una simulación del tráfico de camiones; no muestran información personal.</p>
+</div>
+<script src="/static/js/comun.js"></script>
+<script src="/static/js/publico.js"></script>
+</body>
+</html>
