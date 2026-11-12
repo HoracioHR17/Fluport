@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.api import accesos, asistente, citas, pronostico, publico, sim
+from app.api import accesos, agencias, asistente, citas, pronostico, publico, sim
 from app.config import get_settings
 from app.contracts.enums import EstadoSim
 from app.contracts.schemas import Salud
@@ -42,7 +42,7 @@ app = FastAPI(title="Fluport API", version=VERSION, description="Datos sintétic
 async def _sim_no_iniciada(_: Request, exc: SimNoIniciada) -> JSONResponse:
     return JSONResponse(status_code=503, content={"detail": str(exc)})
 
-for r in (accesos, pronostico, citas, sim, asistente, publico):
+for r in (accesos, pronostico, citas, sim, asistente, publico, agencias):
     app.include_router(r.router)
 
 
@@ -60,9 +60,17 @@ def salud() -> Salud:
 
 @app.get("/", include_in_schema=False)
 def raiz() -> RedirectResponse:
-    return RedirectResponse("/operador/")
+    return RedirectResponse("/publico/")
 
 
-app.mount("/operador", StaticFiles(directory=FRONTEND / "operador", html=True, check_dir=False), name="operador")
+@app.get("/operador", include_in_schema=False)
+@app.get("/operador/", include_in_schema=False)
+def operador() -> RedirectResponse:
+    """Ruta anterior del tablero: ahora es la vista de agencia."""
+    return RedirectResponse("/agencia/")
+
+
+app.mount("/agencia", StaticFiles(directory=FRONTEND / "agencia", html=True, check_dir=False), name="agencia")
+app.mount("/demo", StaticFiles(directory=FRONTEND / "demo", html=True, check_dir=False), name="demo")
 app.mount("/publico", StaticFiles(directory=FRONTEND / "publico", html=True, check_dir=False), name="publico")
 app.mount("/static", StaticFiles(directory=FRONTEND / "static", check_dir=False), name="static")

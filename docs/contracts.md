@@ -114,6 +114,15 @@ Herramientas:
 ```
 backend/app/{api,sim,prediction,assistant,messaging,db,contracts}   # un agente por carpeta
 backend/alembic/                                                    # migraciones
-frontend/{operador,publico,static/{geo,vendor}}                     # sin build, sin npm
+frontend/{agencia,demo,publico,static/{js,css,vendor}}              # sin build, sin npm
 docs/                                                               # contratos, openapi, ejemplos
 ```
+
+## Agencias (`#017`)
+- `GET /api/agencias` → `AgenciaOut[]` · `GET /api/agencias/{id}/transportistas` → `TransportistaOut[]` (teléfono enmascarado).
+- Filtro opcional `agencia_id` en `GET /api/citas`, `GET /api/citas/resumen` y `GET /api/avisos`.
+- `CitaCreate.agencia_id`: agencia del transportista si se crea uno nuevo.
+- Snapshot: `CamionEstado.agencia_id` y `MundoEstado.flota[agencia_id]` (`FlotaAgencia`).
+- `ZonaPublica.contingencia` ∈ `normal | lenta | saturada | cerrada` y `ZonaPublica.norte`.
+- Bot: `t.me/<bot>?start=<agencia_id>` liga al transportista con la agencia.
+- Páginas: `/` → `/publico/` · `/agencia/` · `/demo/` · `/operador/` → `/agencia/`.

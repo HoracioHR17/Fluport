@@ -1,17 +1,19 @@
 """Vista pública para vecinos (M7): semáforo actual y horas pico previstas por caseta.
 
 Solo expone información agregada de tráfico; nunca citas, transportistas ni la comparación A/B.
+`contingencia` resume el estado de cada entrada (normal, lenta, saturada o cerrada) y `norte` el clima.
 Se usa el Mundo B (operación con Fluport).
 """
 from datetime import timedelta
 
-from app.contracts.enums import EstadoAcceso, Mundo, Semaforo
+from app.contracts.enums import Clima, EstadoAcceso, Mundo, Semaforo
 from app.contracts.schemas import HoraPico, PronosticoOut, ZonaPublica
 from app.prediction.features import FRANJA_MIN
 from app.prediction.pronosticador import pronosticador
 from app.sim.motor import Simulador
 
 GRAVEDAD = {Semaforo.verde: 0, Semaforo.amarillo: 1, Semaforo.rojo: 2}
+CONTINGENCIA = {Semaforo.verde: "normal", Semaforo.amarillo: "lenta", Semaforo.rojo: "saturada"}
 
 
 def horas_pico(p: PronosticoOut) -> list[HoraPico]:
@@ -41,9 +43,11 @@ def zonas(sim: Simulador) -> list[ZonaPublica]:
     for a in sim.esc.accesos:
         e, p = estados[a.id], pron[a.id]
         mejor = min(p.franjas, key=lambda f: (f.espera_min, f.inicio)) if p.franjas else None
+        abierto = e.estado == EstadoAcceso.abierto
         res.append(ZonaPublica(
             acceso_id=a.id, nombre=a.nombre, zona=a.zona, semaforo=e.semaforo, espera_min=e.espera_min,
-            abierto=e.estado == EstadoAcceso.abierto, horas_pico=horas_pico(p),
+            abierto=abierto, horas_pico=horas_pico(p),
+            contingencia=CONTINGENCIA[e.semaforo] if abierto else "cerrada", norte=sim.clima == Clima.norte,
             mejor_hora=mejor.inicio if mejor else None, actualizado_en=sim.ts(), etiqueta=sim.cfg.etiqueta_simulacion,
         ))
     return res

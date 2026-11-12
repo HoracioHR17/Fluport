@@ -4,6 +4,9 @@ Flujo:
 1. Chat nuevo → se le pide compartir su número con el botón de contacto de Telegram.
 2. Comparte su propio contacto → se registra (`transportista.telegram_chat_id`) y queda identificado.
 3. Mensajes de texto → asistente (mismo que WhatsApp y web) → respuesta en el chat.
+
+Enlace de agencia: `t.me/<bot>?start=AG01` abre el chat con `/start AG01`; el transportista queda ligado a
+esa agencia (al registrarse, o de inmediato si ya estaba registrado).
 """
 import asyncio
 import logging
@@ -17,7 +20,7 @@ from app.citas.servicio import ErrorCita, normalizar_telefono
 from app.contracts.enums import Canal
 from app.contracts.schemas import AsistenteRequest
 from app.db.base import SessionLocal
-from app.db.models import Transportista
+from app.db.models import Agencia, Transportista
 from app.messaging import telegram
 from app.sim.motor import Simulador
 
@@ -28,14 +31,27 @@ BIENVENIDA = ("¡Hola! Soy el asistente de *FLUPORT* para las casetas del puerto
 REGISTRADO = ("Listo ✅ Ya te identifiqué con el número terminado en {fin}.\n"
               "Escríbeme, por ejemplo: _llego mañana a las 9 con un contenedor de 40_ o _¿cómo está la fila?_")
 CONTACTO_AJENO = "Por seguridad solo puedo registrar *tu propio* número. Usa el botón para compartirlo."
+LIGADO = "Quedaste ligado a la agencia *{nombre}*; ahí verán tus citas y tu camión."
+
+# código de agencia recibido con /start antes de que el chat comparta su número
+_agencia_pendiente: dict[int, str] = {}
+
+
+def codigo_agencia(db: Session, texto: str) -> Agencia | None:
+    """Agencia del parámetro de `/start AG01` (None si no viene o no existe)."""
+    partes = texto.split(maxsplit=1)
+    if len(partes) < 2:
+        return None
+    return db.get(Agencia, partes[1].strip().upper())
 
 
 def transportista_de_chat(db: Session, chat_id: int) -> Transportista | None:
     return db.scalar(select(Transportista).where(Transportista.telegram_chat_id == chat_id))
 
 
-def registrar_contacto(db: Session, chat_id: int, telefono: str, nombre: str | None) -> Transportista:
-    """Liga el chat con el transportista de ese teléfono (lo crea si no existe)."""
+def registrar_contacto(db: Session, chat_id: int, telefono: str, nombre: str | None,
+                       agencia_id: str | None = None) -> Transportista:
+    """Liga el chat con el transportista de ese teléfono (lo crea si no existe) y, si viene, con su agencia."""
     tel = normalizar_telefono(telefono)
     anterior = transportista_de_chat(db, chat_id)
     if anterior is not None and anterior.telefono != tel:
@@ -46,6 +62,8 @@ def registrar_contacto(db: Session, chat_id: int, telefono: str, nombre: str | N
         t = Transportista(alias=nombre or f"Transportista {tel[-4:]}", telefono=tel, es_demo=True)
         db.add(t)
     t.telegram_chat_id = chat_id
+    if agencia_id is not None:
+        t.agencia_id = agencia_id
     db.commit()
     return t
 
@@ -65,24 +83,33 @@ async def procesar_update(sim: Simulador, update: dict[str, Any]) -> str | None:
             return CONTACTO_AJENO
         try:
             with SessionLocal() as db:
-                t = registrar_contacto(db, chat_id, contacto.get("phone_number", ""), contacto.get("first_name"))
+                t = registrar_contacto(db, chat_id, contacto.get("phone_number", ""), contacto.get("first_name"),
+                                       _agencia_pendiente.pop(chat_id, None))
                 fin = (t.telefono or "")[-4:]
+                agencia = t.agencia.nombre if t.agencia else None
         except ErrorCita:
             await telegram.enviar(chat_id, "No pude leer ese número. Inténtalo de nuevo con el botón.",
                                   telegram.TECLADO_CONTACTO)
             return None
-        texto = REGISTRADO.format(fin=fin)
+        texto = REGISTRADO.format(fin=fin) + ("\n" + LIGADO.format(nombre=agencia) if agencia else "")
         await telegram.enviar(chat_id, texto, telegram.QUITAR_TECLADO)
         return texto
 
     texto_usuario = (msg.get("text") or "").strip()
     with SessionLocal() as db:
         t = transportista_de_chat(db, chat_id)
+        agencia = codigo_agencia(db, texto_usuario) if texto_usuario.startswith("/start") else None
         if t is None or texto_usuario.startswith("/start"):
             if t is None:
+                if agencia is not None:
+                    _agencia_pendiente[chat_id] = agencia.id
                 await telegram.enviar(chat_id, BIENVENIDA, telegram.TECLADO_CONTACTO)
                 return BIENVENIDA
             texto = REGISTRADO.format(fin=(t.telefono or "")[-4:])
+            if agencia is not None:
+                t.agencia_id = agencia.id
+                db.commit()
+                texto += "\n" + LIGADO.format(nombre=agencia.nombre)
             await telegram.enviar(chat_id, texto)
             return texto
         if not texto_usuario:

@@ -13,6 +13,10 @@ TEST_DB = os.environ.get("FLUPORT_TEST_DATABASE_URL")
 os.environ["FLUPORT_DATABASE_URL"] = TEST_DB or "postgresql+psycopg://nadie:nada@127.0.0.1:1/inexistente"
 os.environ["FLUPORT_PRONOSTICO_AUTOENTRENAR"] = "false"
 os.environ["FLUPORT_SIM_VELOCIDAD"] = "60"
+# Aísla las pruebas de tu .env: sin llaves reales nunca se llama a Gemini, Twilio ni Telegram.
+for _var in ("LLM_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_WEBHOOK_URL",
+             "TELEGRAM_TOKEN", "TELEGRAM_WEBHOOK_SECRET"):
+    os.environ[f"FLUPORT_{_var}"] = ""
 
 import pytest  # noqa: E402
 

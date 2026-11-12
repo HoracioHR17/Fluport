@@ -8,15 +8,16 @@ Fluport predice la congestión en los accesos al puerto de Veracruz y redistribu
 ## El problema
 Cientos de camiones llegan al puerto todos los días a las mismas horas. Se forman filas largas en los accesos, se pierden horas de trabajo, se quema diésel en ralentí y el tráfico se desborda a la ciudad.
 
-**Para quién:** transportistas, agentes aduanales y terminales, y vecinos de las zonas cercanas al puerto.
+**Para quién:** agencias transportistas y sus choferes, agentes aduanales y terminales, y vecinos de las zonas cercanas al puerto.
 
 ## Cómo funciona
 1. **Simulador en vivo:** recrea el flujo de camiones hacia los accesos. Corre dos mundos a la vez, uno *sin Fluport* y otro *con Fluport*, para medir la diferencia.
 2. **Pronóstico:** estima la espera de cada acceso durante las próximas 12 horas.
 3. **Citas:** sugiere los tres mejores horarios para llegar y permite agendar, cambiar o cancelar.
-4. **Asistente por mensaje (Telegram; WhatsApp listo para conectarse):** el transportista pregunta en lenguaje natural, agenda su cita y recibe avisos.
-5. **Tablero del operador:** mapa en vivo, semáforo por acceso, pronóstico y ahorro en horas, diésel, costo y CO₂.
-6. **Vista pública:** semáforo y horas pico por zona para los vecinos.
+4. **Vista pública:** estado de contingencia de cada entrada (normal, lenta, saturada o cerrada), espera estimada en tiempo real, horas pico y un acceso directo (botón y QR) al bot de Telegram.
+5. **Bot de Telegram (WhatsApp listo para conectarse):** cada transportista se registra con su número, agenda, cambia o cancela sus citas en lenguaje natural y recibe avisos si su caseta se satura o se cierra.
+6. **Vista de agencia:** cada agencia supervisa a sus transportistas: sus camiones en el mapa, su flota por estado, sus citas y los avisos que reciben, además del estado y el pronóstico de las casetas. Invita a sus choferes con un enlace del bot propio de la agencia.
+7. **Panel de demostración:** controla la simulación (velocidad y eventos como cierres, buques o norte) y compara el mundo *sin Fluport* con el *con Fluport*: ahorro en horas, diésel, costo y CO₂.
 
 ## Cómo usarlo
 **Demo en línea:** _(enlace pendiente)_
@@ -30,7 +31,7 @@ cp .env.example .env          # ajustar la conexión a PostgreSQL
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
-Abrir `http://localhost:8000` (tablero) · `http://localhost:8000/publico/` (vecinos) · `http://localhost:8000/docs` (API).
+Abrir `http://localhost:8000/publico/` (vista pública, también en `/`) · `/agencia/` (agencias) · `/demo/` (panel de demostración) · `/docs` (API).
 
 **Pruebas:**
 ```bash
@@ -479,3 +480,40 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `Alembic`: ver `aae10d9`. Segunda migración del esquema.
 
 - **Herramientas de IA:** Claude (Opus 5.5) comparó alternativas a Twilio (Telegram, WhatsApp Cloud API directa, otros proveedores y chat en el tablero), implementó el canal de Telegram reutilizando el asistente y los avisos, generó y probó la migración, y escribió 10 pruebas.
+
+### 2026-11-11 21:45 · `#017` · Flujo por actores: vista pública, agencias y panel de demostración
+
+- **Justificación del cambio:** el tablero único mezclaba tres papeles distintos: el del público, el de quien supervisa a los transportistas y el del presentador que controla la simulación. Se separa el flujo por actores: **la agencia** controla a sus transportistas y ve cómo van sus camiones y el flujo del puerto; **el público** ve el estado de contingencia de cada entrada y los tiempos estimados en tiempo real, y desde ahí entra directo al bot; **el transportista** lleva sus citas en el bot de Telegram. Los controles de la simulación salen de la vista de agencia, porque una agencia no cierra casetas ni acelera el reloj.
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/data/escenario.json`, `backend/app/sim/escenario.py` (modificados) | Agencias de la demo. | Tres agencias ficticias con su participación en los camiones simulados (`AgenciaParam`); `agencia_de()` asigna cada camión simulado a una agencia según el `crc32` de su id, de forma fija y sin consumir números aleatorios, para no alterar los resultados de la simulación ni de las pruebas. |
+  | `backend/app/db/models.py` (modificado) y `backend/alembic/versions/0003_agencias.py` | Esquema. | Tabla `agencia` y `transportista.agencia_id` (FK con índice; si se borra la agencia, el transportista queda independiente). Migración probada de ida y vuelta y verificada con `alembic check`. |
+  | `backend/app/sim/persistencia.py` (modificado) | Siembra. | `sembrar_accesos()` también inserta o actualiza las agencias del escenario al arrancar. |
+  | `backend/app/sim/demanda.py`, `mundo.py`, `motor.py` (modificados) | Simulación por agencia. | `CamionPlan.agencia_id`; cada mundo acumula esperas, camiones atendidos y paso por la fila por agencia; `flota()` cuenta **todos** los camiones activos de cada agencia por estado (no solo los dibujados) y su espera promedio; el camión de una cita real hereda la agencia de su transportista. |
+  | `backend/app/contracts/schemas.py` (modificado) | Contratos. | `FlotaAgencia` y `MundoEstado.flota`; `CamionEstado.agencia_id`; `CitaCreate.agencia_id` (agencia del transportista si se crea uno nuevo); `ZonaPublica.contingencia` (`normal`, `lenta`, `saturada`, `cerrada`) y `norte`; `AgenciaOut` y `TransportistaOut` (teléfono enmascarado: solo los últimos 4 dígitos). |
+  | `backend/app/api/agencias.py` | API de agencias. | `GET /api/agencias` (con número de transportistas); `GET /api/agencias/{id}/transportistas` (alias, final del teléfono, si usa Telegram, citas activas y próxima cita). |
+  | `backend/app/api/citas.py`, `asistente.py`, `backend/app/citas/servicio.py` (modificados) | Filtros por agencia. | `agencia_id` opcional en `GET /api/citas`, `GET /api/citas/resumen` y `GET /api/avisos`; valida que la agencia exista al crear un transportista. |
+  | `backend/app/messaging/bot_telegram.py` (modificado) | Enlace de agencia. | `t.me/<bot>?start=AG01` llega como `/start AG01`: si el chat es nuevo, el código se guarda hasta que comparte su número y queda ligado a esa agencia; si ya estaba registrado, cambia de agencia. Un código inexistente se ignora. |
+  | `backend/app/publico/servicio.py` (modificado) | Contingencia. | Traduce el semáforo y el estado de cada caseta a la contingencia pública y marca si hay norte. |
+  | `backend/app/main.py` (modificado) | Rutas de páginas. | `/` lleva a la vista pública; `/agencia/` y `/demo/`; `/operador/` redirige a `/agencia/`. |
+  | `frontend/agencia/index.html` | Vista de agencia. | Selector de agencia (se recuerda en el navegador o se elige con `?agencia=AG01`); casetas; mapa solo con los camiones de la agencia; "Mi flota ahora" (en ruta, en fila, en revisión, dentro, atendidos y espera promedio); invitación al bot con QR y enlace propio de la agencia; avisos a sus transportistas; pronóstico; lista de sus transportistas; citas de la agencia con formulario para agendar a uno de sus choferes. |
+  | `frontend/demo/index.html` | Panel de demostración. | Lo que era el tablero del operador sin la sección de citas: reloj, pausa y velocidad, mapas sin y con Fluport, inyección de eventos, avisos, pronóstico e impacto. |
+  | `frontend/static/js/tablero.js` (antes `operador.js`) | Lógica de ambos tableros. | El modo sale de `<body data-vista>`; en `agencia`: `iniciarAgencia()`, `elegirAgencia()`, `renderFlota()`, `cargarTransportistas()`, `renderInvitacion()` y filtros por agencia en citas y avisos; en `demo`: controles, mundos A/B e impacto. |
+  | `frontend/publico/index.html`, `frontend/static/js/publico.js` (modificados) | Vista pública. | Alerta de contingencia (norte, entradas cerradas o saturadas); etiqueta de contingencia por entrada; tarjeta "¿Eres transportista?" con botón y QR al bot; actualización cada 10 s. |
+  | `frontend/static/vendor/qrcode/` | Generador de QR. | `qrcode.js` de Kazuhiko Arase (licencia MIT), copiado al proyecto como Leaflet. |
+  | `frontend/static/css/app.css` (modificado) | Estilos. | Flota, invitación, QR, alerta, tarjeta del bot y etiquetas de contingencia con la paleta del proyecto. |
+  | `backend/tests/conftest.py` (corregido) | Aislamiento de las pruebas. | Las pruebas vacían la llave de Gemini y las credenciales de Twilio y Telegram antes de cargar la app: con un `.env` real, dos pruebas fallaban y una llegaba a llamar a Telegram. |
+  | `backend/tests/test_agencias.py` (10), `test_frontend.py` y `test_api.py` (actualizadas) | Pruebas. | Reparto fijo y proporcional de camiones; flota que cuadra con los camiones en fila y atendidos del mundo; agencia heredada por la cita; contingencia cerrada y norte; con BD: catálogo, cita de agencia y filtros (citas, resumen, avisos), teléfono enmascarado, agencia inexistente (404), enlace `/start AG02` antes y después del registro; páginas `/agencia/`, `/demo/` y redirección de `/operador/`. |
+
+- **Funcionalidad:** el público abre `/publico/` y ve, por entrada, si opera normal, lenta, saturada o cerrada, cuánto se espera ahora, las horas pico y la mejor hora; si es transportista, toca "Agenda tu cita en Telegram" o escanea el QR. La agencia abre `/agencia/`, elige su nombre y ve en el mapa solo sus camiones, cuántos van en ruta, en fila o dentro del puerto, la espera promedio de su flota, a sus transportistas con su próxima cita, sus citas y los avisos que reciben; con su QR invita a sus choferes, que al registrarse en el bot quedan ligados a ella. El presentador usa `/demo/` para acelerar el reloj, provocar eventos y mostrar el impacto. Pruebas: 160 con PostgreSQL de prueba.
+
+- **Tecnologías usadas:**
+  - **qrcode-generator** (JavaScript, MIT): genera el QR como SVG en el navegador. **Por qué:** un solo archivo sin dependencias, copiado al repositorio (sin npm ni CDN) y sin llamadas de red; el QR se genera a partir de la URL del propio bot.
+  - **Deep linking de Telegram** (`?start=<código>`): Telegram abre el chat y envía `/start <código>`. **Por qué:** liga al chofer con su agencia sin que escriba nada ni la agencia capture datos.
+  - **crc32** (`zlib`, biblioteca estándar): reparte los camiones simulados entre agencias de forma reproducible. **Por qué:** sortear con el generador aleatorio cambiaría la secuencia de toda la simulación.
+  - `Alembic`: ver `aae10d9`. Tercera migración del esquema.
+
+- **Herramientas de IA:** Claude (Opus 5.5) propuso el flujo por actores, implementó las agencias en la simulación, la base de datos, la API, el bot y las tres vistas, generó y verificó la migración, y escribió 10 pruebas nuevas.

@@ -4,38 +4,87 @@
   "camiones_dia": 2000,
   "camiones_dia_incluye_buques": false,
   "llegadas_por_franja": [
-    { "desde": 0,  "hasta": 6,  "pct": 0.05 },
-    { "desde": 6,  "hasta": 10, "pct": 0.24 },
-    { "desde": 10, "hasta": 14, "pct": 0.28 },
-    { "desde": 14, "hasta": 18, "pct": 0.26 },
-    { "desde": 18, "hasta": 24, "pct": 0.17 }
+    {
+      "desde": 0,
+      "hasta": 6,
+      "pct": 0.05
+    },
+    {
+      "desde": 6,
+      "hasta": 10,
+      "pct": 0.24
+    },
+    {
+      "desde": 10,
+      "hasta": 14,
+      "pct": 0.28
+    },
+    {
+      "desde": 14,
+      "hasta": 18,
+      "pct": 0.26
+    },
+    {
+      "desde": 18,
+      "hasta": 24,
+      "pct": 0.17
+    }
   ],
   "mezcla_carga": {
     "contenedor_20": 0.225,
-    "contenedor_40": 0.360,
-    "refrigerado": 0.060,
+    "contenedor_40": 0.36,
+    "refrigerado": 0.06,
     "peligroso": 0.175,
-    "granel": 0.090,
-    "carga_general": 0.090
+    "granel": 0.09,
+    "carga_general": 0.09
   },
-  "cargas_prioritarias": ["refrigerado", "peligroso"],
+  "cargas_prioritarias": [
+    "refrigerado",
+    "peligroso"
+  ],
   "servicio_sigma": 0.35,
-  "ruta_min": [15, 35],
-  "estancia_min": [45, 120],
+  "ruta_min": [
+    15,
+    35
+  ],
+  "estancia_min": [
+    45,
+    120
+  ],
   "con_cita": 0.65,
   "no_show": 0.15,
-  "cumplimiento_sugerencia": 0.50,
+  "cumplimiento_sugerencia": 0.5,
   "retraso_promedio_min": 20,
-  "ventana_reprogramacion_min": [-60, 180],
+  "ventana_reprogramacion_min": [
+    -60,
+    180
+  ],
   "ocupacion_objetivo_franja": 0.85,
-  "revision_aduanal": { "prob": 0.10, "extra_min": 45 },
+  "revision_aduanal": {
+    "prob": 0.1,
+    "extra_min": 45
+  },
   "buques": {
     "por_dia_media": 1.1,
-    "contenedores": [1540, 2560],
+    "contenedores": [
+      1540,
+      2560
+    ],
     "camiones_por_contenedor": 0.3,
-    "ola_horas": [0, 24]
+    "ola_horas": [
+      0,
+      24
+    ]
   },
-  "norte": { "prob_dia": 0.10, "duracion_h": 24, "duracion_rango_h": [12, 48], "reduccion_atencion": 0.30 },
+  "norte": {
+    "prob_dia": 0.1,
+    "duracion_h": 24,
+    "duracion_rango_h": [
+      12,
+      48
+    ],
+    "reduccion_atencion": 0.3
+  },
   "impacto": {
     "diesel_ralenti_l_h": 3.0,
     "diesel_precio_mxn_l": 26.0,
@@ -44,25 +93,120 @@
   },
   "accesos": [
     {
-      "id": "A1", "nombre": "Caseta La Antigua", "zona": "La Antigua · autopista Cardel–Veracruz",
-      "lat": 19.3390, "lon": -96.3420, "carriles": 4, "tiempo_servicio_min": 3.9, "participacion": 0.40,
+      "id": "A1",
+      "nombre": "Caseta La Antigua",
+      "zona": "La Antigua · autopista Cardel–Veracruz",
+      "lat": 19.339,
+      "lon": -96.342,
+      "carriles": 4,
+      "tiempo_servicio_min": 3.9,
+      "participacion": 0.4,
       "rutas": [
-        { "id": "R-A1-1", "coords": [[19.3700, -96.3700], [19.3600, -96.3610], [19.3490, -96.3510], [19.3390, -96.3420]] }
+        {
+          "id": "R-A1-1",
+          "coords": [
+            [
+              19.37,
+              -96.37
+            ],
+            [
+              19.36,
+              -96.361
+            ],
+            [
+              19.349,
+              -96.351
+            ],
+            [
+              19.339,
+              -96.342
+            ]
+          ]
+        }
       ]
     },
     {
-      "id": "A2", "nombre": "Caseta Paso del Toro", "zona": "Medellín de Bravo · autopista Córdoba–Veracruz (150D)",
-      "lat": 19.0700, "lon": -96.1780, "carriles": 4, "tiempo_servicio_min": 4.1, "participacion": 0.38,
+      "id": "A2",
+      "nombre": "Caseta Paso del Toro",
+      "zona": "Medellín de Bravo · autopista Córdoba–Veracruz (150D)",
+      "lat": 19.07,
+      "lon": -96.178,
+      "carriles": 4,
+      "tiempo_servicio_min": 4.1,
+      "participacion": 0.38,
       "rutas": [
-        { "id": "R-A2-1", "coords": [[19.0300, -96.2500], [19.0430, -96.2260], [19.0570, -96.2020], [19.0700, -96.1780]] }
+        {
+          "id": "R-A2-1",
+          "coords": [
+            [
+              19.03,
+              -96.25
+            ],
+            [
+              19.043,
+              -96.226
+            ],
+            [
+              19.057,
+              -96.202
+            ],
+            [
+              19.07,
+              -96.178
+            ]
+          ]
+        }
       ]
     },
     {
-      "id": "A3", "nombre": "Caseta San Julián", "zona": "Veracruz · autopista Veracruz–Cardel",
-      "lat": 19.2300, "lon": -96.2350, "carriles": 3, "tiempo_servicio_min": 4.5, "participacion": 0.22,
+      "id": "A3",
+      "nombre": "Caseta San Julián",
+      "zona": "Veracruz · autopista Veracruz–Cardel",
+      "lat": 19.23,
+      "lon": -96.235,
+      "carriles": 3,
+      "tiempo_servicio_min": 4.5,
+      "participacion": 0.22,
       "rutas": [
-        { "id": "R-A3-1", "coords": [[19.2700, -96.2700], [19.2570, -96.2580], [19.2430, -96.2460], [19.2300, -96.2350]] }
+        {
+          "id": "R-A3-1",
+          "coords": [
+            [
+              19.27,
+              -96.27
+            ],
+            [
+              19.257,
+              -96.258
+            ],
+            [
+              19.243,
+              -96.246
+            ],
+            [
+              19.23,
+              -96.235
+            ]
+          ]
+        }
       ]
+    }
+  ],
+  "agencias": [
+    {
+      "id": "AG01",
+      "nombre": "Transportes del Golfo",
+      "participacion": 0.4
+    },
+    {
+      "id": "AG02",
+      "nombre": "Logística Sotavento",
+      "participacion": 0.35
+    },
+    {
+      "id": "AG03",
+      "nombre": "Fletes Jarochos",
+      "participacion": 0.25
     }
   ]
 }

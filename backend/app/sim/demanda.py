@@ -34,6 +34,7 @@ class CamionPlan:
     cancelado: bool = False  # cita cancelada/reprogramada antes de salir: el camión no se presenta
     es_demo: bool = False
     origen: str = "base"  # base | buque | urgente | cita
+    agencia_id: str | None = None  # agencia dueña del camión (vista de agencia)
 
 
 def _lognormal(rng: random.Random, media: float, sigma: float) -> float:
@@ -80,6 +81,7 @@ def crear_camion(
         revision_aduanal=aduana,
         prioritario=(tipo in esc.cargas_prioritarias) if prioritario is None else prioritario,
         origen=origen,
+        agencia_id=esc.agencia_de(id_),
     )
 
 

@@ -1,6 +1,7 @@
 """Carga y valida los parámetros del escenario (backend/data/escenario.json)."""
 import json
 import math
+import zlib
 from functools import lru_cache
 from pathlib import Path
 
@@ -30,6 +31,14 @@ class AccesoParam(BaseModel):
     @property
     def capacidad_hora(self) -> int:
         return int(self.carriles * 60 / self.tiempo_servicio_min)
+
+
+class AgenciaParam(BaseModel):
+    """Agencia (empresa transportista) de la demo; `participacion` = parte de los camiones simulados que son suyos."""
+
+    id: str
+    nombre: str
+    participacion: float = Field(gt=0)
 
 
 class FranjaLlegadas(BaseModel):
@@ -90,6 +99,7 @@ class Escenario(BaseModel):
     norte: NorteParam
     impacto: Impacto
     accesos: list[AccesoParam] = Field(min_length=1)
+    agencias: list[AgenciaParam] = Field(default_factory=list)
 
     @field_validator("llegadas_por_franja")
     @classmethod
@@ -130,6 +140,18 @@ class Escenario(BaseModel):
         if len({a.id for a in v}) != len(v):
             raise ValueError("ids de acceso repetidos")
         return v
+
+    def agencia_de(self, camion_id: str) -> str | None:
+        """Agencia de un camión simulado: fija por su id (crc32) para no alterar los números aleatorios."""
+        if not self.agencias:
+            return None
+        total = sum(a.participacion for a in self.agencias)
+        u = (zlib.crc32(camion_id.encode()) % 10_000) / 10_000 * total
+        for a in self.agencias:
+            u -= a.participacion
+            if u < 0:
+                return a.id
+        return self.agencias[-1].id
 
     def acceso(self, acceso_id: str) -> AccesoParam:
         for a in self.accesos:

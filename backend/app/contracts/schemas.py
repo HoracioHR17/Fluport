@@ -74,6 +74,7 @@ class CitaCreate(Modelo):
     telefono: str | None = Field(None, description="Identifica/crea al transportista (solo números de prueba con consentimiento)")
     transportista_id: int | None = None
     alias: str | None = None
+    agencia_id: str | None = Field(None, description="Agencia del transportista si se crea uno nuevo")
     acceso_id: str
     ventana_inicio: datetime
     ventana_fin: datetime
@@ -152,6 +153,18 @@ class CamionEstado(Modelo):
     tipo_carga: TipoCarga
     cita_id: int | None = None
     es_demo: bool = False
+    agencia_id: str | None = None
+
+
+class FlotaAgencia(Modelo):
+    """Camiones activos de una agencia por estado (todos, no solo los dibujados) y su desempeño acumulado."""
+
+    en_ruta: int = 0
+    en_fila: int = 0
+    en_revision: int = 0
+    dentro: int = 0  # dentro del recinto o saliendo
+    atendidos: int = 0
+    espera_prom_min: float = 0.0
 
 
 class Kpis(Modelo):
@@ -178,6 +191,7 @@ class MundoEstado(Modelo):
     camiones_ocultos: int = 0
     accesos: list[AccesoEstado]
     kpis: Kpis
+    flota: dict[str, FlotaAgencia] = {}  # por agencia_id
 
 
 class EventoOut(Modelo):
@@ -300,8 +314,26 @@ class ZonaPublica(Modelo):
     abierto: bool
     horas_pico: list[HoraPico]  # próximas 12 h
     mejor_hora: datetime | None = None  # franja con menor espera prevista en las próximas 12 h
+    contingencia: Literal["normal", "lenta", "saturada", "cerrada"] = "normal"
+    norte: bool = False  # norte activo: la revisión es más lenta en todas las casetas
     actualizado_en: datetime
     etiqueta: str = "SIMULACIÓN"
+
+
+# ───────────────────────────── Agencias ─────────────────────────────
+class AgenciaOut(Modelo):
+    id: str
+    nombre: str
+    transportistas: int = 0
+
+
+class TransportistaOut(Modelo):
+    id: int
+    alias: str
+    telefono_fin: str | None = None  # solo los últimos 4 dígitos
+    telegram: bool = False
+    citas_activas: int = 0
+    proxima_cita: datetime | None = None
 
 
 class Salud(Modelo):

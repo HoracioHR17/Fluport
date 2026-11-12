@@ -4,7 +4,7 @@ Mundo A (sin Fluport): cada camión llega a su hora deseada, fila FIFO, sin avis
 Mundo B (con Fluport): llegada según la franja asignada por el planificador (si el camión cumple),
 prioridad para carga refrigerada/peligrosa y desvío anticipado si su acceso está cerrado.
 """
-from collections import deque
+from collections import Counter, deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
@@ -64,6 +64,10 @@ class MundoSim:
         self.espera_max = 0.0
         self.atendidos = 0
         self.pico_fila = 0
+        # Por agencia (vista de agencia): esperas acumuladas, camiones que ya pasaron la fila y atendidos
+        self.esperas_agencia: Counter[str] = Counter()
+        self.filas_agencia: Counter[str] = Counter()
+        self.atendidos_agencia: Counter[str] = Counter()
 
     # ───────────── Altas de camiones ─────────────
     def agregar(self, planes: list[CamionPlan]) -> None:
@@ -115,12 +119,17 @@ class MundoSim:
             espera = self.env.now - c.t_fila
             self.esperas_total += espera
             self.espera_max = max(self.espera_max, espera)
+            if p.agencia_id:
+                self.esperas_agencia[p.agencia_id] += espera
+                self.filas_agencia[p.agencia_id] += 1
             c.estado, c.t_estado = EstadoCamion.en_revision, self.env.now
             self._notificar_cita(p, "cumplida")
             acc.en_revision += 1
             yield self.env.timeout(p.servicio_base * self.factor_servicio)
             acc.en_revision -= 1
         self.atendidos += 1
+        if p.agencia_id:
+            self.atendidos_agencia[p.agencia_id] += 1
         acc.atendidos.append(self.env.now)
         c.estado, c.t_estado = EstadoCamion.dentro, self.env.now
         yield self.env.timeout(p.estancia_min)

@@ -1,7 +1,7 @@
 """Motor de simulación: avanza los mundos A y B en paralelo, aplica eventos y produce snapshots/KPIs."""
 import logging
 import random
-from collections import defaultdict, deque
+from collections import Counter, defaultdict, deque
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
@@ -22,6 +22,7 @@ from app.contracts.schemas import (
     CamionEstado,
     EventoCreate,
     EventoOut,
+    FlotaAgencia,
     Kpis,
     KpisComparacion,
     KpisResponse,
@@ -214,13 +215,15 @@ class Simulador:
 
     # ───────────── Citas (M3) ─────────────
     def inyectar_cita(
-        self, cita_id: int, acceso_id: str, inicio: datetime, tipo_carga: TipoCarga, es_demo: bool = False
+        self, cita_id: int, acceso_id: str, inicio: datetime, tipo_carga: TipoCarga, es_demo: bool = False,
+        agencia_id: str | None = None,
     ) -> str:
         """Agrega a ambos mundos el camión de una cita real (en B llega en su ventana)."""
         rng = random.Random(cita_id)
         plan = crear_camion(self.esc, rng, f"C{cita_id:05d}", max(self.t, self.a_minuto(inicio)),
                             acceso_id=acceso_id, tipo_carga=tipo_carga, origen="cita")
         plan.cita_id, plan.es_demo, plan.con_cita, plan.no_show, plan.cumple = cita_id, es_demo, True, False, True
+        plan.agencia_id = agencia_id  # la del transportista (None = independiente)
         self.citas[cita_id] = plan
         self._alimentar([plan])
         return plan.id
@@ -300,13 +303,33 @@ class Simulador:
             camiones=[
                 CamionEstado(id=c.plan.id, acceso_id=c.acceso_id, ruta_id=c.ruta_id, progreso=round(ms.progreso(c), 3),
                              estado=c.estado, tipo_carga=c.plan.tipo_carga, cita_id=c.plan.cita_id,
-                             es_demo=c.plan.es_demo)
+                             es_demo=c.plan.es_demo, agencia_id=c.plan.agencia_id)
                 for c in visibles[:tope]
             ],
+            flota=self.flota(mundo),
             camiones_ocultos=max(0, len(visibles) - tope),
             accesos=self.estado_accesos(mundo),
             kpis=self.kpis(mundo),
         )
+
+    def flota(self, mundo: Mundo) -> dict[str, FlotaAgencia]:
+        """Conteo por agencia de TODOS sus camiones activos (no solo los dibujados) y su espera promedio."""
+        ms = self.mundos[mundo]
+        conteo: dict[str, Counter] = {a.id: Counter() for a in self.esc.agencias}
+        for c in ms.camiones.values():
+            if c.plan.agencia_id in conteo:
+                conteo[c.plan.agencia_id][c.estado] += 1
+        res = {}
+        for ag, k in conteo.items():
+            n = ms.filas_agencia[ag]
+            res[ag] = FlotaAgencia(
+                en_ruta=k[EstadoCamion.en_ruta], en_fila=k[EstadoCamion.en_fila],
+                en_revision=k[EstadoCamion.en_revision],
+                dentro=k[EstadoCamion.dentro] + k[EstadoCamion.saliendo],
+                atendidos=ms.atendidos_agencia[ag],
+                espera_prom_min=round(ms.esperas_agencia[ag] / n, 1) if n else 0.0,
+            )
+        return res
 
     def snapshot(self) -> SimSnapshot:
         ma, mb = self._mundo_estado(Mundo.A), self._mundo_estado(Mundo.B)

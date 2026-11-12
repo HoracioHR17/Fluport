@@ -60,17 +60,31 @@ class Acceso(Base):
     __table_args__ = (CheckConstraint("carriles > 0", name="carriles_pos"),)
 
 
+class Agencia(Base):
+    """Empresa transportista que supervisa a sus transportistas y camiones (vista de agencia)."""
+
+    __tablename__ = "agencia"
+
+    id: Mapped[str] = mapped_column(String(16), primary_key=True)  # ej. "AG01"; código del enlace del bot
+    nombre: Mapped[str] = mapped_column(String(120))
+    creada_en: Mapped[datetime] = mapped_column(TS, server_default=func.now())
+
+    transportistas: Mapped[list["Transportista"]] = relationship(back_populates="agencia")
+
+
 class Transportista(Base):
     __tablename__ = "transportista"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     alias: Mapped[str] = mapped_column(String(80))
+    agencia_id: Mapped[str | None] = mapped_column(ForeignKey("agencia.id", ondelete="SET NULL"), index=True)
     telefono: Mapped[str | None] = mapped_column(String(20), unique=True)  # solo teléfonos de prueba con consentimiento
     telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)  # chat del bot, si se registró ahí
     es_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     creado_en: Mapped[datetime] = mapped_column(TS, server_default=func.now())
 
     citas: Mapped[list["Cita"]] = relationship(back_populates="transportista")
+    agencia: Mapped[Agencia | None] = relationship(back_populates="transportistas")
 
 
 class Cita(Base):

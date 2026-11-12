@@ -128,8 +128,25 @@ h1.titulo-seccion { font-size: 28px; }
 .zona__espera { font-size: 36px; }
 .zona__detalle { background: var(--bruma); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
 
+/* ---------- Agencia ---------- */
+.flota { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.flota > div { background: var(--bruma); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.flota b { display: block; font-size: 24px; }
+.invitacion { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.qr { background: #FFFFFF; padding: 8px; border-radius: 8px; line-height: 0; flex-shrink: 0; }
+.qr svg { width: 132px; height: 132px; }
+
+/* ---------- Vista pública: contingencia y bot ---------- */
+.alerta { background: #FBEAE8; color: var(--abismo); border-left: 4px solid #D9574B; border-radius: 10px; padding: 12px 14px; font-size: 15px; font-weight: 700; }
+.cta-bot { flex-direction: row; justify-content: space-between; align-items: center; gap: 16px; border-radius: 14px; }
+.cta-bot .boton { align-self: flex-start; margin-top: 4px; }
+.contingencia { font-size: 14px; font-weight: 700; border-radius: 8px; padding: 6px 10px; align-self: flex-start; }
+.contingencia--normal { background: #EAF6F0; } .contingencia--lenta { background: #FCF3DF; }
+.contingencia--saturada, .contingencia--cerrada { background: #FBEAE8; }
+
 @media (max-width: 640px) {
   .encabezado__in, .principal { padding-left: 16px; padding-right: 16px; }
   .reloj { text-align: left; }
   .mapa { height: 360px; }
+  .cta-bot { flex-direction: column; align-items: flex-start; }
 }

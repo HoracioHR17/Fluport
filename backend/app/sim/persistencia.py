@@ -30,7 +30,7 @@ class Persistencia:
             return False
 
     def sembrar_accesos(self, esc: Escenario) -> None:
-        """Inserta/actualiza los accesos del escenario (las FKs de lecturas y citas dependen de ellos)."""
+        """Inserta/actualiza los accesos y agencias del escenario (las FKs de lecturas y citas dependen de ellos)."""
         filas = [
             dict(
                 id=a.id, nombre=a.nombre, zona=a.zona, lat=a.lat, lon=a.lon, carriles=a.carriles,
@@ -45,6 +45,9 @@ class Persistencia:
         )
         with self.engine.begin() as c:
             c.execute(stmt)
+            if esc.agencias:  # las agencias de la demo también vienen del escenario
+                ag = pg_insert(m.Agencia).values([dict(id=a.id, nombre=a.nombre) for a in esc.agencias])
+                c.execute(ag.on_conflict_do_update(index_elements=[m.Agencia.id], set_={"nombre": ag.excluded.nombre}))
 
     def crear_corrida(
         self, tipo: TipoCorrida, semilla: int, inicio: datetime, velocidad: float, parametros: dict[str, Any]

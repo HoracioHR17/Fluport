@@ -33,11 +33,12 @@ async def listar_citas(
     transportista_id: int | None = None,
     acceso_id: str | None = None,
     estado: EstadoCita | None = None,
+    agencia_id: str | None = None,
     limite: int = Query(100, le=500),
     db: Session = Depends(get_db),
 ) -> list[CitaOut]:
     try:
-        return citas.listar(db, telefono, transportista_id, acceso_id, estado, limite)
+        return citas.listar(db, telefono, transportista_id, acceso_id, estado, limite, agencia_id)
     except ErrorCita as e:
         raise _http(e) from e
 
@@ -53,9 +54,9 @@ async def sugerir_horarios(body: SugerenciaRequest) -> list[Sugerencia]:
 
 
 @router.get("/resumen", response_model=ResumenCitas)
-async def resumen(db: Session = Depends(get_db)) -> ResumenCitas:
-    """Panel de cumplimiento: citas por estado, % cumplimiento y citas por acceso."""
-    return citas.resumen(db)
+async def resumen(agencia_id: str | None = None, db: Session = Depends(get_db)) -> ResumenCitas:
+    """Panel de cumplimiento: citas por estado, % cumplimiento y citas por acceso (opcional: de una agencia)."""
+    return citas.resumen(db, agencia_id)
 
 
 @router.get("/{cita_id}", response_model=CitaOut)

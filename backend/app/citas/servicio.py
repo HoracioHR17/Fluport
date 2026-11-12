@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.contracts.enums import EstadoAcceso, EstadoCita, Mundo, semaforo_de
 from app.contracts.schemas import CitaCreate, CitaOut, CitaReprogramar, ResumenCitas, Sugerencia, SugerenciaRequest
-from app.db.models import Cita, Transportista
+from app.db.models import Agencia, Cita, Transportista
 from app.prediction.features import FRANJA_MIN, espera_de_fila
 from app.prediction.pronosticador import pronosticador
 from app.sim.motor import Simulador
@@ -108,7 +108,8 @@ def sugerir(sim: Simulador, req: SugerenciaRequest) -> list[Sugerencia]:
 
 
 # ───────────────────────────── Persistencia ─────────────────────────────
-def _transportista(db: Session, telefono: str | None, transportista_id: int | None, alias: str | None) -> Transportista:
+def _transportista(db: Session, telefono: str | None, transportista_id: int | None, alias: str | None,
+                   agencia_id: str | None = None) -> Transportista:
     if transportista_id is not None:
         t = db.get(Transportista, transportista_id)
         if t is None:
@@ -117,7 +118,10 @@ def _transportista(db: Session, telefono: str | None, transportista_id: int | No
     tel = normalizar_telefono(telefono or "")
     t = db.scalar(select(Transportista).where(Transportista.telefono == tel))
     if t is None:
-        t = Transportista(alias=alias or f"Transportista {tel[-4:]}", telefono=tel, es_demo=True)
+        if agencia_id is not None and db.get(Agencia, agencia_id) is None:
+            raise ErrorCita(404, f"agencia {agencia_id} no existe")
+        t = Transportista(alias=alias or f"Transportista {tel[-4:]}", telefono=tel, es_demo=True,
+                          agencia_id=agencia_id)
         db.add(t)
         db.flush()
     return t
@@ -136,7 +140,7 @@ def _validar_ventana(sim: Simulador, acceso_id: str, inicio: datetime) -> None:
 
 def crear(db: Session, sim: Simulador, body: CitaCreate, cita_anterior_id: int | None = None) -> CitaOut:
     _validar_ventana(sim, body.acceso_id, body.ventana_inicio)
-    t = _transportista(db, body.telefono, body.transportista_id, body.alias)
+    t = _transportista(db, body.telefono, body.transportista_id, body.alias, body.agencia_id)
     cita = Cita(
         transportista_id=t.id, acceso_id=body.acceso_id, ventana_inicio=body.ventana_inicio,
         ventana_fin=body.ventana_fin, tipo_carga=body.tipo_carga,
@@ -147,7 +151,8 @@ def crear(db: Session, sim: Simulador, body: CitaCreate, cita_anterior_id: int |
     )
     db.add(cita)
     db.flush()
-    sim.inyectar_cita(cita.id, cita.acceso_id, cita.ventana_inicio, cita.tipo_carga, es_demo=t.es_demo)
+    sim.inyectar_cita(cita.id, cita.acceso_id, cita.ventana_inicio, cita.tipo_carga, es_demo=t.es_demo,
+                      agencia_id=t.agencia_id)
     db.commit()
     return CitaOut.model_validate(cita)
 
@@ -162,8 +167,11 @@ def obtener(db: Session, cita_id: int) -> Cita:
 def listar(
     db: Session, telefono: str | None = None, transportista_id: int | None = None,
     acceso_id: str | None = None, estado: EstadoCita | None = None, limite: int = 100,
+    agencia_id: str | None = None,
 ) -> list[CitaOut]:
     q = select(Cita).order_by(Cita.ventana_inicio).limit(limite)
+    if agencia_id is not None:
+        q = q.where(Cita.transportista_id.in_(select(Transportista.id).where(Transportista.agencia_id == agencia_id)))
     if telefono is not None:
         q = q.join(Transportista).where(Transportista.telefono == normalizar_telefono(telefono))
     if transportista_id is not None:
@@ -206,8 +214,11 @@ def cancelar(db: Session, sim: Simulador, cita_id: int) -> CitaOut:
     return CitaOut.model_validate(cita)
 
 
-def resumen(db: Session) -> ResumenCitas:
-    citas = list(db.scalars(select(Cita)))
+def resumen(db: Session, agencia_id: str | None = None) -> ResumenCitas:
+    q = select(Cita)
+    if agencia_id is not None:
+        q = q.join(Transportista).where(Transportista.agencia_id == agencia_id)
+    citas = list(db.scalars(q))
     por_estado = Counter(c.estado for c in citas)
     cumplidas, faltas = por_estado[EstadoCita.cumplida], por_estado[EstadoCita.no_show]
     return ResumenCitas(
@@ -244,6 +255,6 @@ def citas_por_reinyectar(db: Session, ahora: datetime) -> list[dict]:
         t = db.get(Transportista, c.transportista_id)
         c.estado = EstadoCita.agendada
         res.append(dict(cita_id=c.id, acceso_id=c.acceso_id, inicio=c.ventana_inicio, tipo_carga=c.tipo_carga,
-                        es_demo=bool(t and t.es_demo)))
+                        es_demo=bool(t and t.es_demo), agencia_id=t.agencia_id if t else None))
     db.commit()
     return res

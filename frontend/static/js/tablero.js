@@ -1,7 +1,10 @@
-/* Fluport · tablero del operador. Datos: WS /ws/sim (snapshots) + REST (pronóstico, citas). */
+/* Fluport · tableros. Datos: WS /ws/sim (snapshots) + REST (pronóstico, citas, agencias).
+ * <body data-vista="agencia">: la agencia ve casetas, pronóstico, su flota, sus transportistas, citas y avisos.
+ * <body data-vista="demo">: panel del presentador con controles de la simulación, mundos A/B e impacto. */
 (function () {
   "use strict";
   var F = window.Fluport, el = F.el, $ = function (id) { return document.getElementById(id); };
+  var VISTA = document.body.dataset.vista || "demo", AGENCIA = VISTA === "agencia";
 
   var CARGAS = { contenedor_20: "Contenedor 20'", contenedor_40: "Contenedor 40'", refrigerado: "Refrigerado",
     peligroso: "Peligroso", granel: "Granel", carga_general: "Carga general" };
@@ -10,7 +13,11 @@
   var EVENTOS = { cierre_acceso: "Caseta cerrada", reapertura: "Caseta reabierta", buque_atraca: "Atracó un buque",
     norte: "Norte", carga_urgente: "Carga urgente", personalizado: "Evento especial" };
 
-  var estado = { accesos: {}, rutas: {}, mundo: "B", pronCaseta: null, snap: null, mapas: {}, avisos: [] };
+  var estado = { accesos: {}, rutas: {}, mundo: "B", pronCaseta: null, snap: null, mapas: {}, avisos: [],
+    agencia: null, agencias: [], enlaceBot: null };
+
+  /** Parámetro de consulta opcional para filtrar por la agencia elegida. */
+  function filtroAgencia(sep) { return AGENCIA && estado.agencia ? sep + "agencia_id=" + encodeURIComponent(estado.agencia) : ""; }
 
   // ───────────── Mapas (Leaflet) ─────────────
   function prepararRuta(coords) {
@@ -79,6 +86,7 @@
     if (!m) return;
     var vistos = {}, fila = {};
     datos.camiones.forEach(function (c) {
+      if (AGENCIA && c.agencia_id !== estado.agencia && !c.es_demo) return; // solo la flota de la agencia
       var ruta = estado.rutas[c.ruta_id];
       if (!ruta) return;
       var p = c.progreso;
@@ -103,6 +111,10 @@
 
   function elegirMundo(valor) {
     estado.mundo = valor;
+    if (!$("selector-mundo")) { // vista de agencia: un solo mapa (operación con Fluport)
+      if (!estado.mapas.B) estado.mapas.B = crearMapa("B");
+      return;
+    }
     [].forEach.call($("selector-mundo").querySelectorAll("button"), function (b) {
       b.setAttribute("aria-pressed", String(b.dataset.mundo === valor));
     });
@@ -156,6 +168,16 @@
     }));
   }
 
+  function renderFlota(s) {
+    var f = (s.mundos.B.flota || {})[estado.agencia];
+    if (!f || !$("flota")) return;
+    var datos = [["En ruta", f.en_ruta], ["En fila", f.en_fila], ["En revisión", f.en_revision],
+      ["Dentro del puerto", f.dentro], ["Atendidos", f.atendidos], ["Espera promedio", F.num(f.espera_prom_min) + " min"]];
+    F.reemplazar($("flota"), datos.map(function (d) {
+      return el("div", {}, [el("b", { class: "cifra" }, typeof d[1] === "number" ? F.num(d[1]) : d[1]), d[0]]);
+    }));
+  }
+
   function renderEventos(eventos) {
     F.reemplazar($("lista-eventos"), eventos.length ? eventos.slice(0, 8).map(function (e) {
       var detalle = EVENTOS[e.tipo] || e.tipo;
@@ -171,11 +193,18 @@
     $("reloj").textContent = F.hora(s.ts_sim);
     $("reloj-dia").textContent = "Reloj simulado · " + F.fecha(s.ts_sim) + (s.clima === "norte" ? " · norte" : "");
     $("etiqueta").textContent = s.etiqueta || "SIMULACIÓN";
+    renderCasetas(s.mundos.B.accesos);
+    if (AGENCIA) {
+      renderFlota(s);
+      dibujarMapa("B", s.mundos.B);
+      var propios = s.mundos.B.camiones.filter(function (c) { return c.agencia_id === estado.agencia; }).length;
+      $("resumen-mapa").textContent = F.num(propios) + " camiones de tu agencia en el mapa";
+      return;
+    }
     var pausada = s.estado !== "corriendo";
     $("btn-pausa").setAttribute("aria-label", pausada ? "Reanudar simulación" : "Pausar simulación");
     $("icono-pausa").setAttribute("d", pausada ? "M8 5l11 7-11 7z" : "M8 5v14M16 5v14");
     if (document.activeElement !== $("velocidad")) $("velocidad").value = String(Math.round(s.velocidad));
-    renderCasetas(s.mundos.B.accesos);
     renderImpacto(s);
     renderEventos(s.eventos_recientes || []);
     if (estado.mundo !== "B") dibujarMapa("A", s.mundos.A);
@@ -200,7 +229,7 @@
   }
 
   async function cargarAvisos() {
-    try { estado.avisos = await F.api("/api/avisos?limite=6"); renderAvisos(estado.avisos); } catch (e) { /* sin BD */ }
+    try { estado.avisos = await F.api("/api/avisos?limite=6" + filtroAgencia("&")); renderAvisos(estado.avisos); } catch (e) { /* sin BD */ }
   }
 
   // ───────────── Pronóstico ─────────────
@@ -247,12 +276,15 @@
   // ───────────── Citas ─────────────
   async function cargarCitas() {
     try {
-      var r = await F.api("/api/citas/resumen");
+      if (!$("tabla-citas")) return;
+      var r = await F.api("/api/citas/resumen" + filtroAgencia("?"));
       $("cumplimiento").textContent = F.num(r.cumplimiento_pct, 1) + " %";
       F.reemplazar($("estados-cita"), ["agendada", "en_ruta", "cumplida", "no_show", "reprogramada", "cancelada"].map(function (k) {
         return el("div", {}, [el("b", {}, F.num(r.por_estado[k])), ESTADOS_CITA[k]]);
       }));
-      var lista = await F.api("/api/citas?limite=50");
+      var lista = await F.api("/api/citas?limite=50" + filtroAgencia("&"));
+      var nombres = {};
+      (estado.transportistas || []).forEach(function (t) { nombres[t.id] = t.alias; });
       var activas = lista.filter(function (c) { return c.estado === "agendada" || c.estado === "en_ruta"; });
       var otras = lista.filter(function (c) { return activas.indexOf(c) < 0; }).reverse();
       var filas = activas.concat(otras).slice(0, 12);
@@ -261,7 +293,7 @@
         return el("tr", {}, [
           el("td", { class: "cifra" }, F.hora(c.ventana_inicio)),
           el("td", {}, c.acceso_id + " · " + (meta.nombre || "").replace("Caseta ", "")),
-          el("td", {}, "Transportista #" + c.transportista_id),
+          el("td", {}, nombres[c.transportista_id] || "Transportista #" + c.transportista_id),
           el("td", {}, CARGAS[c.tipo_carga] || c.tipo_carga),
           el("td", { class: "cifra" }, c.espera_estimada_min === null ? "—" : F.num(c.espera_estimada_min) + " min"),
           el("td", {}, el("span", { class: "pastilla" }, ESTADOS_CITA[c.estado] || c.estado))
@@ -319,9 +351,10 @@
     try {
       var c = await F.api("/api/citas", { method: "POST", json: {
         telefono: $("cita-tel").value, acceso_id: s.acceso_id, ventana_inicio: s.inicio, ventana_fin: s.fin,
-        tipo_carga: $("cita-carga").value, origen: "web" } });
+        tipo_carga: $("cita-carga").value, origen: "web", agencia_id: estado.agencia || null } });
       aviso.textContent = "Cita #" + c.id + " agendada a las " + F.hora(c.ventana_inicio) + " por " + c.acceso_id + ".";
       F.reemplazar($("sugerencias"), []);
+      await cargarTransportistas();
       cargarCitas();
     } catch (e) {
       aviso.textContent = "No se pudo agendar: " + e.message;
@@ -351,6 +384,72 @@
     }
   }
 
+  // ───────────── Agencia: transportistas e invitación al bot ─────────────
+  async function cargarTransportistas() {
+    if (!AGENCIA || !estado.agencia) return;
+    try {
+      estado.transportistas = await F.api("/api/agencias/" + encodeURIComponent(estado.agencia) + "/transportistas");
+    } catch (e) { estado.transportistas = []; }
+    var lista = estado.transportistas;
+    F.reemplazar($("lista-transportistas"), lista.length ? lista.map(function (t) {
+      return el("li", { style: { flexDirection: "column", gap: "2px" } }, [
+        el("span", {}, [el("b", {}, t.alias), t.telefono_fin ? " · …" + t.telefono_fin : "", t.telegram ? " · Telegram" : ""]),
+        el("span", { class: "tenue" }, t.citas_activas
+          ? F.num(t.citas_activas) + (t.citas_activas === 1 ? " cita activa" : " citas activas") + " · próxima " + F.hora(t.proxima_cita)
+          : "Sin citas activas")
+      ]);
+    }) : [el("li", { class: "tenue" }, "Aún no hay transportistas. Compárteles el enlace del bot.")]);
+  }
+
+  function renderInvitacion() {
+    var caja = $("invitacion");
+    if (!caja) return;
+    if (!estado.enlaceBot) {
+      F.reemplazar(caja, [el("p", { class: "tenue", style: { margin: "0" } }, "El bot de Telegram no está configurado en el servidor.")]);
+      return;
+    }
+    var url = estado.enlaceBot.enlace + "?start=" + encodeURIComponent(estado.agencia);
+    var hijos = [];
+    if (window.qrcode) {
+      var qr = window.qrcode(0, "M"); qr.addData(url); qr.make();
+      var caja_qr = el("div", { class: "qr", role: "img", "aria-label": "Código QR del enlace de tu agencia" });
+      caja_qr.innerHTML = qr.createSvgTag(4, 0); // SVG generado localmente a partir de nuestra propia URL
+      hijos.push(caja_qr);
+    }
+    hijos.push(el("a", { class: "boton", href: url, target: "_blank", rel: "noopener" }, "Abrir " + estado.enlaceBot.usuario));
+    hijos.push(el("p", { class: "tenue", style: { margin: "0", fontSize: "13px", wordBreak: "break-all" } }, url));
+    F.reemplazar(caja, hijos);
+  }
+
+  function elegirAgencia(id) {
+    estado.agencia = id;
+    try { localStorage.setItem("fluport.agencia", id); } catch (e) { /* sin almacenamiento */ }
+    var a = estado.agencias.filter(function (x) { return x.id === id; })[0];
+    document.title = "Fluport · " + (a ? a.nombre : "Agencia");
+    renderInvitacion();
+    Object.keys((estado.mapas.B || {}).camiones || {}).forEach(function (k) {
+      estado.mapas.B.mapa.removeLayer(estado.mapas.B.camiones[k]); delete estado.mapas.B.camiones[k];
+    });
+    if (estado.snap) render(estado.snap);
+    cargarTransportistas().then(cargarCitas);
+    cargarAvisos();
+  }
+
+  async function iniciarAgencia() {
+    estado.agencias = await F.api("/api/agencias");
+    if (!estado.agencias.length) throw new Error("no hay agencias registradas");
+    var pedida = new URLSearchParams(location.search).get("agencia"), guardada = null;
+    try { guardada = localStorage.getItem("fluport.agencia"); } catch (e) { /* sin almacenamiento */ }
+    var ids = estado.agencias.map(function (a) { return a.id; });
+    var inicial = [pedida, guardada].filter(function (x) { return x && ids.indexOf(x) >= 0; })[0] || ids[0];
+    F.reemplazar($("agencia"), estado.agencias.map(function (a) { return el("option", { value: a.id }, a.nombre); }));
+    $("agencia").value = inicial;
+    $("agencia").addEventListener("change", function () { elegirAgencia(this.value); });
+    try { estado.enlaceBot = await F.api("/api/telegram/enlace"); } catch (e) { estado.enlaceBot = null; }
+    elegirAgencia(inicial);
+    setInterval(cargarTransportistas, 15000);
+  }
+
   // ───────────── Inicio ─────────────
   async function iniciar() {
     var accesos = await F.api("/api/accesos");
@@ -361,8 +460,7 @@
     });
     accesos.forEach(function (a) {
       var etiqueta = a.id + " · " + a.nombre;
-      $("evento-caseta").appendChild(el("option", { value: a.id }, etiqueta));
-      $("cita-caseta").appendChild(el("option", { value: a.id }, etiqueta));
+      ["evento-caseta", "cita-caseta"].forEach(function (id) { if ($(id)) $(id).appendChild(el("option", { value: a.id }, etiqueta)); });
     });
     estado.pronCaseta = accesos.length > 1 ? accesos[1].id : accesos[0].id;
     F.reemplazar($("selector-pronostico"), accesos.map(function (a) {
@@ -374,26 +472,31 @@
         } }, a.id);
     }));
     elegirMundo("B");
-    [].forEach.call($("selector-mundo").querySelectorAll("button"), function (b) {
-      b.addEventListener("click", function () { elegirMundo(b.dataset.mundo); });
-    });
-    [].forEach.call(document.querySelectorAll("[data-evento]"), function (b) {
-      b.addEventListener("click", function () { inyectarEvento(b); });
-    });
-    $("btn-pausa").addEventListener("click", function () {
-      control({ accion: estado.snap && estado.snap.estado === "corriendo" ? "pause" : "play" });
-    });
-    $("velocidad").addEventListener("change", function () { control({ accion: "velocidad", velocidad: Number(this.value) }); });
-    $("form-cita").addEventListener("submit", buscarHorarios);
-    $("cita-desde").value = "09:00";
-    $("cita-hasta").value = "15:00";
+    if (AGENCIA) {
+      await iniciarAgencia();
+      $("form-cita").addEventListener("submit", buscarHorarios);
+      $("cita-desde").value = "09:00";
+      $("cita-hasta").value = "15:00";
+    } else {
+      [].forEach.call($("selector-mundo").querySelectorAll("button"), function (b) {
+        b.addEventListener("click", function () { elegirMundo(b.dataset.mundo); });
+      });
+      [].forEach.call(document.querySelectorAll("[data-evento]"), function (b) {
+        b.addEventListener("click", function () { inyectarEvento(b); });
+      });
+      $("btn-pausa").addEventListener("click", function () {
+        control({ accion: estado.snap && estado.snap.estado === "corriendo" ? "pause" : "play" });
+      });
+      $("velocidad").addEventListener("change", function () { control({ accion: "velocidad", velocidad: Number(this.value) }); });
+    }
 
     F.conectarSimulacion(function (m) {
       if (m.tipo === "snapshot") render(m.data);
       else if (m.tipo === "evento") cargarPronostico();
-      else if (m.tipo === "aviso") { estado.avisos.unshift(m.data); renderAvisos(estado.avisos); }
+      else if (m.tipo === "aviso") { if (AGENCIA) cargarAvisos(); else { estado.avisos.unshift(m.data); renderAvisos(estado.avisos); } }
     });
-    cargarModelo(); cargarPronostico(); cargarCitas(); cargarAvisos();
+    cargarModelo(); cargarPronostico();
+    if (!AGENCIA) cargarAvisos();
     setInterval(cargarPronostico, 15000);
     setInterval(cargarCitas, 10000);
     setInterval(cargarModelo, 60000);

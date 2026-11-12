@@ -3,40 +3,34 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fluport · Tablero del operador</title>
+<title>Fluport · Agencia</title>
 <link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/css/tokens.css">
 <link rel="stylesheet" href="/static/css/app.css">
 </head>
-<body>
+<body data-vista="agencia">
 <header class="encabezado">
   <div class="encabezado__in">
-    <a class="logo" href="/operador/" aria-label="Fluport, inicio">
+    <a class="logo" href="/agencia/" aria-label="Fluport, inicio">
       <span><b>FLU</b><span style="font-weight:400">PORT</span></span>
       <span class="logo__puntos" aria-hidden="true"><span class="p-fluye"></span><span class="p-lento"></span><span class="p-saturado"></span></span>
     </a>
     <span class="etiqueta-simulacion" id="etiqueta">SIMULACIÓN</span>
     <nav class="nav" aria-label="Secciones">
       <a href="#casetas" aria-current="page">Tablero</a>
+      <a href="#flota-mapa">Mi flota</a>
       <a href="#citas">Citas</a>
       <a href="/publico/">Vista pública</a>
     </nav>
     <div class="controles">
+      <label class="campo">Agencia
+        <select id="agencia"></select>
+      </label>
       <div class="reloj">
         <div class="reloj__dia" id="reloj-dia">Reloj simulado</div>
         <div class="reloj__hora cifra" id="reloj" aria-live="off">--:--</div>
       </div>
-      <button type="button" class="boton boton--icono" id="btn-pausa" aria-label="Pausar simulación">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path id="icono-pausa" d="M8 5v14M16 5v14"/></svg>
-      </button>
-      <label class="campo">Velocidad
-        <select id="velocidad">
-          <option value="60">1 min / s</option>
-          <option value="600">10 min / s</option>
-          <option value="3600">1 h / s</option>
-        </select>
-      </label>
     </div>
   </div>
 </header>
@@ -50,50 +44,35 @@
     <div class="casetas" id="lista-casetas" aria-live="polite"></div>
   </section>
 
-  <div class="fila">
+  <div class="fila" id="flota-mapa">
     <section class="ancho tarjeta tarjeta--bruma" aria-labelledby="t-mapa">
       <div class="cabecera-seccion">
-        <h2 class="titulo-seccion" id="t-mapa">Mapa en vivo</h2>
-        <div class="segmentado" role="group" aria-label="Mundo mostrado" id="selector-mundo">
-          <button type="button" data-mundo="A" aria-pressed="false">Sin Fluport</button>
-          <button type="button" data-mundo="B" aria-pressed="true">Con Fluport</button>
-          <button type="button" data-mundo="AB" aria-pressed="false">Lado a lado</button>
-        </div>
+        <h2 class="titulo-seccion" id="t-mapa">Mis camiones en vivo</h2>
       </div>
       <div class="mapas">
-        <div class="mapa oculto" id="mapa-A"><span class="mapa__titulo">Sin Fluport</span></div>
-        <div class="mapa" id="mapa-B"><span class="mapa__titulo">Con Fluport</span></div>
+        <div class="mapa" id="mapa-B"><span class="mapa__titulo">Operación con Fluport</span></div>
       </div>
       <div class="leyenda-mapa">
         <span><i style="background:#0A2238;border-radius:50%"></i>En ruta</span>
         <span><i style="background:#E9B03B"></i>En fila</span>
         <span><i style="background:#3FAE7A;border-radius:50%"></i>En revisión</span>
-        <span><i style="border:2px solid #3FAE7A;border-radius:50%;background:#fff"></i>Camión con cita de demo</span>
+        <span><i style="border:2px solid #3FAE7A;border-radius:50%;background:#fff"></i>Cita agendada por Telegram o web</span>
       </div>
       <p class="tenue" style="margin:0;font-size:13px" id="resumen-mapa"></p>
     </section>
 
-    <aside class="lateral" aria-label="Eventos de la simulación">
-      <section class="tarjeta" aria-labelledby="t-eventos">
-        <h2 class="titulo-seccion" id="t-eventos" style="font-size:20px">Inyectar evento</h2>
-        <label class="campo">Caseta
-          <select id="evento-caseta"></select>
-        </label>
-        <div class="botonera">
-          <button type="button" class="boton" data-evento="cierre_acceso">Cerrar caseta</button>
-          <button type="button" class="boton boton--sec" data-evento="reapertura">Reabrir</button>
-          <button type="button" class="boton boton--sec" data-evento="buque_atraca">Atraca buque</button>
-          <button type="button" class="boton boton--sec" data-evento="norte">Norte</button>
-          <button type="button" class="boton boton--sec ancho-completo" data-evento="carga_urgente">Carga urgente</button>
-        </div>
-        <p class="aviso-estado" id="estado-evento" role="status"></p>
+    <aside class="lateral" aria-label="Mi flota">
+      <section class="tarjeta" aria-labelledby="t-flota">
+        <h2 class="titulo-seccion" id="t-flota" style="font-size:20px">Mi flota ahora</h2>
+        <div class="flota" id="flota" aria-live="polite"></div>
       </section>
-      <section class="tarjeta" aria-labelledby="t-recientes" style="flex-grow:1">
-        <h2 class="titulo-seccion" id="t-recientes" style="font-size:20px">Eventos recientes</h2>
-        <ol class="lista-eventos" id="lista-eventos"></ol>
+      <section class="tarjeta" aria-labelledby="t-invitar">
+        <h2 class="titulo-seccion" id="t-invitar" style="font-size:20px">Invita a tus transportistas</h2>
+        <p class="tenue" style="margin:0;font-size:14px">Con este enlace abren el bot de Telegram, comparten su número y quedan ligados a tu agencia.</p>
+        <div class="invitacion" id="invitacion"></div>
       </section>
       <section class="tarjeta" aria-labelledby="t-avisos">
-        <h2 class="titulo-seccion" id="t-avisos" style="font-size:20px">Avisos a transportistas</h2>
+        <h2 class="titulo-seccion" id="t-avisos" style="font-size:20px">Avisos a mis transportistas</h2>
         <ol class="lista-eventos" id="lista-avisos" aria-live="polite"></ol>
       </section>
     </aside>
@@ -118,28 +97,23 @@
       <div class="etiquetas" id="etiquetas-pronostico"></div>
     </section>
 
-    <section class="lateral tarjeta tarjeta--abismo" aria-labelledby="t-ab" style="gap:16px">
-      <h2 class="titulo-seccion" id="t-ab">Impacto de Fluport</h2>
-      <div class="ab">
-        <div class="ab__sin"><div class="claro">Sin Fluport</div><div class="ab__num cifra" id="espera-A">--</div><div class="claro">espera promedio</div></div>
-        <div class="ab__con"><div class="claro">Con Fluport</div><div class="ab__num cifra" id="espera-B">--</div><div class="claro">espera promedio</div></div>
-      </div>
-      <dl class="kpis" id="kpis"></dl>
-      <p class="claro" style="margin:0;font-size:12px">Mismos camiones en ambos mundos · datos sintéticos</p>
+    <section class="lateral tarjeta" aria-labelledby="t-transportistas">
+      <h2 class="titulo-seccion" id="t-transportistas" style="font-size:20px">Mis transportistas</h2>
+      <ol class="lista-eventos" id="lista-transportistas" aria-live="polite"></ol>
     </section>
   </div>
 
   <section id="citas" class="tarjeta tarjeta--bruma" aria-labelledby="t-citas" style="gap:14px">
     <div class="cabecera-seccion">
-      <h2 class="titulo-seccion" id="t-citas">Citas</h2>
+      <h2 class="titulo-seccion" id="t-citas">Citas de mi agencia</h2>
       <span style="font-size:15px"><b class="cifra" style="font-size:22px" id="cumplimiento">--</b> de cumplimiento</span>
     </div>
     <div class="estados" id="estados-cita"></div>
 
     <form class="tarjeta" id="form-cita" style="gap:14px">
-      <h3 style="margin:0;font-size:18px">Agendar una cita</h3>
+      <h3 style="margin:0;font-size:18px">Agendar una cita para un transportista</h3>
       <div class="formulario">
-        <label class="campo">Teléfono de prueba<input id="cita-tel" type="tel" inputmode="tel" autocomplete="off" placeholder="+52 229 000 0000" required></label>
+        <label class="campo">Teléfono del transportista<input id="cita-tel" type="tel" inputmode="tel" autocomplete="off" placeholder="+52 229 000 0000" required></label>
         <label class="campo">Tipo de carga
           <select id="cita-carga">
             <option value="contenedor_40">Contenedor 40'</option>
@@ -161,7 +135,7 @@
 
     <div class="tabla-caja">
       <table class="tabla">
-        <caption class="sr">Próximas citas</caption>
+        <caption class="sr">Citas de la agencia</caption>
         <thead><tr><th scope="col">Hora</th><th scope="col">Caseta</th><th scope="col">Transportista</th><th scope="col">Carga</th><th scope="col">Espera prevista</th><th scope="col">Estado</th></tr></thead>
         <tbody id="tabla-citas"></tbody>
       </table>
@@ -170,7 +144,8 @@
 </main>
 
 <script src="/static/vendor/leaflet/leaflet.js"></script>
+<script src="/static/vendor/qrcode/qrcode.js"></script>
 <script src="/static/js/comun.js"></script>
-<script src="/static/js/operador.js"></script>
+<script src="/static/js/tablero.js"></script>
 </body>
 </html>

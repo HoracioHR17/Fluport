@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fluport · ¿Cómo están las casetas?</title>
+<title>Fluport · ¿Cómo están las entradas al puerto?</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/css/tokens.css">
 <link rel="stylesheet" href="/static/css/app.css">
@@ -19,13 +19,23 @@
       <span class="etiqueta-simulacion" id="etiqueta">SIMULACIÓN</span>
     </div>
     <div>
-      <h1>¿Cómo están las casetas?</h1>
+      <h1>¿Cómo están las entradas al puerto?</h1>
       <p class="tenue" style="margin:6px 0 0;font-size:15px" id="actualizado">Cargando…</p>
     </div>
   </header>
+  <div id="alerta" class="alerta oculto" role="status"></div>
+  <section class="tarjeta cta-bot" id="cta-bot" aria-labelledby="t-bot">
+    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+      <h2 id="t-bot" style="margin:0;font-size:19px">¿Eres transportista?</h2>
+      <p style="margin:0;font-size:14px">Agenda, cambia o cancela tu cita en el bot de Telegram. Te avisamos si tu caseta se satura.</p>
+      <a class="boton" id="enlace-bot" href="#" target="_blank" rel="noopener">Agenda tu cita en Telegram</a>
+    </div>
+    <div class="qr" id="qr-bot" role="img" aria-label="Código QR del bot de Telegram"></div>
+  </section>
   <main id="zonas" aria-live="polite" style="display:flex;flex-direction:column;gap:12px"></main>
   <p class="tenue" style="margin:4px 0 0;font-size:13px;line-height:1.45">● Fluye · menos de 30 min &nbsp;● Lento · 30 a 90 min &nbsp;▲ Saturado · más de 90 min. Datos de una simulación del tráfico de camiones; no muestran información personal.</p>
 </div>
+<script src="/static/vendor/qrcode/qrcode.js"></script>
 <script src="/static/js/comun.js"></script>
 <script src="/static/js/publico.js"></script>
 </body>

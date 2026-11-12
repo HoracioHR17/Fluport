@@ -20,9 +20,9 @@ def test_salud(cliente):
     assert r["estado"] == "ok" and r["bd"] is bool(TEST_DB) and r["simulador"] == "corriendo"
 
 
-def test_raiz_redirige_al_tablero(cliente):
+def test_raiz_redirige_a_la_vista_publica(cliente):
     r = cliente.get("/", follow_redirects=False)
-    assert r.status_code == 307 and r.headers["location"] == "/operador/"
+    assert r.status_code == 307 and r.headers["location"] == "/publico/"
 
 
 def test_accesos_y_rutas(cliente):

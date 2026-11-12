@@ -12,7 +12,7 @@ from app.citas.servicio import ErrorCita
 from app.config import get_settings
 from app.contracts.schemas import AsistenteRequest, AsistenteResponse, AvisoOut
 from app.db.base import get_db
-from app.db.models import Aviso
+from app.db.models import Aviso, Transportista
 from app.messaging import twilio
 from app.messaging.bot_telegram import procesar_update
 from app.messaging.servicio import atender_mensaje, en_segundo_plano
@@ -103,7 +103,10 @@ async def enlace_whatsapp() -> dict:
 
 
 @router.get("/api/avisos", response_model=list[AvisoOut])
-async def avisos(limite: int = 10, db: Session = Depends(get_db)) -> list[AvisoOut]:
-    """Últimos avisos proactivos generados (para el tablero)."""
-    filas = db.scalars(select(Aviso).order_by(Aviso.id.desc()).limit(min(limite, 50)))
+async def avisos(limite: int = 10, agencia_id: str | None = None, db: Session = Depends(get_db)) -> list[AvisoOut]:
+    """Últimos avisos proactivos generados (para el tablero; opcional: solo los de una agencia)."""
+    q = select(Aviso).order_by(Aviso.id.desc()).limit(min(limite, 50))
+    if agencia_id is not None:
+        q = q.join(Transportista, Transportista.id == Aviso.transportista_id).where(Transportista.agencia_id == agencia_id)
+    filas = db.scalars(q)
     return [AvisoOut.model_validate(a) for a in filas]
