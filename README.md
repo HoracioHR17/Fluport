@@ -15,12 +15,12 @@ Cientos de camiones llegan al puerto todos los días a las mismas horas. Se form
 2. **Pronóstico:** estima la espera de cada acceso durante las próximas 12 horas.
 3. **Citas:** sugiere los tres mejores horarios para llegar y permite agendar, cambiar o cancelar.
 4. **Vista pública:** estado de contingencia de cada entrada (normal, lenta, saturada o cerrada), espera estimada en tiempo real, horas pico y un acceso directo (botón y QR) al bot de Telegram.
-5. **Bot de Telegram (WhatsApp listo para conectarse):** el transportista que su agencia dio de alta se conecta con su número, recibe y confirma las citas que le asignan, pide o cambia citas en lenguaje natural y recibe avisos si su caseta se satura o se cierra.
+5. **Bot de Telegram:** el transportista que su agencia dio de alta (o que pidió unirse desde el bot y su agencia aprobó) se conecta con su número, recibe y confirma las citas que le asignan, pide o cambia citas en lenguaje natural y recibe avisos si su caseta se satura o se cierra.
 6. **Vista de agencia:** cada agencia da de alta a sus transportistas, les asigna citas con el pronóstico de espera y supervisa su flota en el mapa, el estado de cada cita (sin confirmar, confirmada, pedida por el chofer, en ruta, cumplida), los avisos y lo que requiere su atención.
 7. **Panel de demostración:** controla la simulación (velocidad y eventos como cierres, buques o norte) y compara el mundo *sin Fluport* con el *con Fluport*: ahorro en horas, diésel, costo y CO₂.
 
 ## Arquitectura
-Monolito modular hexagonal: un solo proceso FastAPI dividido en módulos (`simulacion`, `pronostico`, `citas`, `agencias`, `mensajeria`, `publico`) que se comunican por sus servicios y dependen de **puertos** (interfaces) en lugar de tecnologías concretas; el simulador, PostgreSQL, Telegram, WhatsApp y Gemini son **adaptadores** que `app/main.py` conecta. Detalle, diagrama y reglas de dependencia en [`docs/arquitectura.md`](docs/arquitectura.md); las reglas se verifican con pruebas.
+Monolito modular hexagonal: un solo proceso FastAPI dividido en módulos (`simulacion`, `pronostico`, `citas`, `agencias`, `mensajeria`, `publico`) que se comunican por sus servicios y dependen de **puertos** (interfaces) en lugar de tecnologías concretas; el simulador, PostgreSQL, Telegram y Gemini son **adaptadores** que `app/main.py` conecta. Detalle, diagrama y reglas de dependencia en [`docs/arquitectura.md`](docs/arquitectura.md); las reglas se verifican con pruebas.
 
 ## Cómo usarlo
 **Demo en línea:** _(enlace pendiente)_
@@ -664,3 +664,33 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 - **Tecnologías usadas:** teclado de respuesta de la Bot API de Telegram (`reply_markup.keyboard`) para mostrar las agencias como botones; `unicodedata` (biblioteca estándar) para comparar nombres sin acentos.
 
 - **Herramientas de IA:** el equipo definió el flujo de solicitud y aprobación; se apoyó en Claude (Opus 5.5) como asistente para escribir el servicio, los cambios del bot, la pantalla y las pruebas, que el equipo revisó y aprobó.
+
+### 2026-11-12 02:30 · `pendiente` · Rediseño con gráficas y simbología, mapa acotado al puerto y fin de WhatsApp
+
+- **Justificación del cambio:** el equipo validó en el lienzo de diseño un rediseño de las vistas pública y de agencia con gráficas y una simbología que no depende solo del color, y lo llevó a las pantallas reales. Además retiró WhatsApp: el proyecto solo usa Telegram, y mantener el adaptador de Twilio, su webhook y su configuración era código sin uso y superficie de ataque. Por último, el mapa permitía alejarse hasta perder el puerto de vista; ahora se queda en la zona de Veracruz.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `frontend/static/js/graficas.js` (nuevo) | `simbolo`, `pastilla`, `sparkline`, `velocimetro`, `dona`, `mapaPuerto`, `iconoCaseta`, `estiloRuta`, `iconoCamion`, `rumbo`. | Componentes compartidos en SVG y CSS, sin bibliotecas nuevas. `mapaPuerto` fija `maxBounds` (viscosidad total), zoom mínimo y marca el puerto. |
+  | `frontend/publico/index.html`, `static/js/publico.js` | Vista pública rediseñada. | Velocímetro de espera promedio; tarjetas por caseta con símbolo, tendencia de las próximas 3 h y camiones en fila; mapa de accesos con rutas teñidas por estado; "mejor entrada ahora" y ranking; pronóstico en barras por caseta (pestañas) con umbrales de 30 y 90 min y la mejor ventana de 2 h. |
+  | `frontend/agencia/index.html`, `static/js/agencia.js` (Resumen) | Indicadores con línea de tendencia, citas activas por hora en barras apiladas, dona de la flota, ahorro frente a la llegada sin citas y casetas con símbolo. | La tendencia se arma en el navegador con una muestra cada 5 s. |
+  | `frontend/agencia/flota/index.html`, `agencia.js` (Flota) | Camiones con forma por estado (flecha orientada, cuadro, anillo), halo si traen cita, aro si están elegidos; casetas y rutas con la simbología; barras "mis camiones por caseta". | Clic en un camión del mapa abre su ficha. |
+  | `frontend/agencia/citas/index.html`, `agencia.js` (Citas) | Línea de tiempo por caseta (12 h) con la franja de espera pronosticada y bloques por estado de la cita. | Clic en un bloque resalta la cita en la tabla. |
+  | `frontend/static/js/demo.js`, `demo/index.html` | El panel de demostración usa el mismo mapa acotado. | — |
+  | `frontend/static/css/ui.css`, `static/js/comun.js` | Estilos de los componentes; `horaMas` exportada. | — |
+  | `backend/app/nucleo/contracts/schemas.py`, `modulos/publico/servicio.py` | `ZonaPublica.en_fila`. | Dato agregado, sin información personal. |
+  | `backend/app/modulos/mensajeria/adaptadores/twilio.py`, `tests/test_whatsapp.py` | Eliminados. | — |
+  | `backend/app/modulos/mensajeria/api.py`, `servicio.py`, `asistente/agente.py`, `puertos.py`, `dominio/avisos.py`, `bot_telegram.py` | Sin WhatsApp. | Fuera `/webhook/whatsapp`, `/api/whatsapp/enlace` y `atender_mensaje`; los avisos solo van por Telegram (sin chat vinculado quedan como fallidos); `formato_whatsapp` → `formato_chat`; el asistente responde "por Telegram". |
+  | `backend/app/nucleo/config.py`, `contracts/enums.py`, `citas/servicio.py`, `.env.example`, `requirements.txt` | Sin variables `FLUPORT_TWILIO_*`, sin `whatsapp` en `Canal` y `OrigenCita`. | `normalizar_telefono` ya no quita el prefijo `whatsapp:`. |
+  | `backend/alembic/versions/0006_sin_whatsapp.py` (nueva) | Recrea los enums `canal` y `origen_cita` sin `whatsapp`. | Borra las conversaciones de ese canal y pasa avisos y citas a `telegram`; tiene `downgrade`. |
+  | `backend/tests/` | Pruebas ajustadas y nueva `test_mapas_limitados_al_puerto`. | — |
+  | `docs/diseno.md`, `docs/arquitectura.md`, `docs/contracts.md`, `docs/openapi.json` | Simbología, arquitectura y contratos sin WhatsApp. | — |
+
+- **Funcionalidad:** el público ve de un vistazo qué entrada conviene y a qué hora; la agencia ve tendencias, el estado de su flota en el mapa y sus citas en el tiempo. Todos los estados se distinguen por forma, grosor o patrón además del color. Verificado en Chrome a 1280 y 390 px de ancho, sin errores de JavaScript ni desbordes horizontales. Pruebas: 166 con PostgreSQL de prueba; migración `0006` probada con datos de WhatsApp (`upgrade`, `alembic check` y `downgrade`).
+
+- **Tecnologías usadas:** SVG y `conic-gradient` de CSS para las gráficas (sin bibliotecas de gráficas ni npm); opciones `maxBounds`, `maxBoundsViscosity` y `minZoom` de Leaflet para acotar el mapa; `L.divIcon` con SVG para los marcadores.
+
+- **Herramientas de IA:** el equipo aprobó el rediseño en el lienzo, decidió retirar WhatsApp y acotar el mapa; se apoyó en Claude (Opus 5.5) como asistente para escribir los componentes, las pantallas, la migración y las pruebas, que el equipo revisó y aprobó.
+

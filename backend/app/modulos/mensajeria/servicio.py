@@ -1,6 +1,7 @@
-"""Orquestación de mensajería: WhatsApp entrante → asistente → respuesta, y ciclo de avisos proactivos.
+"""Orquestación de mensajería: ciclo de avisos proactivos, citas asignadas y resultado de las solicitudes de alta.
 
-Los avisos se envían por Telegram si el transportista se registró en el bot; si no, por WhatsApp.
+Los avisos se envían por Telegram a los transportistas conectados al bot; los demás quedan registrados como
+fallidos para que la agencia los vea.
 """
 import asyncio
 import logging
@@ -9,17 +10,16 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 
-from app.modulos.citas.servicio import ErrorCita, normalizar_telefono
-from app.modulos.mensajeria.adaptadores import telegram, twilio
-from app.modulos.mensajeria.asistente.agente import asistente, guardar_turnos
+from app.modulos.mensajeria.adaptadores import telegram
+from app.modulos.mensajeria.asistente.agente import guardar_turnos
 from app.modulos.mensajeria.dominio.avisos import AvisoNuevo, CitaActiva, revisar
 from app.nucleo.contracts.enums import Canal, EstadoAviso, EstadoCita
-from app.nucleo.contracts.schemas import AsistenteRequest, AvisoOut, WsAviso
+from app.nucleo.contracts.schemas import AvisoOut, WsAviso
 from app.nucleo.db.base import SessionLocal
 from app.nucleo.db.models import Aviso, Cita, Transportista
 from app.nucleo.puertos import Operacion
 
-log = logging.getLogger("fluport.whatsapp")
+log = logging.getLogger("fluport.mensajeria")
 _tareas: set[asyncio.Task] = set()  # referencias para que el recolector no cancele tareas en curso
 
 
@@ -28,24 +28,6 @@ def en_segundo_plano(coro) -> asyncio.Task:
     _tareas.add(t)
     t.add_done_callback(_tareas.discard)
     return t
-
-
-# ───────────────────────────── Mensajes entrantes ─────────────────────────────
-async def atender_mensaje(sim: Operacion, direccion: str, texto: str) -> str:
-    """Pasa el mensaje al asistente y envía la respuesta por WhatsApp. Devuelve el texto respondido."""
-    try:
-        telefono = normalizar_telefono(direccion)
-    except ErrorCita:
-        log.warning("Remitente inválido: %r", direccion)
-        return ""
-    twilio.recordar_direccion(telefono, direccion)
-    with SessionLocal() as db:
-        r = await asistente.responder(db, sim, AsistenteRequest(canal=Canal.whatsapp, remitente=telefono,
-                                                                  texto=texto or "(mensaje sin texto)"))
-    enviado, detalle = await twilio.enviar(telefono, r.respuesta)
-    if not enviado:
-        log.error("No se pudo responder a %s: %s", telefono, detalle)
-    return r.respuesta
 
 
 # ───────────────────────────── Avisos proactivos ─────────────────────────────
@@ -64,12 +46,12 @@ def leer_citas_activas() -> tuple[list[CitaActiva], set[tuple[int, str]]]:
     return citas, enviados
 
 
-CANALES = {Canal.telegram: telegram.CanalTelegram(), Canal.whatsapp: twilio.CanalWhatsApp()}  # adaptadores
+CANALES = {Canal.telegram: telegram.CanalTelegram()}  # adaptadores del puerto CanalMensajeria
 
 
 def canal_de(a: AvisoNuevo) -> Canal:
-    """Telegram si el transportista se conectó al bot y el canal está configurado; si no, WhatsApp."""
-    return Canal.telegram if a.telegram_chat_id is not None and CANALES[Canal.telegram].configurado() else Canal.whatsapp
+    """Canal por el que se avisa al transportista (hoy solo Telegram)."""
+    return Canal.telegram
 
 
 def registrar_aviso(a: AvisoNuevo) -> AvisoOut:
@@ -85,9 +67,9 @@ def registrar_aviso(a: AvisoNuevo) -> AvisoOut:
 
 
 async def enviar_aviso(a: AvisoNuevo) -> tuple[bool, str]:
-    canal = canal_de(a)
-    destino = a.telegram_chat_id if canal == Canal.telegram else a.telefono
-    return await CANALES[canal].enviar(destino, a.mensaje)
+    if a.telegram_chat_id is None:
+        return False, "el transportista no está conectado al bot de Telegram"
+    return await CANALES[canal_de(a)].enviar(a.telegram_chat_id, a.mensaje)
 
 
 def marcar_aviso(aviso_id: int, enviado: bool) -> None:
@@ -131,7 +113,7 @@ async def notificar_asignacion(sim: Operacion, cita_id: int, publicar) -> AvisoO
 
 
 async def ciclo_avisos(sim: Operacion, publicar) -> list[AvisoOut]:
-    """Revisa citas, genera avisos nuevos, los guarda, los publica en el tablero y los envía por WhatsApp."""
+    """Revisa citas, genera avisos nuevos, los guarda, los publica en el tablero y los envía por Telegram."""
     citas, enviados = await asyncio.to_thread(leer_citas_activas)
     if not citas:
         return []

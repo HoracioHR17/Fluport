@@ -6,6 +6,7 @@
 <title>Fluport · ¿Cómo están las entradas al puerto?</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/css/tokens.css">
+<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
 <link rel="stylesheet" href="/static/css/ui.css">
 </head>
 <body>
@@ -14,36 +15,75 @@
     <a class="marca" href="/publico/" aria-label="Fluport, inicio"><span><b>FLU</b>PORT</span><span class="marca__puntos" aria-hidden="true"><i></i><i></i><i></i></span></a>
     <span class="sim" id="etiqueta">SIMULACIÓN</span>
     <nav class="pub-nav" aria-label="Secciones">
-      <a href="#entradas" aria-current="page">Entradas</a>
+      <a href="#entradas" aria-current="page">Estado</a>
+      <a href="#mapa">Mapa</a>
       <a href="#pronostico">Mejor hora</a>
       <a href="#transportistas">Para transportistas</a>
     </nav>
     <a class="btn btn--sec" href="/agencia/">Acceso agencias</a>
   </div>
 </header>
+<div class="banda-alerta oculto" id="alerta" role="status">
+  <div class="banda-alerta__in">
+    <svg width="26" height="24" viewBox="0 0 26 24" aria-hidden="true"><path d="M13 2 L25 22 H1 Z" fill="#D9574B"></path><path d="M13 9 V15 M13 18 V19" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round"></path></svg>
+    <p><strong id="alerta-titulo"></strong> <span id="alerta-texto"></span></p>
+    <a href="#mapa">Ver en el mapa</a>
+  </div>
+</div>
 
 <main class="pub-main">
-  <section id="entradas" aria-labelledby="t-hero" style="display:flex;flex-direction:column;gap:20px">
-    <div class="pub-hero">
-      <div>
-        <h1 id="t-hero">¿Cómo están las entradas al puerto?</h1>
-        <p class="tenue" style="margin:0" id="actualizado">Cargando…</p>
-      </div>
-      <p class="leyenda"><span>● Fluye · menos de 30 min</span><span>● Lento · 30 a 90 min</span><span>▲ Saturado · más de 90 min</span></p>
-    </div>
-    <div class="alerta oculto" id="alerta" role="status">
-      <span class="alerta__icono" aria-hidden="true">▲</span>
-      <div style="display:flex;flex-direction:column;gap:4px"><strong id="alerta-titulo" style="font-size:17px"></strong><span class="tenue" id="alerta-texto"></span></div>
+  <section id="entradas" aria-labelledby="t-hero" class="pub-estado">
+    <div class="pub-resumen">
+      <h1 id="t-hero">¿Cómo están las entradas al puerto?</h1>
+      <p class="tenue" style="margin:0" id="actualizado">Cargando…</p>
+      <figure class="pub-resumen__fig">
+        <div id="velocimetro"></div>
+        <figcaption><span class="cifra pub-resumen__cifra" id="promedio">—</span><span class="tenue">espera promedio de las casetas abiertas</span></figcaption>
+      </figure>
     </div>
     <div class="entradas" id="zonas" aria-live="polite"></div>
   </section>
 
-  <section id="pronostico" class="tarjeta" aria-labelledby="t-pron" style="padding:28px;gap:20px">
-    <div class="cabeza">
-      <h2 id="t-pron" style="font-size:24px">Pronóstico de las próximas 12 horas</h2>
-      <span class="tenue" style="font-size:14px">Cada bloque equivale a 30 minutos · pasa el cursor para ver la espera</span>
+  <section id="mapa" aria-labelledby="t-mapa" class="pub-mapa">
+    <div class="tarjeta pub-mapa__mapa">
+      <div class="cabeza"><h2 id="t-mapa">Mapa de accesos</h2><span class="tenue" style="font-size:14px">Color, forma y línea indican el estado</span></div>
+      <div class="mapa mapa--publico" id="mapa-pub" role="region" aria-label="Mapa de las casetas y el puerto de Veracruz"></div>
+      <ul class="simbologia" aria-label="Simbología">
+        <li><span data-simbolo="verde"></span><span><b>Fluye</b> · menos de 30 min</span></li>
+        <li><span data-simbolo="amarillo"></span><span><b>Lento</b> · 30 a 90 min</span></li>
+        <li><span data-simbolo="rojo"></span><span><b>Saturado</b> · más de 90 min</span></li>
+        <li><span data-simbolo="cerrado"></span><span><b>Cerrada</b> · sin paso</span></li>
+        <li><svg width="34" height="12" viewBox="0 0 34 12" aria-hidden="true"><line x1="1" y1="6" x2="33" y2="6" stroke="#D9574B" stroke-width="6" stroke-dasharray="9 5"></line></svg><span>Ruta con fila larga</span></li>
+      </ul>
     </div>
-    <div class="lineas"><div class="lineas__in" id="lineas"></div></div>
+    <aside class="pub-mapa__lado" aria-label="Recomendación">
+      <div class="mejor" id="mejor"></div>
+      <div class="tarjeta">
+        <h2 style="font-size:18px">Espera por caseta</h2>
+        <div class="ranking" id="ranking"></div>
+        <p class="tenue" style="margin:0;font-size:13px">Escala de 0 a 150 min.</p>
+      </div>
+    </aside>
+  </section>
+
+  <section id="pronostico" class="tarjeta" aria-labelledby="t-pron" style="padding:28px;gap:18px">
+    <div class="cabeza">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <h2 id="t-pron" style="font-size:24px">Pronóstico de las próximas 12 horas</h2>
+        <span class="tenue" style="font-size:15px" id="pron-sub">Espera estimada cada 30 minutos</span>
+      </div>
+      <div class="pildoras pildoras--grandes" role="group" aria-label="Caseta del pronóstico" id="pron-casetas"></div>
+    </div>
+    <p class="ventana oculto" id="pron-mejor"></p>
+    <div class="grafica-barras" id="pron-grafica"></div>
+    <ul class="simbologia simbologia--linea" aria-label="Leyenda del pronóstico">
+      <li><span class="muestra" style="background:#3FAE7A"></span>Fluye</li>
+      <li><span class="muestra" style="background:#E9B03B"></span>Lento</li>
+      <li><span class="muestra muestra--rayas"></span>Saturado (rayado)</li>
+      <li><span class="muestra-linea" style="border-color:#3FAE7A"></span>30 min</li>
+      <li><span class="muestra-linea" style="border-color:#D9574B"></span>90 min</li>
+      <li><span class="muestra" style="background:#EAF6F0;border:1px solid #3FAE7A"></span>Mejor ventana</li>
+    </ul>
   </section>
 
   <section id="transportistas" class="bot" aria-labelledby="t-bot">
@@ -52,7 +92,7 @@
       <p>Consulta la cita que te asignó tu agencia, confírmala, pide un cambio y recibe avisos si tu entrada se satura o se cierra.</p>
       <ol class="bot__pasos">
         <li><b>1</b>Escanea el código o toca el botón</li>
-        <li><b>2</b>Comparte tu número registrado por tu agencia</li>
+        <li><b>2</b>Comparte tu número; si aún no tienes alta, elige tu agencia</li>
         <li><b>3</b>Consulta y confirma tus citas en el chat</li>
       </ol>
       <a class="btn btn--verde" id="enlace-bot" href="#" target="_blank" rel="noopener" style="align-self:flex-start;font-size:17px;padding:14px 22px">Abrir el bot en Telegram</a>
@@ -71,7 +111,9 @@
   </div>
 </footer>
 <script src="/static/vendor/qrcode/qrcode.js"></script>
+<script src="/static/vendor/leaflet/leaflet.js"></script>
 <script src="/static/js/comun.js"></script>
+<script src="/static/js/graficas.js"></script>
 <script src="/static/js/publico.js"></script>
 </body>
 </html>

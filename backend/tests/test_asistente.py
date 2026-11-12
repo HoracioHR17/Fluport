@@ -97,12 +97,12 @@ def _manana(servicio, hora):
 
 def test_flujo_sugerir_y_agendar(entorno):
     c, servicio = entorno
-    tel = "whatsapp:+5212290000001"
+    tel = "+5212290000001"
     llm = LLMGuion([
         llamada("sugerir_horario", desde=_manana(servicio, 8), hasta=_manana(servicio, 11), tipo_carga="contenedor_40"),
     ])
     ag.asistente.usar_cliente(llm)
-    r = c.post("/api/asistente/mensaje", json={"canal": "whatsapp", "remitente": tel,
+    r = c.post("/api/asistente/mensaje", json={"canal": "web", "remitente": tel,
                                                "texto": "llego mañana a las 9 con un contenedor de 40"})
     assert r.status_code == 200, r.text
     cuerpo = r.json()
@@ -117,7 +117,7 @@ def test_flujo_sugerir_y_agendar(entorno):
         llamada("crear_cita", acceso_id=opcion["acceso_id"], inicio=opcion["inicio"], tipo_carga="contenedor_40"),
     ])
     ag.asistente.usar_cliente(llm2)
-    r = c.post("/api/asistente/mensaje", json={"canal": "whatsapp", "remitente": tel, "texto": "la 1"})
+    r = c.post("/api/asistente/mensaje", json={"canal": "web", "remitente": tel, "texto": "la 1"})
     cuerpo = r.json()
     cita = cuerpo["acciones"][0]["resultado"]
     assert "cita_id" in cita and cita["inicio"] == opcion["inicio"]
@@ -127,7 +127,7 @@ def test_flujo_sugerir_y_agendar(entorno):
     assert previos[-2]["role"] == "model" and previos[-2]["parts"][0]["text"].startswith("Estas son")
     assert previos[-1]["parts"][0]["text"] == "la 1"
     guardada = c.get(f"/api/citas/{cita['cita_id']}").json()
-    assert guardada["origen"] == "whatsapp" and guardada["estado"] == "agendada"
+    assert guardada["origen"] == "asistente" and guardada["estado"] == "agendada"
     assert cita["cita_id"] in servicio.sim.citas
 
 
@@ -137,7 +137,7 @@ def test_solo_sus_propias_citas(entorno):
                                        "ventana_inicio": _manana(servicio, 13) + ":00-06:00",
                                        "ventana_fin": _manana(servicio, 13) + ":30-06:00", "tipo_carga": "granel"}).json()
     ag.asistente.usar_cliente(LLMGuion([llamada("cancelar_cita", cita_id=ajena["id"]), texto("No pude.")]))
-    r = c.post("/api/asistente/mensaje", json={"canal": "whatsapp", "remitente": "+522290000001", "texto": "cancela"})
+    r = c.post("/api/asistente/mensaje", json={"canal": "web", "remitente": "+522290000001", "texto": "cancela"})
     assert "error" in r.json()["acciones"][0]["resultado"]
     assert r.json()["respuesta"] == "No pude."  # con error, el LLM redacta la explicación
     assert c.get(f"/api/citas/{ajena['id']}").json()["estado"] == "agendada"
@@ -147,11 +147,11 @@ def test_mis_citas_y_cancelar(entorno):
     c, _ = entorno
     tel = "+522290000001"
     ag.asistente.usar_cliente(LLMGuion([llamada("mis_citas")]))
-    mias = c.post("/api/asistente/mensaje", json={"canal": "whatsapp", "remitente": tel, "texto": "mis citas"}).json()
+    mias = c.post("/api/asistente/mensaje", json={"canal": "web", "remitente": tel, "texto": "mis citas"}).json()
     lista = mias["acciones"][0]["resultado"]["citas"]
     assert len(lista) == 1 and mias["respuesta"].startswith("Tus citas:")
     ag.asistente.usar_cliente(LLMGuion([llamada("cancelar_cita", cita_id=lista[0]["cita_id"])]))
-    r = c.post("/api/asistente/mensaje", json={"canal": "whatsapp", "remitente": tel, "texto": "cancélala"}).json()
+    r = c.post("/api/asistente/mensaje", json={"canal": "web", "remitente": tel, "texto": "cancélala"}).json()
     assert r["acciones"][0]["resultado"]["estado"] == "cancelada" and r["respuesta"].startswith("Cancelé")
 
 
@@ -304,14 +304,14 @@ def test_plantillas(sim):
                                                                    "espera_actual_min": 99, "mejor_hora": "20:00"}]}, sim)
 
 
-def test_formato_whatsapp():
-    from app.modulos.mensajeria.asistente.agente import formato_whatsapp
+def test_formato_chat():
+    from app.modulos.mensajeria.asistente.agente import formato_chat
 
-    assert formato_whatsapp("## Opciones\n1. **07:30** - A1\n__nota__") == "Opciones\n1. *07:30* - A1\n_nota_"
+    assert formato_chat("## Opciones\n1. **07:30** - A1\n__nota__") == "Opciones\n1. *07:30* - A1\n_nota_"
 
 
 def test_request_canal():
-    assert AsistenteRequest(canal=Canal.whatsapp, remitente="x", texto="y").canal == "whatsapp"
+    assert AsistenteRequest(canal=Canal.telegram, remitente="x", texto="y").canal == "telegram"
     assert datetime  # noqa: B018
 
 

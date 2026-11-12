@@ -38,12 +38,12 @@ class ErrorCita(Exception):
 
 
 def normalizar_telefono(tel: str) -> str:
-    """'whatsapp:+52 229 123 4567' → '+522291234567' (formato de Twilio y de la BD).
+    """'+52 229 123 4567' → '+522291234567' (formato de la BD).
 
-    Los celulares de México pueden llegar como +521 + 10 dígitos (formato móvil anterior que aún usa WhatsApp)
-    o +52 + 10 dígitos: ambos se guardan como +52 + 10 dígitos para que sean el mismo transportista.
+    Los celulares de México pueden llegar como +521 + 10 dígitos (formato móvil anterior que aún comparten
+    algunas apps, incluido el contacto de Telegram) o +52 + 10 dígitos: ambos se guardan como +52 + 10 dígitos
+    para que sean el mismo transportista.
     """
-    tel = tel.strip().removeprefix("whatsapp:")
     digitos = re.sub(r"\D", "", tel)
     if len(digitos) < 10:
         raise ErrorCita(422, "teléfono inválido")

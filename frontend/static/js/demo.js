@@ -12,18 +12,13 @@
   // ───────────── Mapas (Leaflet) ─────────────
   function crearMapa(mundo) {
     var div = $("mapa-" + mundo);
-    if (!window.L) { div.appendChild(el("p", { style: { padding: "16px" } }, "No se pudo cargar el mapa.")); return null; }
-    var mapa = L.map(div, { zoomControl: true, attributionControl: true });
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 18, attribution: "&copy; colaboradores de OpenStreetMap"
-    }).addTo(mapa);
     var limites = [];
+    Object.keys(estado.rutas).forEach(function (id) { limites = limites.concat(estado.rutas[id].coords); });
+    var mapa = F.mapaPuerto(div, limites); // limitado a la zona del puerto de Veracruz (graficas.js)
+    if (!mapa) return null;
     Object.keys(estado.rutas).forEach(function (id) {
-      var r = estado.rutas[id];
-      L.polyline(r.coords, { color: "#0A2238", opacity: 0.45, weight: 5 }).addTo(mapa);
-      limites = limites.concat(r.coords);
+      L.polyline(estado.rutas[id].coords, { color: "#0A2238", opacity: 0.45, weight: 5 }).addTo(mapa);
     });
-    if (limites.length) mapa.fitBounds(limites, { padding: [30, 30] });
     var m = { mapa: mapa, camiones: {}, casetas: {} };
     Object.keys(estado.accesos).forEach(function (id) {
       var a = estado.accesos[id];
@@ -161,9 +156,9 @@
       (vis.camiones_ocultos ? " · " + F.num(vis.camiones_ocultos) + " más no se dibujan" : "");
   }
 
-  // ───────────── Avisos a transportistas (Telegram o WhatsApp) ─────────────
+  // ───────────── Avisos a transportistas (Telegram) ─────────────
   var TIPOS_AVISO = { turno_30min: "Recordatorio de turno", saturacion: "Caseta saturada o cerrada" };
-  var CANALES = { telegram: "Telegram", whatsapp: "WhatsApp", web: "Web" };
+  var CANALES = { telegram: "Telegram", web: "Web" };
 
   function renderAvisos(lista) {
     F.reemplazar($("lista-avisos"), lista.length ? lista.slice(0, 6).map(function (a) {

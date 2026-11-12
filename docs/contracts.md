@@ -50,9 +50,7 @@ Enums: `tipo_carga` (contenedor_20, contenedor_40, refrigerado, peligroso, grane
 | GET | `/api/sim/kpis` | — | `KpisResponse` | M1 |
 | GET | `/api/sim/snapshot` | — | `SimSnapshot` (respaldo por polling) | M1 |
 | POST | `/api/asistente/mensaje` | `AsistenteRequest` | `AsistenteResponse` | M4 |
-| POST | `/webhook/whatsapp` | Formulario de Twilio (`From`, `Body`, …) + `X-Twilio-Signature` | TwiML vacío (la respuesta se envía aparte por la API REST) · 403 si la firma es inválida | M5 |
 | GET | `/api/avisos?limite=10` | — | `AvisoOut[]` (últimos avisos proactivos) | M5 |
-| GET | `/api/whatsapp/enlace` | — | `{numero, enlace, configurado}` (wa.me de respaldo) | M5 |
 | POST | `/webhook/telegram` | Update de Telegram + `X-Telegram-Bot-Api-Secret-Token` (solo en modo `webhook`) | `{ok: true}` · 403 secreto inválido · 404 si el modo no es `webhook` | M5 |
 | GET | `/api/telegram/enlace` | — | `{usuario, enlace}` (t.me del bot) | M5 |
 | GET | `/api/publico/zonas` | — | `ZonaPublica[]` (por caseta: semáforo actual, horas pico de 12 h, mejor hora) | M7 |
@@ -66,17 +64,16 @@ Payload de `EventoCreate.payload` por tipo:
 
 Notas de citas:
 - Las horas de las citas están en **tiempo simulado** (`ts_sim`). Una cita no puede empezar más de 30 min antes del reloj actual (422).
-- `telefono` se normaliza a `+<dígitos>` (acepta `whatsapp:+52…`); si no existe, se crea el transportista.
+- `telefono` se normaliza a `+<dígitos>` (`+521…` de celular se guarda como `+52…`); si no existe, se crea el transportista.
 - Errores: 404 acceso/cita/transportista inexistente · 409 acceso cerrado, cita no activa o camión ya en camino · 422 ventana inválida o teléfono inválido.
 - Ciclo de estados: `agendada → en_ruta → cumplida` (lo actualiza el simulador) · `reprogramada` / `cancelada` (por la API) · `no_show` si la ventana terminó hace más de 60 min sin salir.
 - Sugerencias: franjas de 30 min dentro de `[desde, hasta]` en accesos abiertos, ordenadas por espera prevista (pronóstico a 12 h; más allá, carga agendada vs. capacidad); `ahorro_vs_pico_min` = espera de la peor franja de la ventana − espera de la sugerida.
 
 Notas de mensajería (M5):
-- Canal principal de la demo: **Telegram**. El bot pide compartir el número (botón de contacto) y guarda `transportista.telegram_chat_id`; desde ahí el transportista es el mismo en web, WhatsApp y Telegram. Solo acepta el contacto propio del usuario y solo chats privados.
+- Canal de mensajería: **Telegram** (único). El bot pide compartir el número (botón de contacto) y guarda `transportista.telegram_chat_id`; desde ahí el transportista es el mismo en el panel de la agencia y en Telegram. Solo acepta el contacto propio del usuario y solo chats privados.
 - Modo `polling` (por defecto): Fluport consulta a Telegram, no requiere URL pública. Modo `webhook`: para hosting.
-- Los avisos se envían por Telegram si el transportista tiene `telegram_chat_id`; si no, por WhatsApp.
+- Los avisos se envían por Telegram si el transportista tiene `telegram_chat_id`; si no, el aviso queda registrado como `fallido` para que la agencia lo vea.
 - Avisos proactivos, uno por cita y tipo: `turno_30min` (faltan ≤ 30 min) y `saturacion` (caseta cerrada o espera prevista ≥ 45 min en las próximas 3 h, con la mejor alternativa si ahorra ≥ 15 min). Se guardan en `aviso`, se publican en el WebSocket como `{"tipo": "aviso"}` y se agregan al historial del asistente para que un "SÍ" tenga contexto.
-- La firma se valida contra `FLUPORT_TWILIO_WEBHOOK_URL` (la URL pública exacta configurada en Twilio).
 
 Notas de la vista pública:
 - Usa el Mundo B (operación con Fluport). Nunca incluye citas, transportistas, teléfonos ni la comparación A/B.
@@ -102,7 +99,7 @@ Servidor → cliente, JSON. Al conectar se envía un snapshot inmediato; luego u
 `CamionEstado.progreso` es 0..1 sobre la polilínea `ruta_id` del GeoJSON; el front interpola la posición.
 
 ## 5. Asistente (M4)
-`POST /api/asistente/mensaje` `{canal, remitente, texto}` → `{respuesta, acciones[]}`. El remitente es el teléfono (acepta `whatsapp:+52…`); el asistente solo ve y modifica las citas de ese teléfono. Sin `FLUPORT_LLM_API_KEY` responde con el estado de las casetas.
+`POST /api/asistente/mensaje` `{canal, remitente, texto}` → `{respuesta, acciones[]}`. El remitente es el teléfono; `canal` ∈ `telegram | web`; el asistente solo ve y modifica las citas de ese teléfono. Sin `FLUPORT_LLM_API_KEY` responde con el estado de las casetas.
 
 Herramientas:
 `consultar_espera(acceso_id?)` → `GET /api/accesos/estado` + `GET /api/pronostico`

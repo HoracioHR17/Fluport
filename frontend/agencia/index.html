@@ -44,24 +44,42 @@
       <a class="btn" href="/agencia/citas/#asignar">Asignar cita</a>
     </header>
     <main class="ag-main">
-      <section aria-label="Indicadores de la flota" class="kpis" id="kpis"></section>
+      <section aria-label="Indicadores de la flota" class="kpis kpis--graficas" id="kpis"></section>
+      <div class="fila-2">
+        <section class="tarjeta ancho" aria-labelledby="t-horas">
+          <div class="cabeza"><h2 id="t-horas">Citas activas por hora</h2><span class="tenue" style="font-size:14px" id="total-horas"></span></div>
+          <div class="apiladas" id="citas-hora"></div>
+          <ul class="simbologia simbologia--linea" aria-label="Leyenda">
+            <li><span class="muestra" style="background:#0A2238"></span>Confirmadas</li>
+            <li><span class="muestra" style="background:#3D6A8F"></span>Pedidas por el chofer</li>
+            <li><span class="muestra muestra--sin"></span>Sin confirmar</li>
+          </ul>
+        </section>
+        <section class="tarjeta angosto" aria-labelledby="t-dona">
+          <h2 id="t-dona">Mi flota ahora</h2>
+          <div class="flota-dona" id="flota-dona"></div>
+        </section>
+      </div>
+      <div class="fila-2">
+        <section class="tarjeta ancho" aria-labelledby="t-at">
+          <div class="cabeza"><h2 id="t-at">Requiere tu atención</h2><span class="tenue" style="font-size:14px" id="total-atencion"></span></div>
+          <ul class="atencion" id="atencion" aria-live="polite"></ul>
+        </section>
+        <section class="tarjeta angosto" aria-labelledby="t-ahorro">
+          <h2 id="t-ahorro">Lo que ahorra Fluport</h2>
+          <div class="ahorro" id="ahorro"></div>
+        </section>
+      </div>
       <section aria-labelledby="t-cas" class="bloque">
-        <h2 id="t-cas" class="titulo-bloque">Casetas ahora</h2>
+        <h2 id="t-cas" class="titulo-bloque">Casetas y mis camiones en fila</h2>
         <div class="casetas" id="casetas" aria-live="polite"></div>
-      </section>
-      <section aria-labelledby="t-mod" class="bloque">
-        <h2 id="t-mod" class="titulo-bloque">Ir a</h2>
-        <div class="modulos" id="modulos"></div>
-      </section>
-      <section class="tarjeta" aria-labelledby="t-at">
-        <div class="cabeza"><h2 id="t-at">Requiere tu atención</h2><span class="tenue" style="font-size:14px" id="total-atencion"></span></div>
-        <ul class="atencion atencion--rejilla" id="atencion" aria-live="polite"></ul>
       </section>
     </main>
   </div>
 </div>
 <script src="/static/vendor/qrcode/qrcode.js"></script>
 <script src="/static/js/comun.js"></script>
+<script src="/static/js/graficas.js"></script>
 <script src="/static/js/agencia.js"></script>
 </body>
 </html>

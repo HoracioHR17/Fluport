@@ -134,6 +134,6 @@
   window.Fluport = {
     SEMAFORO: SEMAFORO, el: el, reemplazar: reemplazar, chip: chip, hora: hora, fecha: fecha,
     zonaHoraria: zonaHoraria, num: num, api: api, conectarSimulacion: conectarSimulacion,
-    horasPico: horasPico, prepararRuta: prepararRuta, posicion: posicion
+    horasPico: horasPico, prepararRuta: prepararRuta, posicion: posicion, horaMas: horaMas
   };
 })();

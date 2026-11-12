@@ -49,6 +49,17 @@
             <div class="pildoras" role="group" aria-label="Filtro de citas" id="filtros"></div>
             <span class="tenue" style="font-size:14px" id="resumen-citas"></span>
           </div>
+          <section class="tarjeta" aria-labelledby="t-linea">
+            <div class="cabeza"><h2 id="t-linea">Línea de tiempo por caseta</h2><span class="tenue" style="font-size:14px">La franja de color es la espera pronosticada</span></div>
+            <div class="linea-tiempo" id="linea-tiempo"></div>
+            <ul class="simbologia simbologia--linea" aria-label="Leyenda">
+              <li><span class="muestra muestra--ancha" style="background:#0A2238"></span>Confirmada</li>
+              <li><span class="muestra muestra--ancha muestra--sin"></span>Sin confirmar</li>
+              <li><span class="muestra muestra--ancha" style="background:#3D6A8F"></span>Pedida por el chofer</li>
+              <li><span class="muestra muestra--ancha" style="background:#3FAE7A"></span>En ruta</li>
+              <li><span class="muestra-ahora"></span>Ahora</li>
+            </ul>
+          </section>
           <section class="tarjeta" aria-label="Citas de la agencia">
             <div class="tabla-caja">
               <table class="tabla">
@@ -90,6 +101,7 @@
 </div>
 <script src="/static/vendor/qrcode/qrcode.js"></script>
 <script src="/static/js/comun.js"></script>
+<script src="/static/js/graficas.js"></script>
 <script src="/static/js/agencia.js"></script>
 </body>
 </html>

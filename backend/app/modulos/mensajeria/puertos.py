@@ -1,6 +1,6 @@
 """Puertos de la mensajería: cómo habla Fluport con los transportistas y con el modelo de lenguaje.
 
-Adaptadores actuales (`adaptadores/`): Telegram y WhatsApp (Twilio) como canales, Gemini como modelo de lenguaje.
+Adaptadores actuales (`adaptadores/`): Telegram como canal, Gemini como modelo de lenguaje.
 Agregar otro canal o proveedor es escribir un adaptador que cumpla el puerto; el asistente y los avisos no cambian.
 """
 from typing import Any, Protocol

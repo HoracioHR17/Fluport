@@ -35,13 +35,7 @@ class Settings(BaseSettings):
     llm_historial_min: float = 30.0  # minutos de conversación previa que recuerda el asistente
     llm_timeout_s: float = 12.0  # tiempo máximo de espera por modelo (principal y respaldo)
     llm_modelo_respaldo: str = "gemini-3.5-flash-lite"  # se usa si el principal está saturado o tarda ("" = sin respaldo)
-    # WhatsApp con Twilio (Sandbox)
-    twilio_account_sid: str = ""
-    twilio_auth_token: str = ""
-    twilio_whatsapp_from: str = ""  # número del Sandbox, p. ej. "whatsapp:+14155238886"
-    twilio_webhook_url: str = ""  # URL pública EXACTA configurada en Twilio (para validar la firma)
-    twilio_validar_firma: bool = True
-    avisos_activos: bool = True  # avisos proactivos (Telegram o WhatsApp, según el canal del transportista)
+    avisos_activos: bool = True  # avisos proactivos por Telegram
     # Telegram (bot creado con @BotFather)
     telegram_token: str = ""
     telegram_modo: str = "polling"  # polling (sin URL pública) | webhook | off

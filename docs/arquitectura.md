@@ -31,7 +31,7 @@ flowchart LR
   subgraph Salida["Adaptadores de salida"]
     PG[("PostgreSQL")]
     GEM["Gemini<br/>(ModeloLenguaje)"]
-    TEL["Telegram / WhatsApp<br/>(CanalMensajeria)"]
+    TEL["Telegram<br/>(CanalMensajeria)"]
     MOT["Simulador SimPy<br/>(implementa Operacion)"]
   end
   WEB --> API
@@ -70,10 +70,11 @@ backend/app/
     │   ├── entrenar.py · api.py
     ├── citas/                  sugerir, agendar, reprogramar, cancelar; ganchos con la operación
     │   ├── servicio.py · api.py
-    ├── agencias/api.py         catálogo, alta de transportistas
+    ├── agencias/               catálogo, alta de transportistas y solicitudes desde el bot
+    │   ├── servicio.py · api.py
     ├── mensajeria/             asistente, bot, avisos
     │   ├── puertos.py          ModeloLenguaje, CanalMensajeria
-    │   ├── adaptadores/        gemini.py, telegram.py, twilio.py
+    │   ├── adaptadores/        gemini.py, telegram.py
     │   ├── dominio/avisos.py   reglas de los avisos (turno, saturación)
     │   ├── asistente/agente.py herramientas y redacción del asistente
     │   ├── servicio.py · bot_telegram.py · api.py
@@ -98,7 +99,7 @@ backend/app/
 | Necesidad | Cambio | Qué no cambia |
 |---|---|---|
 | Datos reales de las casetas | Un adaptador de `Operacion` sobre sensores, cámaras de placas o el sistema de la terminal | Citas, avisos, vista pública, pronóstico |
-| Otro canal (WhatsApp Cloud API, SMS) | Un adaptador de `CanalMensajeria` registrado en `mensajeria/servicio.CANALES` | Asistente, avisos, bot |
+| Otro canal de mensajería (p. ej. SMS) | Un adaptador de `CanalMensajeria` registrado en `mensajeria/servicio.CANALES` | Asistente, avisos, bot |
 | Otro modelo de lenguaje | Un adaptador de `ModeloLenguaje` | Herramientas y reglas del asistente |
 | Escalar la mensajería o el pronóstico | Extraer el módulo como servicio; los `Ganchos` pasan a publicar eventos en un broker | El resto del monolito |
 | Mucho tráfico en la vista pública | Caché o CDN delante de `/api/publico/zonas` (lecturas separadas de escrituras) | Los módulos |

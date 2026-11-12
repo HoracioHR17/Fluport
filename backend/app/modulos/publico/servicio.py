@@ -46,7 +46,7 @@ def zonas(sim: Operacion) -> list[ZonaPublica]:
         abierto = e.estado == EstadoAcceso.abierto
         res.append(ZonaPublica(
             acceso_id=a.id, nombre=a.nombre, zona=a.zona, semaforo=e.semaforo, espera_min=e.espera_min,
-            abierto=abierto, horas_pico=horas_pico(p),
+            abierto=abierto, en_fila=e.en_fila, horas_pico=horas_pico(p),
             contingencia=CONTINGENCIA[e.semaforo] if abierto else "cerrada", norte=sim.clima == Clima.norte,
             mejor_hora=mejor.inicio if mejor else None, actualizado_en=sim.ts(), etiqueta=sim.cfg.etiqueta_simulacion,
         ))

@@ -49,3 +49,17 @@ Una sola familia sans serif del sistema, sin descargas: `font-family: Arial, Hel
 ## 6. Implementación
 - Pantallas: tablero del operador (`frontend/operador/`) y vista pública (`frontend/publico/`), según el lienzo de diseño aprobado.
 - Sin npm: HTML + CSS + JS servidos por FastAPI, con Leaflet como archivo local; la gráfica del pronóstico son barras HTML/CSS (el documento de identidad menciona React y Recharts; se sustituyen por equivalentes sin paso de compilación).
+- Componentes visuales compartidos en `frontend/static/js/graficas.js` (velocímetro, líneas de tendencia, barras, dona, mapa).
+
+## 7. Simbología (el estado nunca depende solo del color)
+| Estado | Caseta | Ruta en el mapa |
+|---|---|---|
+| Fluye (< 30 min) | ● círculo verde | verde, delgada |
+| Lento (30–90 min) | ◆ rombo ámbar | ámbar, media |
+| Saturado (> 90 min) | ▲ triángulo rojo | roja, gruesa y punteada; barras rayadas |
+| Cerrada | ■ cuadro oscuro con X | oscura, punteada |
+
+Camiones: flecha oscura orientada (en ruta), cuadro ámbar (en fila), anillo azul (en revisión o dentro), halo punteado (con cita), aro grueso (seleccionado). Citas: sólida oscura (confirmada), contorno punteado (sin confirmar), azul media (pedida por el chofer), verde (en ruta).
+
+Los mapas no salen de la zona del puerto de Veracruz (`maxBounds` con viscosidad total y zoom mínimo 10).
+

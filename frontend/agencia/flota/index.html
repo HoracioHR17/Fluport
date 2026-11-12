@@ -52,12 +52,29 @@
         <section class="tarjeta ancho" aria-labelledby="t-mapa">
           <div class="cabeza"><h2 id="t-mapa">Mapa</h2><span class="tenue" style="font-size:14px" id="resumen-mapa"></span></div>
           <div class="mapa mapa--grande" id="mapa"></div>
-          <div class="leyenda-mapa"><span>● En ruta</span><span>■ En fila</span><span>● En revisión</span><span>◯ Con cita de un transportista registrado</span><span>Solo tus camiones</span></div>
+          <ul class="simbologia" aria-label="Simbología del mapa">
+            <li><svg width="22" height="22" viewBox="-11 -11 22 22" aria-hidden="true"><path d="M-7 -6 L8 0 L-7 6 L-3 0 Z" fill="#0A2238"></path></svg>En ruta (apunta a la caseta)</li>
+            <li><svg width="22" height="22" viewBox="-11 -11 22 22" aria-hidden="true"><rect x="-6" y="-6" width="12" height="12" fill="#E9B03B" stroke="#0A2238" stroke-width="1.6"></rect></svg>En fila</li>
+            <li><svg width="22" height="22" viewBox="-11 -11 22 22" aria-hidden="true"><circle r="6" fill="#FFFFFF" stroke="#3D6A8F" stroke-width="3.5"></circle></svg>En revisión o dentro del puerto</li>
+            <li><svg width="22" height="22" viewBox="-11 -11 22 22" aria-hidden="true"><circle r="9" fill="#FFFFFF" stroke="#0A2238" stroke-width="1.5" stroke-dasharray="3 2"></circle><path d="M-4 -3.5 L5 0 L-4 3.5 L-2 0 Z" fill="#0A2238"></path></svg>Con cita (halo punteado)</li>
+            <li><svg width="22" height="22" viewBox="-11 -11 22 22" aria-hidden="true"><circle r="9" fill="none" stroke="#0A2238" stroke-width="3"></circle></svg>Seleccionado</li>
+            <li><span data-simbolo="verde"></span><span data-simbolo="amarillo"></span><span data-simbolo="rojo"></span>Caseta: fluye, lento, saturado</li>
+          </ul>
         </section>
-        <aside class="tarjeta angosto" aria-labelledby="t-sel">
-          <h2 id="t-sel">Camión seleccionado</h2>
-          <div id="ficha" aria-live="polite"></div>
-        </aside>
+        <div class="angosto bloque">
+          <aside class="tarjeta" aria-labelledby="t-sel">
+            <h2 id="t-sel">Camión seleccionado</h2>
+            <div id="ficha" aria-live="polite"></div>
+          </aside>
+          <section class="tarjeta" aria-labelledby="t-colas">
+            <h2 id="t-colas">Mis camiones por caseta</h2>
+            <div class="ranking" id="colas"></div>
+            <ul class="simbologia simbologia--linea" aria-label="Leyenda">
+              <li><span class="muestra" style="background:#E9B03B;border:1px solid #0A2238"></span>En fila</li>
+              <li><span class="muestra" style="background:#0A2238"></span>En camino</li>
+            </ul>
+          </section>
+        </div>
       </div>
       <section class="tarjeta" aria-labelledby="t-lista">
         <div class="cabeza"><h2 id="t-lista">Camiones activos</h2><span class="tenue" style="font-size:14px">Ordenados por estado · toca uno para ver su ficha</span></div>
@@ -75,6 +92,7 @@
 <script src="/static/vendor/leaflet/leaflet.js"></script>
 <script src="/static/vendor/qrcode/qrcode.js"></script>
 <script src="/static/js/comun.js"></script>
+<script src="/static/js/graficas.js"></script>
 <script src="/static/js/agencia.js"></script>
 </body>
 </html>

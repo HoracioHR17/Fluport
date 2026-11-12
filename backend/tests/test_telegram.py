@@ -176,16 +176,8 @@ def test_registro_y_conversacion(cliente, tg_conf, enviados):
 
 
 def test_aviso_por_telegram(cliente, tg_conf, enviados, monkeypatch):
-    from app.modulos.mensajeria.adaptadores import twilio
     from app.modulos.mensajeria.servicio import ciclo_avisos
 
-    whatsapp = []
-
-    async def wa(tel, texto):
-        whatsapp.append(tel)
-        return True, "x"
-
-    monkeypatch.setattr(twilio, "enviar", wa)
     inicio = _sim().ts() + timedelta(minutes=15)
     cita = cliente.post("/api/citas", json={"telefono": "+522290000888", "acceso_id": "A1",
                                             "ventana_inicio": inicio.isoformat(),
@@ -193,7 +185,7 @@ def test_aviso_por_telegram(cliente, tg_conf, enviados, monkeypatch):
                                             "tipo_carga": "granel"}).json()
     avisos = cliente.portal.call(ciclo_avisos, _sim(), lambda _: None)
     aviso = next(a for a in avisos if a.cita_id == cita["id"])
-    assert aviso.canal == "telegram" and enviados[-1][0] == CHAT and whatsapp == []
+    assert aviso.canal == "telegram" and enviados[-1][0] == CHAT
 
 
 def test_webhook_telegram(cliente, tg_conf, monkeypatch):

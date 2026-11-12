@@ -29,6 +29,7 @@ def test_paginas(cliente, ruta, texto):
     "/static/css/tokens.css", "/static/css/app.css", "/static/js/comun.js", "/static/js/demo.js",
     "/static/js/publico.js", "/static/vendor/leaflet/leaflet.js", "/static/vendor/leaflet/leaflet.css",
     "/static/favicon.svg", "/static/vendor/qrcode/qrcode.js", "/static/js/agencia.js", "/static/css/ui.css",
+    "/static/js/graficas.js",
 ])
 def test_estaticos(cliente, ruta):
     assert cliente.get(ruta).status_code == 200
@@ -49,3 +50,15 @@ def test_operador_redirige_a_agencia(cliente):
 def test_publico_invita_al_bot(cliente):
     html = cliente.get("/publico/").text
     assert 'id="enlace-bot"' in html and "qrcode.js" in html
+
+
+def test_mapas_limitados_al_puerto():
+    """Los mapas usan el mapa común, que no deja salir de la zona del puerto de Veracruz."""
+    from pathlib import Path
+
+    js = Path(__file__).resolve().parents[2] / "frontend" / "static" / "js"
+    graficas = (js / "graficas.js").read_text(encoding="utf-8")
+    assert "maxBounds" in graficas and "maxBoundsViscosity: 1" in graficas and "minZoom" in graficas
+    for f in ("publico.js", "agencia.js", "demo.js"):
+        codigo = (js / f).read_text(encoding="utf-8")
+        assert "F.mapaPuerto(" in codigo and "L.map(" not in codigo, f

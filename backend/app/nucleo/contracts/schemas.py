@@ -316,6 +316,7 @@ class ZonaPublica(Modelo):
     semaforo: Semaforo
     espera_min: float
     abierto: bool
+    en_fila: int = 0  # camiones formados en la caseta (dato agregado)
     horas_pico: list[HoraPico]  # próximas 12 h
     mejor_hora: datetime | None = None  # franja con menor espera prevista en las próximas 12 h
     contingencia: Literal["normal", "lenta", "saturada", "cerrada"] = "normal"

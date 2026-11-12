@@ -16,7 +16,7 @@
 
   var estado = { agencia: null, agencias: [], accesos: {}, rutas: {}, snap: null, mapa: null, bot: null,
     transportistas: [], solicitudes: [], citas: [], avisos: [], filtroCitas: "activas", filtroFlota: "todos", filtroTrans: "todos",
-    filtroAvisos: "todos", busqueda: "", seleccion: null };
+    filtroAvisos: "todos", busqueda: "", seleccion: null, historia: [] };
 
   // ───────────── Utilidades ─────────────
   function nombreCaseta(id) { return ((estado.accesos[id] || {}).nombre || id || "").replace("Caseta ", ""); }
@@ -58,55 +58,137 @@
   }
 
   // ───────────── Resumen ─────────────
+  // Historial corto en el navegador para las líneas de tendencia de los indicadores (una muestra cada 5 s).
+  var HISTORIA_MAX = 36;
+  function registrarHistoria() {
+    var s = estado.snap;
+    if (!s) return;
+    var ahora = Date.now(), h = estado.historia;
+    if (h.length && ahora - h[h.length - 1].t < 5000) return;
+    var f = (s.mundos.B.flota || {})[estado.agencia] || {};
+    h.push({ t: ahora, en_ruta: f.en_ruta || 0, en_fila: f.en_fila || 0, espera: f.espera_prom_min || 0,
+      activas: estado.citas.filter(function (c) { return ACTIVAS[c.estado]; }).length });
+    if (h.length > HISTORIA_MAX) h.shift();
+  }
+  function serie(clave, actual) {
+    var v = estado.historia.map(function (x) { return x[clave]; });
+    return v.length > 1 ? v : [actual, actual];
+  }
+
   function renderResumen() {
     if (!$("kpis")) return;
+    registrarHistoria();
     var s = estado.snap, f = s ? ((s.mundos.B.flota || {})[estado.agencia] || {}) : {};
     var activas = estado.citas.filter(function (c) { return ACTIVAS[c.estado]; });
     var conf = activas.filter(function (c) { return c.confirmada_en; }).length;
-    var conectados = estado.transportistas.filter(function (t) { return t.telegram; }).length;
+    var sinConf = estado.citas.filter(sinConfirmar).length;
+    var espA = s ? s.mundos.A.kpis.espera_prom_min : 0;
     var kpis = [
-      ["En ruta", F.num(f.en_ruta), "camiones hacia el puerto", "/agencia/flota/"],
-      ["En fila", F.num(f.en_fila), "esperando en caseta", "/agencia/flota/"],
-      ["Citas activas", F.num(activas.length), F.num(conf) + " confirmadas", "/agencia/citas/"],
-      ["Sin confirmar", F.num(estado.citas.filter(sinConfirmar).length), "esperan el SÍ del chofer", "/agencia/citas/"],
-      ["Espera promedio", F.num(f.espera_prom_min) + " min", "de tu flota", "/agencia/flota/"],
-      ["Conectados a Telegram", F.num(conectados) + " / " + F.num(estado.transportistas.length), "transportistas", "/agencia/transportistas/"]
+      ["Camiones en ruta", F.num(f.en_ruta), "", "hacia las casetas", "en_ruta", f.en_ruta || 0, "/agencia/flota/"],
+      ["En fila en casetas", F.num(f.en_fila), "", "esperando turno", "en_fila", f.en_fila || 0, "/agencia/flota/"],
+      ["Citas activas", F.num(activas.length), "", F.num(conf) + " confirmadas · " + F.num(sinConf) + " sin confirmar", "activas", activas.length, "/agencia/citas/"],
+      ["Espera promedio de mi flota", F.num(f.espera_prom_min), "min", espA >= 5 ? F.num(Math.max(0, espA - (f.espera_prom_min || 0))) + " min menos que sin Fluport" : "acumulada del día", "espera", f.espera_prom_min || 0, "/agencia/flota/"]
     ];
     F.reemplazar($("kpis"), kpis.map(function (k) {
-      return el("a", { class: "kpi", href: k[3] }, [el("span", {}, k[0]), el("span", { class: "cifra" }, k[1]), el("span", {}, k[2])]);
-    }));
-    if (s) renderCasetas(s.mundos.B);
-    var rech = estado.avisos.filter(function (a) { return a.tipo === "cita_rechazada"; }).length;
-    var sinBot = estado.transportistas.length - conectados;
-    var mods = [
-      ["Flota en vivo", "Mapa y lista de tus camiones: en ruta, en fila, en revisión o dentro.", plural((f.en_ruta || 0) + (f.en_fila || 0) + (f.en_revision || 0) + (f.dentro || 0), "camión activo", "camiones activos"), "azul", "/agencia/flota/"],
-      ["Citas", "Asigna citas con el pronóstico de espera y sigue su confirmación.", plural(estado.citas.filter(sinConfirmar).length, "sin confirmar", "sin confirmar"), estado.citas.filter(sinConfirmar).length ? "amarillo" : "verde", "/agencia/citas/"],
-      ["Transportistas", "Alta de choferes, placas e invitación al bot de Telegram.", sinBot ? plural(sinBot, "sin conectar", "sin conectar") : "Todos conectados", sinBot ? "amarillo" : "verde", "/agencia/transportistas/"],
-      ["Avisos", "Mensajes enviados a tus choferes y sus respuestas.", rech ? plural(rech, "rechazo", "rechazos") : plural(estado.avisos.length, "aviso", "avisos"), rech ? "rojo" : "azul", "/agencia/avisos/"]
-    ];
-    F.reemplazar($("modulos"), mods.map(function (m) {
-      return el("a", { class: "modulo", href: m[4] }, [
-        el("span", { class: "modulo__cab" }, [m[0], el("span", { "aria-hidden": "true" }, "→")]),
-        el("p", {}, m[1]), chip(m[3], m[2])
+      return el("a", { class: "kpi kpi--grafica", href: k[6] }, [
+        el("span", {}, k[0]),
+        el("span", { class: "kpi__valor" }, [el("span", { class: "cifra" }, k[1]), k[2] ? el("span", { class: "kpi__unidad" }, k[2]) : null]),
+        F.sparkline(serie(k[4], k[5]), { ancho: 120, alto: 34, area: true }),
+        el("span", {}, k[3])
       ]);
     }));
+    renderCitasHora(activas);
+    renderDona(f);
+    renderAhorro(s, f);
+    if (s) renderCasetas(s.mundos.B);
     renderAtencion();
+  }
+
+  /** Barras apiladas de las citas activas por hora de llegada: confirmadas, pedidas por el chofer y sin confirmar. */
+  function renderCitasHora(activas) {
+    var caja = $("citas-hora");
+    if (!caja) return;
+    $("total-horas").textContent = plural(activas.length, "cita activa", "citas activas");
+    if (!activas.length) { F.reemplazar(caja, [el("p", { class: "vacio" }, "Sin citas activas. Asigna una desde Citas.")]); return; }
+    var porHora = {};
+    activas.forEach(function (c) {
+      var h = F.hora(c.ventana_inicio).slice(0, 2) + ":00";
+      var g = porHora[h] = porHora[h] || { conf: 0, chofer: 0, sin: 0 };
+      if (c.origen !== "web") g.chofer++; else if (c.confirmada_en) g.conf++; else g.sin++;
+    });
+    var horas = Object.keys(porHora).sort(), max = 1;
+    horas.forEach(function (h) { var g = porHora[h]; max = Math.max(max, g.conf + g.chofer + g.sin); });
+    var techo = Math.max(4, max);
+    F.reemplazar(caja, [el("div", { class: "apiladas__caja" }, el("div", { class: "apiladas__in", role: "img",
+      "aria-label": horas.map(function (h) { var g = porHora[h]; return h + ": " + g.conf + " confirmadas, " + g.chofer + " pedidas por chofer, " + g.sin + " sin confirmar"; }).join("; ") }, [
+      el("div", { class: "apiladas__area" }, horas.map(function (h) {
+        var g = porHora[h], tot = g.conf + g.chofer + g.sin;
+        return el("div", { class: "apiladas__col" }, [
+          el("span", { class: "apiladas__total" }, String(tot)),
+          g.sin ? el("div", { class: "apiladas__tramo apiladas__tramo--sin", style: { height: (g.sin / techo * 100) + "%" } }) : null,
+          g.chofer ? el("div", { class: "apiladas__tramo", style: { height: (g.chofer / techo * 100) + "%", background: "#3D6A8F" } }) : null,
+          g.conf ? el("div", { class: "apiladas__tramo", style: { height: (g.conf / techo * 100) + "%", background: "#0A2238" } }) : null
+        ]);
+      })),
+      el("div", { class: "apiladas__horas", "aria-hidden": "true" }, horas.map(function (h) { return el("span", {}, h); }))
+    ]))]);
+  }
+
+  var PARTES_FLOTA = [["en_ruta", "En ruta", "#0A2238", "ruta"], ["en_fila", "En fila", "#E9B03B", "fila"],
+    ["en_revision", "En revisión", "#3FAE7A", "revision"], ["dentro", "Dentro del puerto", "#8FB3D1", "dentro"]];
+  function iconoParte(tipo, color) {
+    var forma = tipo === "ruta" ? F.svg("path", { d: "M2 3 L14 8 L2 13 L5 8 Z", fill: color })
+      : tipo === "fila" ? F.svg("rect", { x: 2, y: 2, width: 12, height: 12, fill: color, stroke: "#0A2238", "stroke-width": 1.2 })
+      : tipo === "dentro" ? F.svg("circle", { cx: 8, cy: 8, r: 5, fill: "#FFFFFF", stroke: "#3D6A8F", "stroke-width": 3 })
+      : F.svg("circle", { cx: 8, cy: 8, r: 6, fill: color });
+    return F.svg("svg", { width: 16, height: 16, viewBox: "0 0 16 16", "aria-hidden": "true" }, forma);
+  }
+  function renderDona(f) {
+    if (!$("flota-dona")) return;
+    var total = PARTES_FLOTA.reduce(function (s, p) { return s + (f[p[0]] || 0); }, 0);
+    var etiqueta = PARTES_FLOTA.map(function (p) { return F.num(f[p[0]] || 0) + " " + p[1].toLowerCase(); }).join(", ");
+    F.reemplazar($("flota-dona"), [
+      F.dona(PARTES_FLOTA.map(function (p) { return { valor: f[p[0]] || 0, color: p[2] }; }), F.num(total), total === 1 ? "camión" : "camiones", "Mi flota: " + etiqueta),
+      el("ul", { class: "flota-dona__lista" }, PARTES_FLOTA.map(function (p) {
+        return el("li", {}, [iconoParte(p[3], p[2]), el("span", {}, p[1]), el("b", { class: "cifra" }, F.num(f[p[0]] || 0))]);
+      }))
+    ]);
+  }
+
+  function renderAhorro(s, f) {
+    if (!$("ahorro")) return;
+    if (!s) { F.reemplazar($("ahorro"), [el("p", { class: "vacio" }, "Esperando datos de la simulación…")]); return; }
+    var a = s.mundos.A.kpis.espera_prom_min, b = f.espera_prom_min || 0, c = s.comparacion, max = Math.max(a, b, 1);
+    function barra(texto, v, color) {
+      return el("div", { class: "ahorro__fila" }, [
+        el("div", { class: "ranking__txt" }, [el("span", {}, texto), el("b", { class: "cifra" }, F.num(v) + " min")]),
+        el("div", { class: "ranking__pista" }, el("div", { class: "ranking__barra", style: { width: (v / max * 100).toFixed(0) + "%", background: color } }))
+      ]);
+    }
+    F.reemplazar($("ahorro"), [
+      el("div", { role: "img", "aria-label": "Espera promedio: tu flota " + F.num(b) + " min, sin Fluport " + F.num(a) + " min", class: "ahorro__barras" }, [
+        barra("Mi flota con Fluport", b, "#0A2238"), barra("Sin Fluport (llegada libre)", a, "#A9C3DA")]),
+      el("dl", { class: "ahorro__datos" }, [
+        el("div", {}, [el("dt", {}, "Horas de espera"), el("dd", { class: "cifra" }, F.num(c.horas_ahorradas) + " h")]),
+        el("div", {}, [el("dt", {}, "Diésel"), el("dd", { class: "cifra" }, F.num(c.diesel_l_evitado) + " L")]),
+        el("div", {}, [el("dt", {}, "CO₂"), el("dd", { class: "cifra" }, F.num(c.co2_kg_evitado) + " kg")])
+      ]),
+      el("p", { class: "tenue", style: { margin: 0, fontSize: "12px" } }, "Ahorro de todo el puerto en la simulación de hoy, comparado con la llegada sin citas.")
+    ]);
   }
 
   function renderCasetas(mb) {
     var enFila = {};
     camionesAgencia().forEach(function (c) { if (c.estado === "en_fila") enFila[c.acceso_id] = (enFila[c.acceso_id] || 0) + 1; });
     F.reemplazar($("casetas"), mb.accesos.map(function (a) {
-      var cerrada = a.estado === "cerrado", n = enFila[a.acceso_id] || 0;
-      return el("div", { class: "caseta" }, [
-        el("div", { style: { display: "flex", flexDirection: "column", gap: "2px" } }, [
+      var e = F.estadoDe(a.semaforo, a.estado !== "cerrado"), n = enFila[a.acceso_id] || 0;
+      return el("div", { class: "caseta caseta--" + e }, [
+        F.simbolo(e, 24),
+        el("div", { style: { display: "flex", flexDirection: "column", gap: "2px", flex: "1" } }, [
           el("strong", {}, nombreCaseta(a.acceso_id)),
-          el("span", { class: "tenue", style: { fontSize: "13px" } }, n ? plural(n, "camión tuyo en fila", "camiones tuyos en fila") : "Ninguno de tus camiones en fila")
+          el("span", { class: "tenue", style: { fontSize: "13px" } }, F.ETIQUETA[e] + (e === "cerrado" ? "" : " · " + F.num(a.espera_min) + " min"))
         ]),
-        el("div", { class: "caseta__der" }, [
-          el("span", { class: "cifra" }, cerrada ? "—" : F.num(a.espera_min) + " min"),
-          cerrada ? chip("oscuro", "Cerrada") : chip(a.semaforo, F.SEMAFORO[a.semaforo].simbolo + " " + F.SEMAFORO[a.semaforo].etiqueta)
-        ])
+        el("div", { class: "caseta__der" }, [el("span", { class: "cifra" }, F.num(n)), el("span", { class: "tenue", style: { fontSize: "12px" } }, n === 1 ? "mío en fila" : "míos en fila")])
       ]);
     }));
   }
@@ -141,30 +223,39 @@
   }
 
   // ───────────── Flota ─────────────
-  function iconoCaseta(id, a) {
-    var cerrada = a && a.estado === "cerrado";
-    var texto = (cerrada ? "" : (a && a.semaforo === "rojo" ? "▲ " : "● ")) + nombreCaseta(id) + " · " + (cerrada ? "cerrada" : F.num(a ? a.espera_min : 0) + " min");
-    return L.divIcon({ html: el("span", { class: "marcador-caseta" + (cerrada ? " marcador-caseta--cerrada" : "") }, texto).outerHTML, className: "", iconSize: null, iconAnchor: [14, 14] });
-  }
+  // Simbología del mapa (graficas.js): casetas con la forma de su estado y rutas teñidas; camiones con forma por
+  // estado (flecha en ruta, cuadro en fila, anillo dentro), halo punteado si traen cita y aro si están elegidos.
   function crearMapa() {
     if (!$("mapa")) return;
-    if (!window.L) { $("mapa").appendChild(el("p", { style: { padding: "16px" } }, "No se pudo cargar el mapa.")); return; }
-    var mapa = L.map($("mapa"));
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18, attribution: "&copy; colaboradores de OpenStreetMap" }).addTo(mapa);
-    var lim = [];
-    Object.keys(estado.rutas).forEach(function (id) { L.polyline(estado.rutas[id].coords, { color: "#0A2238", opacity: 0.35, weight: 5 }).addTo(mapa); lim = lim.concat(estado.rutas[id].coords); });
-    if (lim.length) mapa.fitBounds(lim, { padding: [30, 30] });
-    var casetas = {};
-    Object.keys(estado.accesos).forEach(function (id) { var a = estado.accesos[id]; casetas[id] = L.marker([a.lat, a.lon], { icon: iconoCaseta(id, null), keyboard: false }).addTo(mapa); });
-    estado.mapa = { mapa: mapa, camiones: {}, casetas: casetas };
+    var puntos = Object.keys(estado.accesos).map(function (id) { return [estado.accesos[id].lat, estado.accesos[id].lon]; });
+    Object.keys(estado.rutas).forEach(function (id) { puntos = puntos.concat(estado.rutas[id].coords); });
+    var mapa = F.mapaPuerto($("mapa"), puntos);
+    if (!mapa) return;
+    var rutas = {}, casetas = {};
+    Object.keys(estado.rutas).forEach(function (id) { rutas[id] = L.polyline(estado.rutas[id].coords, F.estiloRuta("verde")).addTo(mapa); });
+    Object.keys(estado.accesos).forEach(function (id) {
+      var a = estado.accesos[id];
+      L.polyline([[a.lat, a.lon], [F.PUERTO.lat, F.PUERTO.lon]], { color: "#0A2238", weight: 2, opacity: 0.45, dashArray: "4 6", interactive: false }).addTo(mapa);
+      casetas[id] = L.marker([a.lat, a.lon], { icon: F.iconoCaseta("verde", nombreCaseta(id)), keyboard: false, zIndexOffset: 500 }).addTo(mapa);
+    });
+    estado.mapa = { mapa: mapa, camiones: {}, casetas: casetas, rutas: rutas };
   }
-  function estiloCamion(c, sel) {
-    if (sel) return { radius: 10, color: "#0A2238", weight: 4, fillColor: "#E9B03B", fillOpacity: 1 };
-    if (c.cita_id) return { radius: 8, color: "#3FAE7A", weight: 4, fillColor: "#FFFFFF", fillOpacity: 1 };
-    if (c.estado === "en_fila") return { radius: 5, color: "#9A6B0B", weight: 1, fillColor: "#E9B03B", fillOpacity: 1 };
-    if (c.estado === "en_revision") return { radius: 5, color: "#1E6B47", weight: 1, fillColor: "#3FAE7A", fillOpacity: 1 };
-    if (c.estado === "saliendo") return { radius: 3, color: "#4A5B6B", weight: 1, fillColor: "#A9B8C6", fillOpacity: 0.9 };
-    return { radius: 4, color: "#0A2238", weight: 1, fillColor: "#0A2238", fillOpacity: 0.9 };
+
+  /** Posición, forma y orientación de un camión en el mapa. */
+  function ubicarCamion(c, fila) {
+    var r = estado.rutas[c.ruta_id], a = estado.accesos[c.acceso_id];
+    if (c.estado === "dentro" || c.estado === "saliendo") {
+      var k = parseInt(String(c.id).replace(/\D/g, ""), 10) || 0; // reparto estable alrededor del puerto
+      return { pos: [F.PUERTO.lat - 0.006 - (k % 6) * 0.0035, F.PUERTO.lon - 0.006 - (Math.floor(k / 6) % 4) * 0.0035], tipo: "dentro" };
+    }
+    if (!r) return null;
+    if (c.estado === "en_revision" && a) return { pos: [a.lat, a.lon], tipo: "dentro" };
+    if (c.estado === "en_fila") {
+      fila[c.acceso_id] = (fila[c.acceso_id] || 0) + 1;
+      return { pos: F.posicion(r, Math.max(0.6, 1 - 0.012 * fila[c.acceso_id])), tipo: "fila" };
+    }
+    var p = F.posicion(r, c.progreso), q = F.posicion(r, Math.min(1, c.progreso + 0.02));
+    return { pos: p, tipo: "ruta", angulo: F.rumbo(p, q) };
   }
 
   /** Datos de presentación de un camión: transportista y placas si es de una cita registrada. */
@@ -204,18 +295,25 @@
     if (m) {
       var vistos = {}, fila = {};
       lista.forEach(function (c) {
-        var r = estado.rutas[c.ruta_id];
-        if (!r) return;
-        var p = c.progreso;
-        if (c.estado === "en_fila") { fila[c.acceso_id] = (fila[c.acceso_id] || 0) + 1; p = Math.max(0.55, 1 - 0.006 * fila[c.acceso_id]); }
-        var pos = F.posicion(r, p), st = estiloCamion(c, c.id === estado.seleccion);
+        var u = ubicarCamion(c, fila);
+        if (!u) return;
+        var sel = c.id === estado.seleccion, clave = u.tipo + (c.cita_id ? "c" : "") + (sel ? "s" : "") + (u.tipo === "ruta" ? Math.round(u.angulo / 15) : "");
         vistos[c.id] = true;
-        if (m.camiones[c.id]) { m.camiones[c.id].setLatLng(pos); m.camiones[c.id].setStyle(st); }
-        else m.camiones[c.id] = L.circleMarker(pos, Object.assign({ interactive: false }, st)).addTo(m.mapa);
+        var mk = m.camiones[c.id];
+        if (!mk) {
+          mk = m.camiones[c.id] = L.marker(u.pos, { keyboard: false, zIndexOffset: sel ? 1000 : 0, title: datosCamion(c).nombre }).addTo(m.mapa);
+          mk.on("click", function () { seleccionar(c.id); });
+        } else mk.setLatLng(u.pos);
+        if (mk._clave !== clave) { mk.setIcon(F.iconoCamion(u.tipo, { cita: !!c.cita_id, sel: sel, angulo: u.angulo })); mk.setZIndexOffset(sel ? 1000 : 0); mk._clave = clave; }
       });
       Object.keys(m.camiones).forEach(function (id) { if (!vistos[id]) { m.mapa.removeLayer(m.camiones[id]); delete m.camiones[id]; } });
-      mb.accesos.forEach(function (a) { if (m.casetas[a.acceso_id]) m.casetas[a.acceso_id].setIcon(iconoCaseta(a.acceso_id, a)); });
+      mb.accesos.forEach(function (a) {
+        var e = F.estadoDe(a.semaforo, a.estado !== "cerrado");
+        if (m.casetas[a.acceso_id]) m.casetas[a.acceso_id].setIcon(F.iconoCaseta(e, nombreCaseta(a.acceso_id) + " · " + (e === "cerrado" ? "cerrada" : F.num(a.espera_min) + " min")));
+        Object.keys(m.rutas).forEach(function (id) { if (estado.rutas[id].acceso === a.acceso_id) m.rutas[id].setStyle(F.estiloRuta(e)); });
+      });
     }
+    renderColas(todos);
     $("resumen-mapa").textContent = plural(lista.length, "camión en el mapa", "camiones en el mapa");
     // tabla (las primeras 60 filas para que siga siendo ágil)
     F.reemplazar($("tabla-camiones"), lista.length ? lista.slice(0, 60).map(function (c) {
@@ -228,6 +326,25 @@
       ]);
     }) : [el("tr", {}, el("td", { colspan: "6", class: "vacio" }, "No hay camiones con este filtro."))]);
     renderFicha();
+  }
+
+  /** Barras apiladas por caseta: mis camiones en fila y en camino. */
+  function renderColas(todos) {
+    if (!$("colas")) return;
+    var ids = Object.keys(estado.accesos).sort(), cuenta = {}, max = 1;
+    ids.forEach(function (id) { cuenta[id] = { fila: 0, ruta: 0 }; });
+    todos.forEach(function (c) { var k = cuenta[c.acceso_id]; if (!k) return; if (c.estado === "en_fila") k.fila++; else if (c.estado === "en_ruta") k.ruta++; });
+    ids.forEach(function (id) { max = Math.max(max, cuenta[id].fila + cuenta[id].ruta); });
+    F.reemplazar($("colas"), ids.map(function (id) {
+      var k = cuenta[id];
+      return el("div", { class: "ranking__fila" }, [
+        el("div", { class: "ranking__txt" }, [el("span", {}, nombreCaseta(id)), el("span", {}, [el("b", {}, F.num(k.fila)), " en fila · " + F.num(k.ruta) + " en camino"])]),
+        el("div", { class: "colas__pista", role: "img", "aria-label": nombreCaseta(id) + ": " + k.fila + " en fila, " + k.ruta + " en camino" }, [
+          el("div", { class: "colas__fila", style: { width: (k.fila / max * 100) + "%" } }),
+          el("div", { class: "colas__ruta", style: { width: (k.ruta / max * 100) + "%" } })
+        ])
+      ]);
+    }));
   }
 
   function seleccionar(id) { estado.seleccion = id; renderFlota(); }
@@ -263,9 +380,10 @@
     var lista = estado.citas.filter(pasa[estado.filtroCitas]);
     var activas = estado.citas.filter(pasa.activas);
     $("resumen-citas").textContent = plural(activas.length, "cita activa", "citas activas") + " · " + F.num(activas.filter(function (c) { return c.confirmada_en; }).length) + " confirmadas";
+    renderLineaTiempo();
     F.reemplazar($("tabla-citas"), lista.length ? lista.map(function (c) {
       var e = estadoCita(c), tr = t[c.transportista_id] || {};
-      return el("tr", { class: sinConfirmar(c) ? "resaltada" : "" }, [
+      return el("tr", { class: (c.id === estado.citaResaltada ? "elegida " : "") + (sinConfirmar(c) ? "resaltada" : ""), "data-cita": c.id, tabindex: "-1" }, [
         el("td", { class: "cifra" }, F.hora(c.ventana_inicio)),
         el("td", {}, tr.alias || "Transportista #" + c.transportista_id),
         el("td", { class: "cifra" }, tr.placas || "—"),
@@ -276,6 +394,67 @@
           ? el("button", { type: "button", class: "btn btn--sec btn--chico", onclick: function () { cancelar(c); } }, "Cancelar") : null)
       ]);
     }) : [el("tr", {}, el("td", { colspan: "7", class: "vacio" }, "No hay citas con este filtro."))]);
+  }
+
+  /** Línea de tiempo: una fila por caseta, de 1 h antes a 11 h después de la hora simulada. */
+  function renderLineaTiempo() {
+    var caja = $("linea-tiempo");
+    if (!caja || !estado.snap) return;
+    var ahora = new Date(estado.snap.ts_sim).getTime(), H = 3600000;
+    var ini = Math.floor(ahora / H) * H - H, fin = ini + 12 * H;
+    var pct = function (t) { return ((t - ini) / (fin - ini) * 100); };
+    var t = porId(estado.transportistas);
+    var activas = estado.citas.filter(function (c) { return ACTIVAS[c.estado]; });
+    var horas = []; for (var h = 0; h < 12; h++) horas.push(el("span", {}, F.hora(new Date(ini + h * H).toISOString())));
+    var ids = Object.keys(estado.accesos).sort();
+    var mb = estado.snap.mundos.B;
+    var filas = ids.map(function (id) {
+      var a = mb.accesos.filter(function (x) { return x.acceso_id === id; })[0] || {};
+      var e = F.estadoDe(a.semaforo, a.estado !== "cerrado");
+      var p = (estado.pron || {})[id];
+      var calor = p ? p.franjas.filter(function (f) { var x = new Date(f.inicio).getTime(); return x >= ini && x < fin; }).map(function (f) {
+        var x = new Date(f.inicio).getTime(), v = f.espera_min;
+        return el("span", { title: F.hora(f.inicio) + " · " + F.num(v) + " min", style: { left: pct(x) + "%", width: (30 * 60000 / (fin - ini) * 100) + "%", background: v < 30 ? "#3FAE7A" : v <= 90 ? "#E9B03B" : "#D9574B" } });
+      }) : [];
+      var mias = activas.filter(function (c) { return c.acceso_id === id; }).sort(function (x, y) { return x.ventana_inicio < y.ventana_inicio ? -1 : 1; });
+      var carriles = [];
+      var bloques = mias.map(function (c) {
+        var x0 = new Date(c.ventana_inicio).getTime(), x1 = new Date(c.ventana_fin).getTime();
+        if (x1 < ini || x0 > fin) return null;
+        var carril = 0; while (carriles[carril] && carriles[carril] > x0) carril++;
+        carriles[carril] = Math.max(x1, x0 + 50 * 60000); // el bloque mide al menos ~1 h en pantalla
+        var ec = estadoCita(c), tr = t[c.transportista_id] || {};
+        var tipo = c.estado === "en_ruta" ? "ruta" : c.origen !== "web" ? "chofer" : c.confirmada_en ? "conf" : "sin";
+        return el("button", { type: "button", class: "bloque-cita bloque-cita--" + tipo,
+          style: { left: Math.max(0, pct(x0)) + "%", width: Math.max(8, pct(x1) - pct(x0)) + "%", top: (carril * 34 + 4) + "px" },
+          "aria-label": F.hora(c.ventana_inicio) + ", " + (tr.alias || "Transportista") + ", " + ec.texto,
+          title: F.hora(c.ventana_inicio) + " · " + (tr.alias || "") + " · " + ec.texto,
+          onclick: function () { resaltarCita(c.id); } }, F.hora(c.ventana_inicio));
+      });
+      var alto = Math.max(1, carriles.length) * 34 + 8;
+      return el("div", { class: "linea-tiempo__fila" }, [
+        el("div", { class: "linea-tiempo__nombre" }, [F.simbolo(e, 18), el("span", {}, nombreCaseta(id))]),
+        el("div", { class: "linea-tiempo__pista" }, [
+          el("div", { class: "linea-tiempo__calor", role: "img", "aria-label": "Espera pronosticada en " + nombreCaseta(id) }, calor),
+          el("div", { class: "linea-tiempo__citas", style: { height: alto + "px" } }, [el("div", { class: "linea-tiempo__ahora", style: { left: pct(ahora) + "%" }, "aria-hidden": "true" })].concat(bloques))
+        ])
+      ]);
+    });
+    F.reemplazar(caja, [el("div", { class: "linea-tiempo__in" }, [el("div", { class: "linea-tiempo__horas", "aria-hidden": "true" }, horas)].concat(filas))]);
+  }
+
+  function resaltarCita(id) {
+    estado.citaResaltada = id;
+    if (estado.filtroCitas !== "activas") { estado.filtroCitas = "activas"; [].forEach.call($("filtros").children, function (b) { b.setAttribute("aria-pressed", String(b.dataset.id === "activas")); }); }
+    renderCitas();
+    var fila = document.querySelector('[data-cita="' + id + '"]');
+    if (fila) { fila.scrollIntoView({ behavior: "smooth", block: "center" }); fila.focus({ preventScroll: true }); }
+  }
+
+  async function cargarPronostico() {
+    try { var lista = await F.api("/api/pronostico"); estado.pron = {}; lista.forEach(function (p) { estado.pron[p.acceso_id] = p; }); }
+    catch (e) { estado.pron = {}; }
+    renderLineaTiempo();
   }
 
   async function cancelar(c) {
@@ -466,7 +645,7 @@
   }
 
   function elegirAgencia(id) {
-    estado.agencia = id; estado.seleccion = null;
+    estado.agencia = id; estado.seleccion = null; estado.historia = [];
     if ($("estado-solicitudes")) $("estado-solicitudes").textContent = "";
     try { localStorage.setItem("fluport.agencia", id); } catch (e) { /* sin almacenamiento */ }
     if (estado.mapa) { Object.keys(estado.mapa.camiones).forEach(function (k) { estado.mapa.mapa.removeLayer(estado.mapa.camiones[k]); }); estado.mapa.camiones = {}; }
@@ -479,7 +658,9 @@
       $("mapa") ? F.api("/api/accesos/rutas") : Promise.resolve({ features: [] })]);
     res[0].forEach(function (a) { estado.accesos[a.id] = a; if ($("cita-caseta")) $("cita-caseta").appendChild(el("option", { value: a.id }, a.nombre)); });
     res[2].features.filter(function (f) { return f.properties.tipo === "ruta"; }).forEach(function (f) {
-      estado.rutas[f.properties.ruta_id] = F.prepararRuta(f.geometry.coordinates.map(function (c) { return [c[1], c[0]]; }));
+      var r = F.prepararRuta(f.geometry.coordinates.map(function (c) { return [c[1], c[0]]; }));
+      r.acceso = f.properties.acceso_id;
+      estado.rutas[f.properties.ruta_id] = r;
     });
     estado.agencias = res[1];
     if (!estado.agencias.length) throw new Error("no hay agencias registradas");
@@ -504,10 +685,15 @@
     if ($("form-cita")) { $("form-cita").addEventListener("submit", buscarHorarios); $("cita-desde").value = "09:00"; $("cita-hasta").value = "15:00"; }
     if ($("form-alta")) $("form-alta").addEventListener("submit", darDeAlta);
     if ($("invitacion")) { try { estado.bot = await F.api("/api/telegram/enlace"); } catch (e) { estado.bot = null; } }
+    [].forEach.call(document.querySelectorAll("[data-simbolo]"), function (n) { n.appendChild(F.simbolo(n.dataset.simbolo, 18)); });
     crearMapa();
     elegirAgencia(inicial);
+    if ($("linea-tiempo")) { cargarPronostico(); setInterval(cargarPronostico, 60000); }
     F.conectarSimulacion(function (m) {
-      if (m.tipo === "snapshot") { estado.snap = m.data; reloj(m.data); renderResumen(); renderFlota(); }
+      if (m.tipo === "snapshot") {
+        estado.snap = m.data; reloj(m.data); renderResumen(); renderFlota();
+        if ($("linea-tiempo") && Date.now() - (estado.lineaEn || 0) > 5000) { estado.lineaEn = Date.now(); renderLineaTiempo(); }
+      }
       else if (m.tipo === "aviso") { cargarAvisos(); cargarCitas(); }
     });
     setInterval(cargarCitas, 10000);

@@ -93,8 +93,8 @@ def instrucciones(sim: Operacion) -> str:
     casetas = "; ".join(f"{a.id} = {a.nombre} ({a.zona})" for a in sim.esc.accesos)
     return (
         "Eres el asistente de citas de FLUPORT para transportistas del puerto de Veracruz. "
-        "Respondes por WhatsApp: en español, breve (máximo 6 líneas), cordial y claro, sin tecnicismos. "
-        "Formato de WhatsApp: negritas con UN asterisco (*07:30*), nunca Markdown (**, #, tablas).\n"
+        "Respondes por Telegram: en español, breve (máximo 6 líneas), cordial y claro, sin tecnicismos. "
+        "Formato de Telegram: negritas con UN asterisco (*07:30*), nunca Markdown doble (**, #, tablas).\n"
         f"Fecha y hora actual (hora de Veracruz): {DIAS[ahora.weekday()]} {ahora:%Y-%m-%d %H:%M}. "
         "Es una SIMULACIÓN con datos sintéticos.\n"
         f"Casetas: {casetas}.\n"
@@ -218,7 +218,7 @@ def _cuando(iso: str) -> str:
 
 
 def redactar(herramienta: str, r: dict[str, Any], sim: Operacion) -> str | None:
-    """Respuesta de WhatsApp con plantilla para resultados sin error. None = que la redacte el LLM."""
+    """Respuesta del chat con plantilla para resultados sin error. None = que la redacte el LLM."""
     if herramienta == "sugerir_horario":
         ops = r.get("opciones") or []
         if not ops:
@@ -254,8 +254,8 @@ def redactar(herramienta: str, r: dict[str, Any], sim: Operacion) -> str | None:
     return None
 
 
-def formato_whatsapp(texto: str) -> str:
-    """Convierte Markdown común al formato de WhatsApp: **x** → *x*, __x__ → _x_, sin encabezados #."""
+def formato_chat(texto: str) -> str:
+    """Convierte Markdown común al Markdown de Telegram: **x** → *x*, __x__ → _x_, sin encabezados #."""
     texto = re.sub(r"\*\*(.+?)\*\*", r"*\1*", texto, flags=re.S)
     texto = re.sub(r"__(.+?)__", r"_\1_", texto, flags=re.S)
     texto = re.sub(r"^\s{0,3}#{1,6}\s*", "", texto, flags=re.M)
@@ -313,8 +313,7 @@ class Asistente:
 
     async def responder(self, db: Session, sim: Operacion, req: AsistenteRequest) -> AsistenteResponse:
         telefono = normalizar_telefono(req.remitente)
-        origen = OrigenCita.whatsapp if req.canal == Canal.whatsapp else (
-            OrigenCita.telegram if req.canal == Canal.telegram else OrigenCita.asistente)
+        origen = OrigenCita.telegram if req.canal == Canal.telegram else OrigenCita.asistente
         cliente = self.cliente
         if cliente is None:
             return self._sin_llm(sim)
@@ -330,7 +329,7 @@ class Asistente:
                 nuevos.append(turno)
                 llamadas = [p["functionCall"] for p in turno.get("parts", []) if "functionCall" in p]
                 if not llamadas:
-                    texto = formato_whatsapp("\n".join(p["text"] for p in turno.get("parts", []) if p.get("text")))
+                    texto = formato_chat("\n".join(p["text"] for p in turno.get("parts", []) if p.get("text")))
                     guardar_turnos(db, req.canal, telefono, nuevos)
                     return AsistenteResponse(respuesta=texto or "¿Me lo puedes repetir, por favor?", acciones=acciones)
                 respuestas, textos = [], []

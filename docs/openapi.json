@@ -787,26 +787,6 @@
         }
       }
     },
-    "/webhook/whatsapp": {
-      "post": {
-        "tags": [
-          "asistente"
-        ],
-        "summary": "Recibir Whatsapp",
-        "description": "Webhook de Twilio para mensajes de WhatsApp entrantes.\n\nResponde de inmediato (Twilio espera una respuesta rápida) y contesta al transportista en segundo plano\npor la API REST de Twilio.",
-        "operationId": "recibir_whatsapp_webhook_whatsapp_post",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          }
-        }
-      }
-    },
     "/webhook/telegram": {
       "post": {
         "tags": [
@@ -848,30 +828,6 @@
                   "additionalProperties": true,
                   "type": "object",
                   "title": "Response Enlace Telegram Api Telegram Enlace Get"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/whatsapp/enlace": {
-      "get": {
-        "tags": [
-          "asistente"
-        ],
-        "summary": "Enlace Whatsapp",
-        "description": "Enlace wa.me para abrir el chat con el número de Fluport (respaldo para la demo).",
-        "operationId": "enlace_whatsapp_api_whatsapp_enlace_get",
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object",
-                  "title": "Response Enlace Whatsapp Api Whatsapp Enlace Get"
                 }
               }
             }
@@ -1615,7 +1571,6 @@
       "Canal": {
         "type": "string",
         "enum": [
-          "whatsapp",
           "telegram",
           "web"
         ],
@@ -2197,7 +2152,6 @@
         "type": "string",
         "enum": [
           "web",
-          "whatsapp",
           "telegram",
           "asistente",
           "simulador"
@@ -2777,6 +2731,11 @@
           "abierto": {
             "type": "boolean",
             "title": "Abierto"
+          },
+          "en_fila": {
+            "type": "integer",
+            "title": "En Fila",
+            "default": 0
           },
           "horas_pico": {
             "items": {

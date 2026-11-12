@@ -27,7 +27,6 @@ class EstadoCita(StrEnum):
 
 class OrigenCita(StrEnum):
     web = "web"
-    whatsapp = "whatsapp"
     telegram = "telegram"
     asistente = "asistente"
     simulador = "simulador"
@@ -79,7 +78,6 @@ class TipoCorrida(StrEnum):
 
 
 class Canal(StrEnum):
-    whatsapp = "whatsapp"
     telegram = "telegram"
     web = "web"
 

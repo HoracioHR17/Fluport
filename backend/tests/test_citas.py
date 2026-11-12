@@ -10,14 +10,14 @@ from app.nucleo.contracts.enums import Mundo, TipoCarga, TipoEventoSim
 from app.nucleo.contracts.schemas import EventoCreate, SugerenciaRequest
 from tests.conftest import INICIO, vaciar_tablas
 
-TEL = "whatsapp:+52 229 000 0001"
+TEL = "+52 229 000 0001"
 
 
 # ───────────── Sin BD ─────────────
 def test_normalizar_telefono():
-    assert normalizar_telefono("whatsapp:+52 229 123 4567") == "+522291234567"
+    assert normalizar_telefono("+52 229 123 4567") == "+522291234567"
     assert normalizar_telefono("229-123-4567") == "+2291234567"
-    assert normalizar_telefono("whatsapp:+5212291234567") == "+522291234567"  # celular MX con el "1" extra
+    assert normalizar_telefono("+5212291234567") == "+522291234567"  # celular MX con el "1" extra
     with pytest.raises(ErrorCita):
         normalizar_telefono("123")
 

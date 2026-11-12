@@ -3,7 +3,7 @@
 Flujo:
 1. Chat nuevo → se le pide compartir su número con el botón de contacto de Telegram.
 2. Comparte su propio contacto → se registra (`transportista.telegram_chat_id`) y queda identificado.
-3. Mensajes de texto → asistente (mismo que WhatsApp y web) → respuesta en el chat.
+3. Mensajes de texto → asistente (el mismo del canal web de pruebas) → respuesta en el chat.
 
 Enlace de agencia: `t.me/<bot>?start=AG01` abre el chat con `/start AG01`; si el transportista aún no tiene
 agencia, queda ligado a esa.

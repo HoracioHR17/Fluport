@@ -1,4 +1,4 @@
-"""Avisos proactivos por mensaje (Telegram o WhatsApp) (M5).
+"""Avisos proactivos por Telegram (M5).
 
 Cada ciclo se revisan las citas activas de transportistas con teléfono y se generan, una sola vez por cita:
 - `turno_30min`: faltan 30 min (o menos) para su cita.
