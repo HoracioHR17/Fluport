@@ -71,11 +71,11 @@ Opcional, para que el túnel arranque solo: `sudo cloudflared --config ~/.cloudf
 - Ten un hotspot del celular como respaldo de internet.
 - En `backend/.env`: `FLUPORT_TELEGRAM_MODO=polling`, `FLUPORT_TELEGRAM_SOLO_REGISTRADOS=true` y `FLUPORT_ASISTENTE_WEB_ACTIVO=false` (el canal HTTP del asistente no autentica al remitente).
 
-## 6. Proteger el panel de demostración y el de agencias (recomendado, gratis)
+## 6. Proteger el panel de agencia y los controles de la simulación (recomendado, gratis)
 
-`/demo/` permite cerrar casetas y acelerar el reloj, y `/agencia/` todavía no pide inicio de sesión. Con
-**Cloudflare Zero Trust → Access → Applications → Self-hosted** crea una aplicación para
-`<tu-dominio>.tech/demo/*`, otra para `<tu-dominio>.tech/agencia/*` y otra para `<tu-dominio>.tech/api/sim/*`, con una política
+La pantalla principal de `/agencia/` permite cerrar entradas y acelerar el reloj de la simulación, y todavía no pide
+inicio de sesión. Con **Cloudflare Zero Trust → Access → Applications → Self-hosted** crea una aplicación para
+`<tu-dominio>.tech/agencia/*` y otra para `<tu-dominio>.tech/api/sim/*`, con una política
 **Allow** para los correos del equipo (código de un solo uso por correo). La vista pública y el bot quedan abiertos.
 
 ## 7. Plan B: sin dominio o si el DNS no ha propagado
@@ -94,4 +94,4 @@ Plan C: misma red Wi-Fi, `uvicorn ... --host 0.0.0.0` y abrir `http://<IP de la 
 - [ ] Los tiempos se actualizan solos (WebSocket o sondeo).
 - [ ] El botón "Abrir el bot en Telegram" y el QR funcionan.
 - [ ] `/agencia/` (tras Access, si lo activaste): alta de transportista, asignación de cita, mensaje en Telegram, SÍ → confirmada.
-- [ ] `/demo/`: cerrar una caseta → alerta en la vista pública → aviso en Telegram.
+- [ ] `/agencia/` (panel Simulación): cerrar una entrada → alerta en la vista pública → aviso en Telegram.

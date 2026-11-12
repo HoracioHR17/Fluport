@@ -95,8 +95,10 @@ def raiz() -> RedirectResponse:
 
 @app.get("/operador", include_in_schema=False)
 @app.get("/operador/", include_in_schema=False)
+@app.get("/demo", include_in_schema=False)
+@app.get("/demo/", include_in_schema=False)
 def operador() -> RedirectResponse:
-    """Ruta anterior del tablero: ahora es la vista de agencia."""
+    """Rutas anteriores (tablero y panel de demo): la simulación se controla desde la pantalla principal de agencia."""
     return RedirectResponse("/agencia/")
 
 
@@ -133,6 +135,5 @@ class PaginasVersionadas(StaticFiles):
 
 
 app.mount("/agencia", PaginasVersionadas(directory=FRONTEND / "agencia", html=True, check_dir=False), name="agencia")
-app.mount("/demo", PaginasVersionadas(directory=FRONTEND / "demo", html=True, check_dir=False), name="demo")
 app.mount("/publico", PaginasVersionadas(directory=FRONTEND / "publico", html=True, check_dir=False), name="publico")
 app.mount("/static", StaticFiles(directory=FRONTEND / "static", check_dir=False), name="static")

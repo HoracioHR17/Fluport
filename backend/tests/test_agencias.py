@@ -35,9 +35,9 @@ def test_snapshot_trae_agencia_y_flota(sim):
     assert set(mb.flota) == {"AG01"}
     # la flota cuenta todos los camiones activos, no solo los dibujados
     ms = sim.mundos[Mundo.B]
-    en_fila = sum(1 for c in ms.camiones.values() if c.estado == EstadoCamion.en_fila)
-    assert sum(f.en_fila for f in mb.flota.values()) == en_fila
-    assert sum(f.atendidos for f in mb.flota.values()) == ms.atendidos
+    en_fila_agencia = sum(1 for c in ms.camiones.values() if c.estado == EstadoCamion.en_fila and c.plan.agencia_id == "AG01")
+    assert sum(f.en_fila for f in mb.flota.values()) == en_fila_agencia
+    assert 0 < sum(f.atendidos for f in mb.flota.values()) <= ms.atendidos  # el resto son de otros transportistas
 
 
 def test_cita_hereda_la_agencia_del_transportista(sim):

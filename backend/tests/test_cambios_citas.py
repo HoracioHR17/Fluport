@@ -222,3 +222,24 @@ def test_si_o_no_los_atiende_el_asistente(cliente, enviados):
         {"functionCall": {"name": "cancelar_cita", "args": {"cita_id": cita["id"]}}}]}]))
     r = cliente.portal.call(bot.procesar_update, _sim(), _msg("sí"))
     assert r.startswith("Cancelé tu cita")
+
+
+def test_en_ruta_avisa_cuello_de_botella_con_eta(cliente, enviados):
+    """Con cita y ubicación en tiempo real: si su entrada se cierra, el bot sugiere otra con hora de llegada."""
+    from app.nucleo.contracts.enums import TipoEventoSim
+    from app.nucleo.contracts.schemas import EventoCreate
+
+    _transportista_con_bot()
+    for c in cliente.get(f"/api/citas?telefono={TEL}").json():  # deja solo la cita de esta prueba
+        if c["estado"] in ("agendada", "en_ruta"):
+            cliente.delete(f"/api/citas/{c['id']}")
+    cita = _cita(cliente, "A3", horas=1, origen="telegram")
+    cliente.post("/api/sim/eventos", json={"tipo": "cierre_acceso", "acceso_id": "A3"})
+    try:
+        upd = {"update_id": 9, "message": {"chat": {"id": CHAT, "type": "private"}, "from": {"id": CHAT},
+                                           "location": {"latitude": 19.181, "longitude": -96.216, "live_period": 900}}}
+        r = cliente.portal.call(bot.procesar_update, _sim(), upd)
+        assert "Cuello de botella" in r and f"#{cita['id']}" in r and "llegas ~" in r
+    finally:
+        cliente.post("/api/sim/eventos", json={"tipo": "reapertura", "acceso_id": "A3"})
+        bot._en_vivo.clear()

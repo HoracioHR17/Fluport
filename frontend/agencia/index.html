@@ -43,6 +43,25 @@
       <a class="btn" href="/agencia/citas/#asignar">Asignar cita</a>
     </header>
     <main class="ag-main">
+      <section class="tarjeta" aria-labelledby="t-sim">
+        <div class="cabeza"><h2 id="t-sim">Simulación</h2><span class="tenue" style="font-size:14px" id="sim-estado"></span></div>
+        <div class="form form--fila">
+          <button type="button" class="btn btn--chico" id="sim-pausa">Pausar</button>
+          <label class="campo">Velocidad
+            <select id="sim-velocidad">
+              <option value="60">1 min / s</option>
+              <option value="600">10 min / s</option>
+              <option value="3600">1 h / s</option>
+            </select>
+          </label>
+          <label class="campo">Entrada<select id="sim-acceso"></select></label>
+          <button type="button" class="btn btn--sec btn--chico" data-evento="cierre_acceso">Cerrar entrada</button>
+          <button type="button" class="btn btn--sec btn--chico" data-evento="reapertura">Reabrir</button>
+          <button type="button" class="btn btn--sec btn--chico" data-evento="buque_atraca">Atraca buque</button>
+          <button type="button" class="btn btn--sec btn--chico" data-evento="norte">Norte</button>
+        </div>
+        <p class="estado-msg" id="sim-msg" role="status"></p>
+      </section>
       <section aria-label="Indicadores de la flota" class="kpis kpis--graficas" id="kpis"></section>
       <div class="fila-2">
         <section class="tarjeta ancho" aria-labelledby="t-horas">

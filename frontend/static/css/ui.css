@@ -354,3 +354,32 @@ a:hover { color: #13324F; }
 .form--fila .estado-msg { grid-column: 1 / -1; }
 .edicion-cita > td { background: var(--bruma); }
 .ag-menu__nombre { display: block; font-size: 15px; line-height: 1.3; color: #FFFFFF; }
+
+/* Vista pública · móviles: menos ruido en el mapa y tarjetas compactas */
+@media (max-width: 760px) {
+  .pub-cab__in, .pub-main, .pub-pie__in { padding-left: 14px; padding-right: 14px; }
+  .pub-cab__in { gap: 8px 12px; }
+  .pub-nav { order: 3; width: 100%; flex-wrap: nowrap; overflow-x: auto; gap: 2px; }
+  .pub-nav a { padding: 8px 10px; font-size: 14px; white-space: nowrap; }
+  .pub-main { padding-top: 16px; gap: 18px; }
+  .pub-resumen { padding: 18px; }
+  .pub-estado .entradas { flex-basis: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .entrada { padding: 14px; gap: 10px; }
+  .entrada__cab h2 { font-size: 15px; }
+  .entrada__cab .tenue { display: none; }
+  .entrada__espera .cifra { font-size: 34px; }
+  .entrada .sparkline { width: 100%; height: auto; }
+  .entrada__datos { grid-template-columns: 1fr; gap: 4px; }
+  .entrada__datos dd { font-size: 15px; }
+  .pub-mapa .tarjeta { padding: 12px; }
+  .mapa--publico { height: min(70vh, 460px); min-height: 320px; }
+  .marcador-caseta { padding: 4px 7px; font-size: 12px; gap: 4px; }
+  .marcador-caseta svg { width: 18px; height: 18px; }
+  .marcador-puerto b { display: none; }
+  .simbologia { font-size: 13px; gap: 6px 12px; }
+  .banda-alerta__in { padding: 12px 14px; }
+  .bot { padding: 20px; gap: 20px; border-radius: 16px; }
+  .qr svg { width: 130px; height: 130px; }
+  .grafica-barras__eje, .grafica-barras__in { height: 220px; }
+}
+@media (max-width: 380px) { .pub-estado .entradas { grid-template-columns: 1fr; } }

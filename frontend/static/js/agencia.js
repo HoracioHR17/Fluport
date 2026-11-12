@@ -58,6 +58,40 @@
 
   function reloj(s) {
     $("reloj").textContent = F.fecha(s.ts_sim) + " · " + F.hora(s.ts_sim) + " (hora simulada)" + (s.clima === "norte" ? " · norte activo" : "");
+    if ($("sim-pausa")) { // panel de simulación (pantalla principal)
+      var pausada = s.estado !== "corriendo";
+      $("sim-pausa").textContent = pausada ? "Reanudar" : "Pausar";
+      if (document.activeElement !== $("sim-velocidad")) $("sim-velocidad").value = String(Math.round(s.velocidad));
+      var cerradas = s.mundos.B.accesos.filter(function (a) { return a.estado === "cerrado"; }).map(function (a) { return nombreCaseta(a.acceso_id); });
+      $("sim-estado").textContent = (pausada ? "En pausa" : "Corriendo") + (cerradas.length ? " · cerrada: " + cerradas.join(", ") : "");
+    }
+  }
+
+  // ───────────── Panel de simulación (antes /demo) ─────────────
+  var EVENTOS_SIM = { cierre_acceso: "Entrada cerrada", reapertura: "Entrada reabierta", buque_atraca: "Atracó un buque", norte: "Norte activo" };
+  function iniciarPanelSimulacion() {
+    if (!$("sim-pausa")) return;
+    Object.keys(estado.accesos).sort().forEach(function (id) { $("sim-acceso").appendChild(el("option", { value: id }, nombreCaseta(id))); });
+    $("sim-pausa").addEventListener("click", function () {
+      var accion = estado.snap && estado.snap.estado === "corriendo" ? "pause" : "play";
+      F.api("/api/sim/control", { method: "POST", json: { accion: accion } }).catch(function (e) { $("sim-msg").textContent = "No se pudo: " + e.message; });
+    });
+    $("sim-velocidad").addEventListener("change", function () {
+      F.api("/api/sim/control", { method: "POST", json: { accion: "velocidad", velocidad: Number(this.value) } }).catch(function () {});
+    });
+    [].forEach.call(document.querySelectorAll("[data-evento]"), function (b) {
+      b.addEventListener("click", async function () {
+        var tipo = b.dataset.evento, cuerpo = { tipo: tipo, payload: {} };
+        if (tipo === "cierre_acceso" || tipo === "reapertura") cuerpo.acceso_id = $("sim-acceso").value;
+        if (tipo === "buque_atraca") cuerpo.payload = { contenedores: 2000 };
+        b.disabled = true;
+        try {
+          await F.api("/api/sim/eventos", { method: "POST", json: cuerpo });
+          $("sim-msg").textContent = EVENTOS_SIM[tipo] + (cuerpo.acceso_id ? ": " + nombreCaseta(cuerpo.acceso_id) : "") + ".";
+        } catch (e) { $("sim-msg").textContent = "No se aplicó: " + e.message; }
+        finally { b.disabled = false; }
+      });
+    });
   }
 
   // ───────────── Resumen ─────────────
@@ -756,6 +790,7 @@
     if ($("form-alta")) $("form-alta").addEventListener("submit", darDeAlta);
     if ($("invitacion")) { try { estado.bot = await F.api("/api/telegram/enlace"); } catch (e) { estado.bot = null; } }
     [].forEach.call(document.querySelectorAll("[data-simbolo]"), function (n) { n.appendChild(F.simbolo(n.dataset.simbolo, 18)); });
+    iniciarPanelSimulacion();
     crearMapa();
     elegirAgencia(inicial);
     if ($("linea-tiempo")) { cargarPronostico(); setInterval(cargarPronostico, 60000); }

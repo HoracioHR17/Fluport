@@ -151,18 +151,35 @@
     Object.keys(estado.accesos).forEach(function (id) {
       var a = estado.accesos[id];
       m.tramos[id] = L.polyline([[a.lat, a.lon], [F.PUERTO.lat, F.PUERTO.lon]], { color: "#0A2238", weight: 2, opacity: 0.45, dashArray: "4 6", interactive: false }).addTo(mapa);
-      m.casetas[id] = L.marker([a.lat, a.lon], { keyboard: false, icon: F.iconoCaseta("verde", corto(a.nombre)) }).addTo(mapa);
+      m.casetas[id] = L.marker([a.lat, a.lon], { keyboard: false, icon: F.iconoCaseta("verde", corto(a.nombre)) })
+        .bindTooltip(corto(a.nombre), { direction: "top", offset: [0, -14] }).addTo(mapa);
     });
+    m.claves = {};
     estado.mapa = m;
+  }
+
+  // En pantallas angostas el mapa se simplifica: etiquetas con solo la espera, rutas más delgadas y sin las líneas
+  // punteadas hacia el puerto (el nombre de cada entrada aparece al tocarla).
+  var MOVIL = window.matchMedia ? window.matchMedia("(max-width: 760px)") : { matches: false };
+  function estiloRutaPub(e) {
+    var s = Object.assign({}, F.estiloRuta(e));
+    if (MOVIL.matches) s.weight = Math.max(3, s.weight - 3);
+    return s;
   }
 
   function actualizarMapa(zonas) {
     var m = estado.mapa;
     if (!m) return;
+    var movil = MOVIL.matches;
     zonas.forEach(function (z) {
-      var e = est(z);
-      if (m.casetas[z.acceso_id]) m.casetas[z.acceso_id].setIcon(F.iconoCaseta(e, corto(z.nombre) + " · " + (z.abierto ? F.num(z.espera_min) + " min" : "cerrada")));
-      Object.keys(m.rutas).forEach(function (id) { if (m.rutas[id].acceso === z.acceso_id) m.rutas[id].linea.setStyle(F.estiloRuta(e)); });
+      var e = est(z), espera = z.abierto ? F.num(z.espera_min) + " min" : "cerrada";
+      var texto = movil ? espera : corto(z.nombre) + " · " + espera;
+      var clave = e + "|" + texto + "|" + movil;
+      if (m.claves[z.acceso_id] === clave) return; // sin cambios: no se redibuja (evita parpadeo al tocar)
+      m.claves[z.acceso_id] = clave;
+      if (m.casetas[z.acceso_id]) m.casetas[z.acceso_id].setIcon(F.iconoCaseta(e, texto));
+      if (m.tramos[z.acceso_id]) m.tramos[z.acceso_id].setStyle({ opacity: movil ? 0 : 0.45 });
+      Object.keys(m.rutas).forEach(function (id) { if (m.rutas[id].acceso === z.acceso_id) m.rutas[id].linea.setStyle(estiloRutaPub(e)); });
     });
   }
 

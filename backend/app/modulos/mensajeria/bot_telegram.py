@@ -23,21 +23,22 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.modulos.agencias import servicio as agencias
-from app.modulos.citas.servicio import ErrorCita, normalizar_telefono
+from app.modulos.citas.servicio import ErrorCita, espera_estimada, normalizar_telefono
 from app.modulos.mensajeria.adaptadores import telegram
-from app.modulos.mensajeria.asistente.agente import asistente
+from app.modulos.mensajeria.asistente.agente import asistente, guardar_turnos
 from app.modulos.mensajeria.dominio import ubicacion
 from app.nucleo.config import get_settings
-from app.nucleo.contracts.enums import Canal
+from app.nucleo.contracts.enums import Canal, EstadoCita
 from app.nucleo.contracts.schemas import AsistenteRequest
 from app.nucleo.db.base import SessionLocal
-from app.nucleo.db.models import Agencia, Transportista
+from app.nucleo.db.models import Agencia, Cita, Transportista
 from app.nucleo.puertos import Operacion
 
 log = logging.getLogger("fluport.telegram")
@@ -81,6 +82,8 @@ class Seguimiento:
     mejor: str | None = None
     estado: str | None = None
     avisado: float = 0.0
+    cita_aviso: tuple[int, str] | None = None  # (cita, entrada sugerida) del último aviso de cuello de botella
+    cita_avisado: float = 0.0
 
 
 _en_vivo: dict[int, Seguimiento] = {}
@@ -98,9 +101,74 @@ def texto_cercanas(sim: Operacion, lat: float, lon: float, en_vivo: bool) -> tup
         lineas.append("⛔ Todas las entradas están cerradas por ahora. Te aviso cuando reabran si sigues compartiendo.")
     else:
         lejos = "" if mejor.distancia_km <= ubicacion.LEJOS_KM else " (estás lejos: el tiempo de manejo es aproximado)"
-        lineas.append(f"👉 Te conviene *{mejor.nombre}*: ~{mejor.total_min:.0f} min entre manejo y fila{lejos}.")
+        eta, _ = _llegada(sim, mejor)
+        lineas.append(f"👉 Te conviene *{mejor.nombre}*: llegas ~{eta:%H:%M}, ~{mejor.total_min:.0f} min entre manejo y fila{lejos}.")
     lineas.append(EN_VIVO if en_vivo else SUGERIR_EN_VIVO)
     return "\n".join(lineas), mejor
+
+
+# ───────────── Cuello de botella en ruta (transportista con cita que comparte su ubicación en vivo) ─────────────
+ESPERA_CUELLO_MIN = 45  # espera prevista al llegar que se considera cuello de botella (igual que los avisos)
+MEJORA_MIN = 15  # la otra entrada debe ahorrar al menos esto entre manejo y fila
+
+
+@dataclass(frozen=True)
+class CitaEnCurso:
+    cita_id: int
+    acceso_id: str
+    telefono: str
+
+
+def cita_en_curso(sim: Operacion, chat_id: int) -> CitaEnCurso | None:
+    """Próxima cita activa del transportista de este chat (None si no tiene, no está registrado o no hay BD)."""
+    try:
+        with SessionLocal() as db:
+            t = transportista_de_chat(db, chat_id)
+            if t is None:
+                return None
+            c = db.scalar(select(Cita).where(Cita.transportista_id == t.id,
+                                             Cita.estado.in_((EstadoCita.agendada, EstadoCita.en_ruta)),
+                                             Cita.ventana_fin >= sim.ts())
+                          .order_by(Cita.ventana_inicio).limit(1))
+            return CitaEnCurso(c.id, c.acceso_id, t.telefono) if c else None
+    except Exception:  # noqa: BLE001  (sin BD: solo se ofrece la entrada más conveniente)
+        return None
+
+
+def _llegada(sim: Operacion, x: ubicacion.EntradaCercana) -> tuple[datetime, float]:
+    """Hora estimada de llegada a la entrada (tiempo simulado) y espera prevista en su fila a esa hora."""
+    eta = sim.ts() + timedelta(minutes=x.manejo_min)
+    return eta, espera_estimada(sim, x.acceso_id, eta)
+
+
+def texto_cuello_de_botella(sim: Operacion, lat: float, lon: float, cita: CitaEnCurso) -> tuple[str, str] | None:
+    """Si la entrada de su cita tiene cuello de botella (cerrada o espera >= 45 min al llegar) y otra le ahorra
+    tiempo, el mensaje con la nueva entrada y su ETA. Devuelve (texto, entrada sugerida) o None."""
+    lista = ubicacion.cercanas(sim, lat, lon)
+    propia = next((x for x in lista if x.acceso_id == cita.acceso_id), None)
+    if propia is None:
+        return None
+    eta_p, espera_p = _llegada(sim, propia)
+    if propia.abierta and espera_p < ESPERA_CUELLO_MIN:
+        return None
+    total_p = propia.manejo_min + espera_p if propia.abierta else float("inf")
+    mejor, eta_m, espera_m, total_m = None, None, 0.0, float("inf")
+    for x in lista:
+        if x.acceso_id == propia.acceso_id or not x.abierta:
+            continue
+        eta, espera = _llegada(sim, x)
+        if x.manejo_min + espera < total_m:
+            mejor, eta_m, espera_m, total_m = x, eta, espera, x.manejo_min + espera
+    if mejor is None or total_m > total_p - MEJORA_MIN:
+        return None
+    motivo = ("está *cerrada*" if not propia.abierta
+              else f"tendrá ~{espera_p:.0f} min de fila cuando llegues (~{eta_p:%H:%M})")
+    pasas = eta_m + timedelta(minutes=espera_m)
+    texto = (f"⚠️ *Cuello de botella* en *{propia.nombre}* (tu cita *#{cita.cita_id}*): {motivo}.\n"
+             f"👉 Te conviene *{mejor.nombre}*: llegas ~*{eta_m:%H:%M}* ({mejor.distancia_km:.1f} km, "
+             f"~{mejor.manejo_min:.0f} min de camino), esperas ~{espera_m:.0f} min y pasas ~{pasas:%H:%M}.\n"
+             f"Responde *SÍ* y cambio tu cita a {mejor.nombre} (misma hora).")
+    return texto, mejor.acceso_id
 
 
 def _coordenadas(loc: dict[str, Any]) -> tuple[float, float] | None:
@@ -135,7 +203,39 @@ async def atender_ubicacion(sim: Operacion, chat_id: int, loc: dict[str, Any], e
     else:
         _en_vivo.pop(chat_id, None)
     await telegram.enviar(chat_id, texto)
+    if vivo:  # si va en camino a una cita con cuello de botella, se le avisa de inmediato
+        aviso = await _avisar_cuello(sim, chat_id, _en_vivo[chat_id])
+        if aviso:
+            return texto + "\n\n" + aviso
     return texto
+
+
+async def _avisar_cuello(sim: Operacion, chat_id: int, s: Seguimiento) -> str | None:
+    """Aviso de cuello de botella en la entrada de su cita (una vez por entrada sugerida y como máximo cada 3 min)."""
+    cita = await asyncio.to_thread(cita_en_curso, sim, chat_id)
+    if cita is None:
+        return None
+    r = texto_cuello_de_botella(sim, s.lat, s.lon, cita)
+    if r is None:
+        s.cita_aviso = None  # sin cuello de botella: si vuelve a aparecer, se avisa otra vez
+        return None
+    texto, sugerida = r
+    ahora = time.monotonic()
+    if s.cita_aviso == (cita.cita_id, sugerida) or ahora - s.cita_avisado < AVISO_MIN_S:
+        return None
+    s.cita_aviso, s.cita_avisado = (cita.cita_id, sugerida), ahora
+    await telegram.enviar(chat_id, texto)
+    # queda en el historial del asistente: un "SÍ" posterior cambia la cita a la entrada sugerida
+    await asyncio.to_thread(_guardar_aviso, cita.telefono, texto)
+    return texto
+
+
+def _guardar_aviso(telefono: str, texto: str) -> None:
+    try:
+        with SessionLocal() as db:
+            guardar_turnos(db, Canal.telegram, telefono, [{"role": "model", "parts": [{"text": texto}]}])
+    except Exception:  # noqa: BLE001
+        log.warning("No se pudo guardar el aviso de cuello de botella en el historial")
 
 
 async def revisar_seguimiento(sim: Operacion, chat_id: int, s: Seguimiento) -> str | None:
@@ -144,6 +244,9 @@ async def revisar_seguimiento(sim: Operacion, chat_id: int, s: Seguimiento) -> s
     if ahora > s.hasta:
         _en_vivo.pop(chat_id, None)
         return None
+    aviso = await _avisar_cuello(sim, chat_id, s)  # con cita: se vigila la entrada de su cita
+    if aviso:
+        return aviso
     mejor = ubicacion.recomendada(ubicacion.cercanas(sim, s.lat, s.lon))
     nuevo_id, nuevo_estado = (mejor.acceso_id, mejor.estado) if mejor else (None, "cerrada")
     cambio = nuevo_id != s.mejor
@@ -156,8 +259,9 @@ async def revisar_seguimiento(sim: Operacion, chat_id: int, s: Seguimiento) -> s
         texto = "⛔ Todas las entradas cerca de ti se cerraron. Te aviso cuando reabran."
     elif cambio:
         antes = sim.esc.acceso(s.mejor).nombre if s.mejor else "ninguna"
-        texto = (f"🔁 Ahora te conviene *{mejor.nombre}* ({mejor.distancia_km:.1f} km, espera ~{mejor.espera_min:.0f} min, "
-                 f"~{mejor.total_min:.0f} min en total) en lugar de {antes}.")
+        eta, _ = _llegada(sim, mejor)
+        texto = (f"🔁 Ahora te conviene *{mejor.nombre}* ({mejor.distancia_km:.1f} km, espera ~{mejor.espera_min:.0f} min): "
+                 f"llegas ~{eta:%H:%M}, ~{mejor.total_min:.0f} min en total, en lugar de {antes}.")
     else:
         texto = (f"⚠️ *{mejor.nombre}* pasó a *{ESTADO_TXT[nuevo_estado]}* (espera ~{mejor.espera_min:.0f} min). "
                  "Sigue siendo tu mejor opción por cercanía.")

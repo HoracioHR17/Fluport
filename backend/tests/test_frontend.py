@@ -17,7 +17,6 @@ def cliente():
     ("/agencia/citas/", 'data-pantalla="citas"'),
     ("/agencia/transportistas/", 'data-pantalla="transportistas"'),
     ("/agencia/avisos/", 'data-pantalla="avisos"'),
-    ("/demo/", 'data-vista="demo"'),
     ("/publico/", "¿Cómo están las entradas al puerto?"),
 ])
 def test_paginas(cliente, ruta, texto):
@@ -26,7 +25,7 @@ def test_paginas(cliente, ruta, texto):
 
 
 @pytest.mark.parametrize("ruta", [
-    "/static/css/tokens.css", "/static/css/app.css", "/static/js/comun.js", "/static/js/demo.js",
+    "/static/css/tokens.css", "/static/js/comun.js",
     "/static/js/publico.js", "/static/vendor/leaflet/leaflet.js", "/static/vendor/leaflet/leaflet.css",
     "/static/favicon.svg", "/static/vendor/qrcode/qrcode.js", "/static/js/agencia.js", "/static/css/ui.css",
     "/static/js/graficas.js",
@@ -37,14 +36,20 @@ def test_estaticos(cliente, ruta):
 
 def test_paginas_solo_usan_recursos_locales(cliente):
     """Ninguna página carga scripts o estilos de un CDN (funciona sin internet, salvo los mosaicos del mapa)."""
-    for ruta in ("/agencia/", "/agencia/flota/", "/agencia/citas/", "/agencia/transportistas/", "/agencia/avisos/", "/demo/", "/publico/"):
+    for ruta in ("/agencia/", "/agencia/flota/", "/agencia/citas/", "/agencia/transportistas/", "/agencia/avisos/", "/publico/"):
         html = cliente.get(ruta).text
         assert 'src="http' not in html and 'href="http' not in html
 
 
-def test_operador_redirige_a_agencia(cliente):
-    r = cliente.get("/operador/", follow_redirects=False)
-    assert r.status_code == 307 and r.headers["location"] == "/agencia/"
+def test_operador_y_demo_redirigen_a_agencia(cliente):
+    for ruta in ("/operador/", "/demo/"):
+        r = cliente.get(ruta, follow_redirects=False)
+        assert r.status_code == 307 and r.headers["location"] == "/agencia/"
+
+
+def test_simulacion_se_controla_desde_agencia(cliente):
+    html = cliente.get("/agencia/").text
+    assert 'id="sim-pausa"' in html and 'data-evento="cierre_acceso"' in html
 
 
 def test_publico_invita_al_bot(cliente):
@@ -59,7 +64,7 @@ def test_mapas_limitados_al_puerto():
     js = Path(__file__).resolve().parents[2] / "frontend" / "static" / "js"
     graficas = (js / "graficas.js").read_text(encoding="utf-8")
     assert "maxBounds: lim" in graficas and "maxBoundsViscosity: 1" in graficas and "setMinZoom" in graficas
-    for f in ("publico.js", "agencia.js", "demo.js"):
+    for f in ("publico.js", "agencia.js"):
         codigo = (js / f).read_text(encoding="utf-8")
         assert "F.mapaPuerto(" in codigo and "L.map(" not in codigo, f
 

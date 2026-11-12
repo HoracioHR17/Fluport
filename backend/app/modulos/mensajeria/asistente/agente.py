@@ -5,6 +5,7 @@ El asistente solo puede ver y modificar las citas del teléfono que escribe.
 """
 import logging
 import re
+import unicodedata
 from datetime import datetime, timedelta
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -361,7 +362,8 @@ QUIERE_MODIFICAR = re.compile(
 
 def quiere_modificar(texto: str) -> bool:
     """¿El mensaje pide cancelar o cambiar una cita? (no se responde solo con la lista de citas)"""
-    return bool(QUIERE_MODIFICAR.search(texto or ""))
+    sin_acentos = "".join(ch for ch in unicodedata.normalize("NFD", texto or "") if unicodedata.category(ch) != "Mn")
+    return bool(QUIERE_MODIFICAR.search(sin_acentos))
 
 
 def formato_chat(texto: str) -> str:

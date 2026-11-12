@@ -99,3 +99,13 @@ def test_ubicacion_en_vivo_expira(sim, enviados):
 def test_ediciones_de_texto_se_ignoran(sim, enviados):
     upd = {"update_id": 2, "edited_message": {"chat": {"id": CHAT, "type": "private"}, "from": {"id": CHAT}, "text": "hola"}}
     assert asyncio.run(bot.procesar_update(sim, upd)) is None and enviados == []
+
+
+def test_cuello_de_botella_en_la_entrada_de_la_cita(sim):
+    """Si la entrada de su cita se cierra, se le sugiere otra con su hora estimada de llegada."""
+    cita = bot.CitaEnCurso(cita_id=7, acceso_id="A1", telefono="+522290000007")
+    assert bot.texto_cuello_de_botella(sim, *CERCA_A1, cita) is None  # abierta y sin fila: nada que avisar
+    sim.aplicar_evento(EventoCreate(tipo=TipoEventoSim.cierre_acceso, acceso_id="A1"))
+    texto, sugerida = bot.texto_cuello_de_botella(sim, *CERCA_A1, cita)
+    assert sugerida != "A1" and "Cuello de botella" in texto and "cerrada" in texto
+    assert "llegas ~" in texto and "#7" in texto and "SÍ" in texto

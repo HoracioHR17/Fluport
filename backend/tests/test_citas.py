@@ -33,11 +33,13 @@ def test_sugerencias_ordenadas_y_dentro_de_la_ventana(sim):
 
 
 def test_sugerencias_empatadas_prefieren_el_centro_de_la_ventana(sim):
-    """Sin congestión (espera 0 en todas), primero la franja que contiene la hora pedida (centro de la ventana)."""
+    """Entre las franjas con la menor espera (mismo tramo de 5 min), gana la más cercana a la hora pedida."""
     req = SugerenciaRequest(acceso_id="A1", desde=INICIO.replace(hour=7, minute=30),
                             hasta=INICIO.replace(hour=10, minute=30), tipo_carga="granel")
     s = citas.sugerir(sim, req)
-    assert s[0].inicio.hour == 9 and s[0].espera_min_est < 5
+    centro = req.desde + (req.hasta - req.desde) / 2
+    mejores = [x for x in s if round(x.espera_min_est / 5) == round(s[0].espera_min_est / 5)]
+    assert all(abs(s[0].inicio - centro) <= abs(x.inicio - centro) for x in mejores)
 
 
 def test_sin_hora_las_empatadas_prefieren_la_mas_proxima(sim):

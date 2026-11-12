@@ -114,3 +114,25 @@ def test_publicador_recibe_eventos(sim):
     sim.aplicar_evento(EventoCreate(tipo=TipoEventoSim.norte))
     sim.publicar_snapshot()
     assert '"tipo":"evento"' in recibidos[0] and '"tipo":"snapshot"' in recibidos[1]
+
+
+def test_cierre_crea_cuello_de_botella_y_fluport_desvia(sim):
+    """Sin Fluport los camiones se forman ante la barrera; con Fluport se desvían ya (y cargan las demás entradas)."""
+    from app.nucleo.contracts.enums import EstadoCamion, Mundo
+
+    sim.avanzar(6 * 60)  # 10:00, hora de mucho tráfico
+    fila_b_antes = sum(len(a.en_fila) for a in sim.mundos[Mundo.B].accesos.values())
+    sim.aplicar_evento(EventoCreate(tipo=TipoEventoSim.cierre_acceso, acceso_id="A2"))
+    sim.avanzar(60)
+    a, b = sim.mundos[Mundo.A], sim.mundos[Mundo.B]
+    # Mundo A: nadie pasa por la entrada cerrada y la fila crece
+    assert len(a.accesos["A2"].en_fila) > 20 and a.atendidos_hora("A2") < 10 and a.espera_estimada("A2") > 30
+    # Mundo B: nadie va ni espera en la entrada cerrada; la fila se reparte en las demás
+    assert len(b.accesos["A2"].en_fila) == 0
+    assert not [c for c in b.camiones.values() if c.acceso_id == "A2" and c.estado == EstadoCamion.en_ruta]
+    assert sum(len(x.en_fila) for x in b.accesos.values()) > fila_b_antes
+    # al reabrir, Fluport manda a la entrada reabierta a los últimos de las filas largas
+    sim.aplicar_evento(EventoCreate(tipo=TipoEventoSim.reapertura, acceso_id="A2"))
+    sim.avanzar(30)
+    hacia_a2 = [c for c in b.camiones.values() if c.acceso_id == "A2" and c.estado in (EstadoCamion.en_ruta, EstadoCamion.en_fila)]
+    assert hacia_a2 and b.atendidos_hora("A2") > 0
