@@ -26,9 +26,17 @@ def test_casetas_por_entrada(sim):
     assert "entrada norte: A1" in t and "entrada sur: A4" in t and "conservando la hora" in t
 
 
-def test_reprogramar_permite_omitir_la_hora():
-    h = next(h for h in HERRAMIENTAS if h["name"] == "reprogramar_cita")
-    assert h["parameters"]["required"] == ["cita_id"]
+def test_reprogramar_y_cancelar_sin_numero_de_cita():
+    for nombre in ("reprogramar_cita", "cancelar_cita"):
+        h = next(h for h in HERRAMIENTAS if h["name"] == nombre)
+        assert "required" not in h["parameters"] and "cita_id" in h["parameters"]["properties"]
+
+
+def test_intencion_de_modificar():
+    from app.modulos.mensajeria.asistente.agente import quiere_modificar
+
+    assert quiere_modificar("cancela mi cita") and quiere_modificar("ya no voy a llegar") and quiere_modificar("Cámbiala")
+    assert not quiere_modificar("¿cuáles son mis citas?")
 
 
 # ───────────── Con PostgreSQL de prueba ─────────────
@@ -75,9 +83,10 @@ def _transportista_con_bot():
         db.commit()
 
 
-def _cita(c, acceso="A1", horas=3):
+def _cita(c, acceso="A1", horas=3, origen="web"):
+    """origen "web" = la asigna la agencia (obligatoria); "telegram" = la pidió el chofer en el bot."""
     r = c.post("/api/citas", json={"telefono": TEL, "acceso_id": acceso, "ventana_inicio": _ts(c, horas),
-                                   "ventana_fin": _ts(c, horas + 0.5), "tipo_carga": "contenedor_40"})
+                                   "ventana_fin": _ts(c, horas + 0.5), "tipo_carga": "contenedor_40", "origen": origen})
     assert r.status_code == 201, r.text
     return r.json()
 
@@ -106,18 +115,18 @@ def test_agencia_cancela_y_avisa_al_transportista(cliente, enviados):
     assert _avisos(cliente, "cita_cancelada")[0]["cita_id"] == cita["id"]
 
 
-def test_agencia_cambia_la_cita_y_el_si_la_confirma(cliente, enviados):
+def test_agencia_asigna_y_cambia_sin_pedir_confirmacion(cliente, enviados):
     _transportista_con_bot()
     cita = _cita(cliente)
     _esperar(cliente, enviados, 1)
+    assert "Nueva cita" in enviados[-1][1] and "SÍ" not in enviados[-1][1] and "Preséntate" in enviados[-1][1]
+    assert cliente.get(f"/api/citas/{cita['id']}").json()["confirmada_en"] is not None  # obligatoria desde que se asigna
     r = cliente.patch(f"/api/citas/{cita['id']}", json={"acceso_id": "A4", "ventana_inicio": _ts(cliente, 4),
                                                         "ventana_fin": _ts(cliente, 4.5)})
     nueva = r.json()
     _esperar(cliente, enviados, 2)
-    assert "cambió tu cita" in enviados[-1][1] and f"#{nueva['id']}" in enviados[-1][1] and "SÍ" in enviados[-1][1]
-    respuesta = cliente.portal.call(bot.procesar_update, _sim(), _msg("sí"))
-    assert respuesta.startswith("Cita confirmada") and "San Julián" in respuesta
-    assert cliente.get(f"/api/citas/{nueva['id']}").json()["confirmada_en"] is not None
+    assert "cambió tu cita" in enviados[-1][1] and f"#{nueva['id']}" in enviados[-1][1] and "SÍ" not in enviados[-1][1]
+    assert nueva["acceso_id"] == "A4" and nueva["confirmada_en"] is not None
 
 
 def test_transportista_cambia_de_entrada_conservando_la_hora(cliente, enviados):
@@ -136,9 +145,9 @@ def test_transportista_cambia_de_entrada_conservando_la_hora(cliente, enviados):
     assert any(a["cita_id"] == nueva["id"] for a in _avisos(cliente, "cambio_chofer"))
 
 
-def test_transportista_cancela_y_la_agencia_se_entera(cliente, enviados):
+def test_transportista_cancela_su_propia_cita(cliente, enviados):
     _transportista_con_bot()
-    cita = _cita(cliente, "A3", horas=6)
+    cita = _cita(cliente, "A3", horas=6, origen="telegram")
     ag.asistente.usar_cliente(_Guion([{"role": "model", "parts": [
         {"functionCall": {"name": "cancelar_cita", "args": {"cita_id": cita["id"]}}}]}]))
     r = cliente.portal.call(bot.procesar_update, _sim(), _msg("cancela mi cita, se descompuso el camión"))
@@ -175,3 +184,41 @@ def _sim():
 
 def _msg(texto):
     return {"update_id": 1, "message": {"chat": {"id": CHAT, "type": "private"}, "from": {"id": CHAT}, "text": texto}}
+
+
+def test_cancelar_pidiendo_primero_la_lista(cliente, enviados):
+    """El LLM consulta mis_citas y luego cancela: la lista no debe cortar la conversación."""
+    _transportista_con_bot()
+    for c in cliente.get(f"/api/citas?telefono={TEL}").json():  # deja una sola cita activa
+        if c["estado"] in ("agendada", "en_ruta"):
+            cliente.delete(f"/api/citas/{c['id']}")
+    cita = _cita(cliente, "A2", horas=8, origen="telegram")
+    ag.asistente.usar_cliente(_Guion([
+        {"role": "model", "parts": [{"functionCall": {"name": "mis_citas", "args": {}}}]},
+        {"role": "model", "parts": [{"functionCall": {"name": "cancelar_cita", "args": {}}}]},
+    ]))
+    r = cliente.portal.call(bot.procesar_update, _sim(), _msg("cancela mi cita por favor"))
+    assert r.startswith("Cancelé tu cita") and f"#{cita['id']}" in r
+    assert cliente.get(f"/api/citas/{cita['id']}").json()["estado"] == "cancelada"
+
+
+def test_cita_de_la_agencia_no_la_cancela_el_chofer(cliente, enviados):
+    """La cita asignada es obligatoria: si el chofer pide cancelarla, se le pasa la petición a la agencia."""
+    _transportista_con_bot()
+    cita = _cita(cliente, "A1", horas=9)
+    ag.asistente.usar_cliente(_Guion([{"role": "model", "parts": [
+        {"functionCall": {"name": "cancelar_cita", "args": {"cita_id": cita["id"]}}}]}]))
+    r = cliente.portal.call(bot.procesar_update, _sim(), _msg("cancela mi cita, no voy a poder"))
+    assert "es obligatoria" in r and "avisé" in r
+    assert cliente.get(f"/api/citas/{cita['id']}").json()["estado"] == "agendada"
+    assert any(a["cita_id"] == cita["id"] for a in _avisos(cliente, "solicitud_cancelacion"))
+
+
+def test_si_o_no_los_atiende_el_asistente(cliente, enviados):
+    """Ya no hay confirmación con SÍ / NO: cualquier respuesta corta va al asistente."""
+    _transportista_con_bot()
+    cita = _cita(cliente, "A1", horas=10, origen="telegram")
+    ag.asistente.usar_cliente(_Guion([{"role": "model", "parts": [
+        {"functionCall": {"name": "cancelar_cita", "args": {"cita_id": cita["id"]}}}]}]))
+    r = cliente.portal.call(bot.procesar_update, _sim(), _msg("sí"))
+    assert r.startswith("Cancelé tu cita")

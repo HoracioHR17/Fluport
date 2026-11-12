@@ -11,12 +11,13 @@
   var ESTADO_CAMION = { en_ruta: { t: "En ruta", tono: "azul" }, en_fila: { t: "En fila", tono: "amarillo" },
     en_revision: { t: "En revisión", tono: "verde" }, dentro: { t: "Dentro", tono: "verde" }, saliendo: { t: "Saliendo", tono: "azul" } };
   var TIPOS_AVISO = { turno_30min: "Recordatorio", saturacion: "Contingencia", cita_asignada: "Cita asignada", cita_rechazada: "Respuesta del chofer",
-    cita_cancelada: "Cancelación avisada", cita_reasignada: "Cambio avisado", cambio_chofer: "Cambio del chofer", cancelacion_chofer: "Cancelación del chofer" };
+    cita_cancelada: "Cancelación avisada", cita_reasignada: "Cambio avisado", cambio_chofer: "Cambio del chofer", cancelacion_chofer: "Cancelación del chofer",
+    solicitud_cancelacion: "Pide cancelar" };
   var TONO_AVISO = { turno_30min: "verde", saturacion: "oscuro", cita_asignada: "azul", cita_rechazada: "rojo",
-    cita_cancelada: "oscuro", cita_reasignada: "azul", cambio_chofer: "azul", cancelacion_chofer: "rojo" };
+    cita_cancelada: "oscuro", cita_reasignada: "azul", cambio_chofer: "azul", cancelacion_chofer: "rojo", solicitud_cancelacion: "rojo" };
   // tipos que agrupa cada filtro de avisos (el resto filtra por su propio tipo)
-  var GRUPO_AVISOS = { cita_rechazada: ["cita_rechazada", "cambio_chofer", "cancelacion_chofer"], cita_asignada: ["cita_asignada", "cita_reasignada", "cita_cancelada"] };
-  var REASIGNAR = ["cita_rechazada", "cancelacion_chofer"];
+  var GRUPO_AVISOS = { cita_rechazada: ["cita_rechazada", "cambio_chofer", "cancelacion_chofer", "solicitud_cancelacion"], cita_asignada: ["cita_asignada", "cita_reasignada", "cita_cancelada"] };
+  var REASIGNAR = ["cita_rechazada", "cancelacion_chofer", "solicitud_cancelacion"];
   var ACTIVAS = { agendada: true, en_ruta: true };
 
   var estado = { agencia: null, agencias: [], accesos: {}, rutas: {}, snap: null, mapa: null, bot: null,
@@ -28,13 +29,12 @@
   function porId(lista) { var m = {}; lista.forEach(function (x) { m[x.id] = x; }); return m; }
   function q(sep) { return sep + "agencia_id=" + encodeURIComponent(estado.agencia); }
   function chip(tono, texto) { return el("span", { class: "chip chip--" + tono }, texto); }
-  function sinConfirmar(c) { return c.estado === "agendada" && c.origen === "web" && !c.confirmada_en; }
   function plural(n, uno, varios) { return F.num(n) + " " + (n === 1 ? uno : varios); }
 
   function estadoCita(c) {
     if (c.estado === "agendada") {
       if (c.origen !== "web") return { texto: "Pedida por el chofer", tono: "azul" };
-      return c.confirmada_en ? { texto: "Confirmada", tono: "verde" } : { texto: "Sin confirmar", tono: "amarillo" };
+      return { texto: "Asignada", tono: "verde" }; // las citas de la agencia son obligatorias: no se confirman
     }
     return ({ en_ruta: { texto: "En ruta", tono: "azul" }, cumplida: { texto: "Cumplida", tono: "verde" },
       no_show: { texto: "No se presentó", tono: "rojo" }, reprogramada: { texto: "Reprogramada", tono: "amarillo" },
@@ -48,10 +48,9 @@
 
   // ───────────── Menú, contadores y reloj (todas las pantallas) ─────────────
   function contadores() {
-    var pend = estado.citas.filter(sinConfirmar).length;
     var rech = estado.avisos.filter(function (a) { return REASIGNAR.indexOf(a.tipo) >= 0; }).length;
     var sinBot = estado.transportistas.filter(function (t) { return !t.telegram; }).length;
-    [["citas", pend], ["avisos", rech], ["transportistas", sinBot + estado.solicitudes.length]].forEach(function (p) {
+    [["avisos", rech], ["transportistas", sinBot + estado.solicitudes.length]].forEach(function (p) {
       var n = document.querySelector('[data-contador="' + p[0] + '"]');
       if (n) { n.textContent = p[1]; n.classList.toggle("oculto", !p[1]); }
     });
@@ -84,13 +83,12 @@
     registrarHistoria();
     var s = estado.snap, f = s ? ((s.mundos.B.flota || {})[estado.agencia] || {}) : {};
     var activas = estado.citas.filter(function (c) { return ACTIVAS[c.estado]; });
-    var conf = activas.filter(function (c) { return c.confirmada_en; }).length;
-    var sinConf = estado.citas.filter(sinConfirmar).length;
+    var asignadas = activas.filter(function (c) { return c.origen === "web"; }).length;
     var espA = s ? s.mundos.A.kpis.espera_prom_min : 0;
     var kpis = [
       ["Camiones en ruta", F.num(f.en_ruta), "", "hacia las casetas", "en_ruta", f.en_ruta || 0, "/agencia/flota/"],
       ["En fila en casetas", F.num(f.en_fila), "", "esperando turno", "en_fila", f.en_fila || 0, "/agencia/flota/"],
-      ["Citas activas", F.num(activas.length), "", F.num(conf) + " confirmadas · " + F.num(sinConf) + " sin confirmar", "activas", activas.length, "/agencia/citas/"],
+      ["Citas activas", F.num(activas.length), "", F.num(asignadas) + " asignadas · " + F.num(activas.length - asignadas) + " pedidas por choferes", "activas", activas.length, "/agencia/citas/"],
       ["Espera promedio de mi flota", F.num(f.espera_prom_min), "min", espA >= 5 ? F.num(Math.max(0, espA - (f.espera_prom_min || 0))) + " min menos que sin Fluport" : "acumulada del día", "espera", f.espera_prom_min || 0, "/agencia/flota/"]
     ];
     F.reemplazar($("kpis"), kpis.map(function (k) {
@@ -108,7 +106,7 @@
     renderAtencion();
   }
 
-  /** Barras apiladas de las citas activas por hora de llegada: confirmadas, pedidas por el chofer y sin confirmar. */
+  /** Barras apiladas de las citas activas por hora de llegada: asignadas por la agencia y pedidas por el chofer. */
   function renderCitasHora(activas) {
     var caja = $("citas-hora");
     if (!caja) return;
@@ -118,13 +116,13 @@
     activas.forEach(function (c) {
       var h = F.hora(c.ventana_inicio).slice(0, 2) + ":00";
       var g = porHora[h] = porHora[h] || { conf: 0, chofer: 0, sin: 0 };
-      if (c.origen !== "web") g.chofer++; else if (c.confirmada_en) g.conf++; else g.sin++;
+      if (c.origen !== "web") g.chofer++; else g.conf++;
     });
     var horas = Object.keys(porHora).sort(), max = 1;
     horas.forEach(function (h) { var g = porHora[h]; max = Math.max(max, g.conf + g.chofer + g.sin); });
     var techo = Math.max(4, max);
     F.reemplazar(caja, [el("div", { class: "apiladas__caja" }, el("div", { class: "apiladas__in", role: "img",
-      "aria-label": horas.map(function (h) { var g = porHora[h]; return h + ": " + g.conf + " confirmadas, " + g.chofer + " pedidas por chofer, " + g.sin + " sin confirmar"; }).join("; ") }, [
+      "aria-label": horas.map(function (h) { var g = porHora[h]; return h + ": " + g.conf + " asignadas, " + g.chofer + " pedidas por chofer"; }).join("; ") }, [
       el("div", { class: "apiladas__area" }, horas.map(function (h) {
         var g = porHora[h], tot = g.conf + g.chofer + g.sin;
         return el("div", { class: "apiladas__col" }, [
@@ -204,12 +202,10 @@
     var enCerrada = estado.citas.filter(function (c) { return c.estado === "agendada" && cerradas[c.acceso_id]; });
     if (enCerrada.length) items.push(["▲", "#FBEAE8", plural(enCerrada.length, "cita en caseta cerrada", "citas en caseta cerrada"), "Fluport avisó a los transportistas con una alternativa.", "Revisar citas", "/agencia/citas/"]);
     estado.avisos.filter(function (a) { return REASIGNAR.indexOf(a.tipo) >= 0; }).slice(0, 2).forEach(function (r) {
-      items.push(["!", "#FBEAE8", r.tipo === "cancelacion_chofer" ? "Un transportista canceló su cita" : "Un transportista no puede asistir", r.mensaje.replace(/\*/g, ""), "Reasignar", "/agencia/citas/#asignar"]);
+      items.push(["!", "#FBEAE8", r.tipo === "cancelacion_chofer" ? "Un transportista canceló su cita" : r.tipo === "solicitud_cancelacion" ? "Un transportista pide cancelar" : "Un transportista no puede asistir", r.mensaje.replace(/\*/g, ""), "Reasignar", "/agencia/citas/#asignar"]);
     });
     var sol = estado.solicitudes.length;
     if (sol) items.push(["+", "#E6F4EA", plural(sol, "solicitud de alta", "solicitudes de alta"), "Transportistas que pidieron unirse a tu agencia desde Telegram.", "Revisar", "/agencia/transportistas/"]);
-    var sc = estado.citas.filter(sinConfirmar).length;
-    if (sc) items.push(["?", "#FCF3DF", plural(sc, "cita sin confirmar", "citas sin confirmar"), "El transportista aún no responde SÍ en Telegram.", "Ver cuáles", "/agencia/citas/"]);
     var ped = estado.citas.filter(function (c) { return c.estado === "agendada" && c.origen !== "web"; }).length;
     if (ped) items.push(["●", "#E3EEF6", plural(ped, "cita pedida por un chofer", "citas pedidas por choferes"), "Agendadas desde el bot.", "Ver cuáles", "/agencia/citas/"]);
     var sinBot = estado.transportistas.filter(function (t) { return !t.telegram; }).length;
@@ -371,19 +367,19 @@
   }
 
   // ───────────── Citas ─────────────
-  var FILTROS_CITAS = [["activas", "Activas"], ["sin_confirmar", "Sin confirmar"], ["choferes", "Pedidas por choferes"], ["historial", "Historial"]];
+  var FILTROS_CITAS = [["activas", "Activas"], ["choferes", "Pedidas por choferes"], ["historial", "Historial"]];
 
   function renderCitas() {
     if (!$("tabla-citas")) return;
     var t = porId(estado.transportistas);
     var pasa = {
-      activas: function (c) { return ACTIVAS[c.estado]; }, sin_confirmar: sinConfirmar,
+      activas: function (c) { return ACTIVAS[c.estado]; },
       choferes: function (c) { return c.origen !== "web"; }, historial: function (c) { return !ACTIVAS[c.estado]; }
     };
     [].forEach.call($("filtros").children, function (b) { b.textContent = b.dataset.texto + " · " + F.num(estado.citas.filter(pasa[b.dataset.id]).length); });
     var lista = estado.citas.filter(pasa[estado.filtroCitas]);
     var activas = estado.citas.filter(pasa.activas);
-    $("resumen-citas").textContent = plural(activas.length, "cita activa", "citas activas") + " · " + F.num(activas.filter(function (c) { return c.confirmada_en; }).length) + " confirmadas";
+    $("resumen-citas").textContent = plural(activas.length, "cita activa", "citas activas") + " · " + F.num(activas.filter(function (c) { return c.origen === "web"; }).length) + " asignadas por la agencia";
     renderLineaTiempo();
     // mientras la agencia edita una cita no se redibuja la tabla (perdería lo que está escribiendo)
     if (estado.edicion && $("edicion-cita") && estado.citas.some(function (c) { return c.id === estado.edicion.id && c.estado === "agendada"; })) return;
@@ -398,7 +394,7 @@
 
   function filaCita(c, t) {
       var e = estadoCita(c), tr = t[c.transportista_id] || {};
-      return el("tr", { class: (c.id === estado.citaResaltada ? "elegida " : "") + (sinConfirmar(c) ? "resaltada" : ""), "data-cita": c.id, tabindex: "-1" }, [
+      return el("tr", { class: (c.id === estado.citaResaltada ? "elegida" : ""), "data-cita": c.id, tabindex: "-1" }, [
         el("td", { class: "cifra" }, F.hora(c.ventana_inicio)),
         el("td", {}, tr.alias || "Transportista #" + c.transportista_id),
         el("td", { class: "cifra" }, tr.placas || "—"),
@@ -460,7 +456,7 @@
       var nueva = await F.api("/api/citas/" + c.id, { method: "PATCH", json: {
         acceso_id: ed.acceso, ventana_inicio: isoMas(fecha, ed.hora, zona, 0), ventana_fin: isoMas(fecha, ed.hora, zona, duracion) } });
       estado.edicion = null; estado.citaResaltada = nueva.id;
-      $("estado-cita").textContent = "Cita cambiada: ahora es la #" + nueva.id + ". Se le avisó al transportista para que la confirme.";
+      $("estado-cita").textContent = "Cita cambiada: ahora es la #" + nueva.id + ". Se le avisó al transportista por Telegram.";
       await cargarCitas();
     } catch (e) { ed.msg = "No se pudo cambiar: " + e.message; renderCitasForzado(); }
   }
@@ -493,7 +489,7 @@
         var carril = 0; while (carriles[carril] && carriles[carril] > x0) carril++;
         carriles[carril] = Math.max(x1, x0 + 50 * 60000); // el bloque mide al menos ~1 h en pantalla
         var ec = estadoCita(c), tr = t[c.transportista_id] || {};
-        var tipo = c.estado === "en_ruta" ? "ruta" : c.origen !== "web" ? "chofer" : c.confirmada_en ? "conf" : "sin";
+        var tipo = c.estado === "en_ruta" ? "ruta" : c.origen !== "web" ? "chofer" : "conf";
         return el("button", { type: "button", class: "bloque-cita bloque-cita--" + tipo,
           style: { left: Math.max(0, pct(x0)) + "%", width: Math.max(8, pct(x1) - pct(x0)) + "%", top: (carril * 34 + 4) + "px" },
           "aria-label": F.hora(c.ventana_inicio) + ", " + (tr.alias || "Transportista") + ", " + ec.texto,
@@ -576,7 +572,7 @@
       var c = await F.api("/api/citas", { method: "POST", json: { transportista_id: tid, acceso_id: s.acceso_id,
         ventana_inicio: s.inicio, ventana_fin: s.fin, tipo_carga: $("cita-carga").value, origen: "web" } });
       $("estado-cita").textContent = "Cita asignada a " + (t.alias || "el transportista") + " a las " + F.hora(c.ventana_inicio) + " en " + nombreCaseta(c.acceso_id) +
-        (t.telegram ? ". Se le envió por Telegram para que la confirme." : ". Aún no está conectado a Telegram: compártele la invitación.");
+        (t.telegram ? ". Se le avisó por Telegram." : ". Aún no está conectado a Telegram: compártele la invitación.");
       F.reemplazar($("sugerencias"), []);
       await cargarTransportistas(); await cargarCitas(); cargarAvisos();
     } catch (e) { $("estado-cita").textContent = "No se pudo asignar: " + e.message; }

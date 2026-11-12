@@ -14,7 +14,7 @@ from sqlalchemy import select
 from app.modulos.mensajeria.adaptadores import telegram
 from app.modulos.mensajeria.asistente.agente import guardar_turnos
 from app.modulos.mensajeria.dominio.avisos import AvisoNuevo, CitaActiva, revisar
-from app.nucleo.contracts.enums import Canal, EstadoAviso, EstadoCita, OrigenCita
+from app.nucleo.contracts.enums import Canal, EstadoAviso, EstadoCita
 from app.nucleo.contracts.schemas import AvisoOut, WsAviso
 from app.nucleo.db.base import SessionLocal
 from app.nucleo.db.models import Aviso, Cita, Transportista
@@ -95,7 +95,7 @@ def mensaje_asignacion(sim: Operacion, cita_id: int) -> AvisoNuevo | None:
         agencia = t.agencia.nombre if t.agencia else "Tu agencia"
         espera = f"\nEspera prevista: ~{round(c.espera_estimada_min)} min." if c.espera_estimada_min is not None else ""
         texto = (f"*Nueva cita* asignada por {agencia}:\n{ini:%d/%m} de {ini:%H:%M} a {fin:%H:%M} · "
-                 f"{sim.esc.acceso(c.acceso_id).nombre}{espera}\n¿La confirmas? Responde *SÍ* o *NO*.")
+                 f"{sim.esc.acceso(c.acceso_id).nombre}{espera}\nPreséntate en ese horario; te recuerdo 30 min antes.")
         return AvisoNuevo(c.id, t.id, t.telefono, "cita_asignada", texto, t.telegram_chat_id)
 
 
@@ -127,10 +127,7 @@ def mensaje_reasignacion(sim: Operacion, cita_id: int) -> AvisoNuevo | None:
         anterior = f" *#{c.cita_anterior_id}*" if c.cita_anterior_id else ""
         texto = (f"🔁 *{agencia}* cambió tu cita{anterior}. Ahora es la *#{c.id}*:\n{ini:%d/%m} de {ini:%H:%M} a "
                  f"{fin:%H:%M} · {sim.esc.acceso(c.acceso_id).nombre}")
-        if c.origen == OrigenCita.web:  # las citas de la agencia se confirman con SÍ / NO
-            texto += "\n¿La confirmas? Responde *SÍ* o *NO*."
-        else:
-            texto += "\nSi no te queda, escríbeme y la ajustamos."
+        texto += "\nPreséntate en el nuevo horario; te recuerdo 30 min antes."
         return AvisoNuevo(c.id, t.id, t.telefono, "cita_reasignada", texto, t.telegram_chat_id)
 
 

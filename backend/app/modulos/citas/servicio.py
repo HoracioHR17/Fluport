@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.modulos.pronostico.pronosticador import pronosticador
 from app.nucleo.colas import FRANJA_MIN
-from app.nucleo.contracts.enums import EstadoCita, Mundo, semaforo_de
+from app.nucleo.contracts.enums import EstadoCita, Mundo, OrigenCita, semaforo_de
 from app.nucleo.contracts.schemas import (
     CitaCreate,
     CitaOut,
@@ -154,6 +154,8 @@ def crear(db: Session, sim: Operacion, body: CitaCreate, cita_anterior_id: int |
         estado=EstadoCita.agendada, origen=body.origen,
         espera_estimada_min=espera_estimada(sim, body.acceso_id, body.ventana_inicio),
         cita_anterior_id=cita_anterior_id,
+        # la cita que asigna la agencia es obligatoria para el transportista: queda en firme sin pedirle confirmación
+        confirmada_en=datetime.now().astimezone() if body.origen == OrigenCita.web else None,
     )
     db.add(cita)
     db.flush()

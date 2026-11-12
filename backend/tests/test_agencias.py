@@ -4,7 +4,6 @@ from datetime import timedelta
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
 
 from app.modulos.mensajeria import bot_telegram as bot
 from app.modulos.mensajeria.adaptadores import telegram
@@ -151,11 +150,11 @@ def test_bot_solo_vincula_numeros_dados_de_alta(cliente, monkeypatch):
         assert t.agencia_id == "AG02" and t.alias == "Lupe Ramos"
 
 
-def test_cita_asignada_se_confirma_o_rechaza_en_el_bot(cliente, monkeypatch):
+def test_cita_asignada_es_obligatoria_y_solo_se_avisa(cliente, monkeypatch):
+    """La agencia asigna la cita: el chofer recibe el aviso, no se le pide SÍ / NO y queda en firme."""
     from app.modulos.mensajeria.servicio import notificar_asignacion
     from app.modulos.simulacion.servicio import servicio
     from app.nucleo.db.base import SessionLocal
-    from app.nucleo.db.models import Aviso, Cita
 
     enviados = []
 
@@ -171,29 +170,17 @@ def test_cita_asignada_se_confirma_o_rechaza_en_el_bot(cliente, monkeypatch):
     with SessionLocal() as db:
         tid = bot.transportista_de_chat(db, chat).id
 
-    def asignar(horas):
-        r = cliente.post("/api/citas", json={"transportista_id": tid, "acceso_id": "A1", "origen": "web",
-                                             "ventana_inicio": _ts(cliente, horas), "ventana_fin": _ts(cliente, horas + 0.5),
-                                             "tipo_carga": "contenedor_40"})
-        assert r.status_code == 201
-        cita = r.json()
-        cliente.portal.call(notificar_asignacion, sim, cita["id"], lambda _: None)
-        return cita
-
-    c1 = asignar(3)
-    assert enviados[-1][0] == chat and "Nueva cita" in enviados[-1][1] and "SÍ" in enviados[-1][1]
-    r = cliente.portal.call(bot.procesar_update, sim, _msg("Sí"))
-    assert r.startswith("Cita confirmada")
-    with SessionLocal() as db:
-        assert db.get(Cita, c1["id"]).confirmada_en is not None
-    c2 = asignar(5)
-    assert cliente.portal.call(bot.procesar_update, sim, _msg("no")) == bot.RECHAZADA
-    with SessionLocal() as db:
-        assert db.get(Cita, c2["id"]).confirmada_en is None
-        assert db.scalar(select(Aviso.tipo).where(Aviso.cita_id == c2["id"], Aviso.tipo == "cita_rechazada"))
-    # la agencia ve la cita confirmada
+    r = cliente.post("/api/citas", json={"transportista_id": tid, "acceso_id": "A1", "origen": "web",
+                                         "ventana_inicio": _ts(cliente, 3), "ventana_fin": _ts(cliente, 3.5),
+                                         "tipo_carga": "contenedor_40"})
+    assert r.status_code == 201
+    cita = r.json()
+    assert cita["confirmada_en"] is not None  # obligatoria desde que se asigna
+    cliente.portal.call(notificar_asignacion, sim, cita["id"], lambda _: None)
+    assert enviados[-1][0] == chat and "Nueva cita" in enviados[-1][1] and "SÍ" not in enviados[-1][1]
+    # la agencia la ve asignada
     citas = {c["id"]: c for c in cliente.get("/api/citas?agencia_id=AG02").json()}
-    assert citas[c1["id"]]["confirmada_en"] is not None and citas[c2["id"]]["confirmada_en"] is None
+    assert citas[cita["id"]]["confirmada_en"] is not None
 
 
 def test_buscar_agencia_por_nombre_o_codigo(cliente):
