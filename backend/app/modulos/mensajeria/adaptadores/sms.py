@@ -135,8 +135,7 @@ async def _enviar_adb(telefono: str, texto: str) -> tuple[bool, str]:
     async with _candado_adb:
         await _adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
         codigo, salida = await _adb("shell", "am", "start", "-a", "android.intent.action.SENDTO",
-                                    "-d", shlex.quote(f"sms:{telefono}"), "--es", "sms_body", shlex.quote(texto),
-                                    "--ez", "exit_on_sent", "true")
+                                    "-d", shlex.quote(f"sms:{telefono}"), "--es", "sms_body", shlex.quote(texto))
         if codigo != 0 or "Error" in salida:
             return False, f"adb: no se pudo abrir Mensajes ({salida.strip()[:120]})"
         await asyncio.sleep(s.sms_adb_espera_s)
@@ -153,8 +152,7 @@ async def _enviar_adb(telefono: str, texto: str) -> tuple[bool, str]:
         codigo, salida = await _adb("shell", "input", "tap", str(punto[0]), str(punto[1]))
         if codigo != 0:
             return False, f"adb: no se pudo tocar Enviar ({salida.strip()[:120]})"
-        await asyncio.sleep(1.0)
-        await _adb("shell", "input", "keyevent", "KEYCODE_HOME")  # deja el celular listo para el siguiente
+        # se queda en la conversación de Mensajes: el SMS enviado queda a la vista en la demo
         return True, f"adb: enviado desde Mensajes (toque en {punto[0]},{punto[1]})"
 
 

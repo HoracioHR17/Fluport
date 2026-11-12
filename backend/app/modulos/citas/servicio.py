@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.modulos.pronostico.pronosticador import pronosticador
+from app.nucleo.corredores import rodeo_min
 from app.nucleo.colas import FRANJA_MIN
 from app.nucleo.contracts.enums import EstadoCita, Mundo, OrigenCita, semaforo_de
 from app.nucleo.contracts.schemas import (
@@ -81,6 +82,8 @@ def sugerir(sim: Operacion, req: SugerenciaRequest) -> list[Sugerencia]:
     if not accesos:
         raise ErrorCita(409, "no hay accesos abiertos")
 
+    # corredor de origen: el que dijo o el de la entrada pedida; otro corredor cobra el rodeo (manejo extra)
+    origen = req.origen or (sim.esc.acceso(req.acceso_id).entrada if req.acceso_id else None)
     f_ini = int(sim.a_minuto(desde) // FRANJA_MIN)
     f_fin = int(sim.a_minuto(req.hasta) // FRANJA_MIN)
     centro = req.desde + (req.hasta - req.desde) / 2
@@ -93,6 +96,7 @@ def sugerir(sim: Operacion, req: SugerenciaRequest) -> list[Sugerencia]:
         for a in accesos:
             espera = espera_estimada(sim, a, inicio)
             cambio = 5.0 if req.acceso_id and a != req.acceso_id else 0.0  # preferencia leve por el acceso pedido
+            cambio += rodeo_min(origen, sim.esc.acceso(a).entrada)
             # desempate: la franja más cercana a la hora que mencionó el transportista (centro de la ventana)
             # o, si no dio hora, la más próxima
             ref = desde if req.preferencia == "temprano" else centro

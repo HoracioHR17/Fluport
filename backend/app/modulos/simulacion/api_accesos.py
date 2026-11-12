@@ -16,6 +16,7 @@ async def listar_accesos() -> list[AccesoOut]:
         AccesoOut(
             id=a.id, nombre=a.nombre, zona=a.zona, lat=a.lat, lon=a.lon, carriles=a.carriles,
             tiempo_servicio_min=a.tiempo_servicio_min, capacidad_hora=a.capacidad_hora, estado=estados[a.id],
+            entrada=a.entrada,
         )
         for a in sim.esc.accesos
     ]

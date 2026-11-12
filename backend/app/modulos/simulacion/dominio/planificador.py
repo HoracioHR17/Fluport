@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from app.modulos.simulacion.dominio.escenario import Escenario
 from app.nucleo.colas import FRANJA_MIN
+from app.nucleo.corredores import rodeo_min
 
 
 class Planificador:
@@ -30,8 +31,10 @@ class Planificador:
         desde = deseada + lo if desde is None else desde
         hasta = deseada + hi if hasta is None else hasta
         accesos = [acceso_id] if acceso_id and acceso_id not in self.cerrados else None
-        if accesos is None:  # sin preferencia o acceso cerrado: cualquier acceso abierto
-            accesos = [a.id for a in self.esc.accesos if a.id not in self.cerrados]
+        corredor = self.esc.acceso(acceso_id).entrada if acceso_id else None
+        if accesos is None:  # sin preferencia o acceso cerrado: entradas abiertas de su mismo corredor, si hay
+            abiertos = [a.id for a in self.esc.accesos if a.id not in self.cerrados]
+            accesos = [a for a in abiertos if self.esc.acceso(a).entrada == corredor] or abiertos
         res = []
         for f in range(int(max(desde, 0) // FRANJA_MIN), int(hasta // FRANJA_MIN) + 1):
             ini, fin = f * FRANJA_MIN, (f + 1) * FRANJA_MIN
@@ -41,7 +44,8 @@ class Planificador:
             else:
                 desplazamiento_h = min(abs(deseada - ini), abs(deseada - fin)) / 60 + 0.01
             for a in accesos:
-                cambio_acceso = 0.0 if a == acceso_id else 0.3
+                # cambiar de entrada cuesta; cambiar de corredor cuesta además el rodeo (en horas de carga equivalente)
+                cambio_acceso = 0.0 if a == acceso_id else 0.3 + rodeo_min(corredor, self.esc.acceso(a).entrada) / 60
                 res.append((self.carga(a, f) + 0.15 * desplazamiento_h + cambio_acceso, a, f))
         res.sort()
         return res

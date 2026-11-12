@@ -42,6 +42,7 @@ class AccesoOut(Modelo):
     tiempo_servicio_min: float
     capacidad_hora: int
     estado: EstadoAcceso
+    entrada: Literal["norte", "sur", "urbana"] = "urbana"  # corredor por el que llegan los camiones
 
 
 class AccesoEstado(Modelo):
@@ -124,6 +125,9 @@ class ResumenCitas(Modelo):
 
 class SugerenciaRequest(Modelo):
     acceso_id: str | None = Field(None, description="None = considerar todos los accesos abiertos")
+    origen: Literal["norte", "sur", "urbana"] | None = Field(
+        None, description="Corredor por el que viene el camión; las entradas de otro corredor cobran el rodeo. "
+        "None = el corredor de acceso_id, o sin preferencia")
     desde: datetime
     hasta: datetime
     tipo_carga: TipoCarga

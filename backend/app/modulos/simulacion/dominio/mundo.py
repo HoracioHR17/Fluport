@@ -15,6 +15,7 @@ from app.modulos.simulacion.dominio.demanda import CamionPlan
 from app.modulos.simulacion.dominio.escenario import Escenario
 from app.modulos.simulacion.dominio.planificador import Planificador
 from app.nucleo.contracts.enums import EstadoAcceso, EstadoCamion, Mundo
+from app.nucleo.corredores import rodeo_min
 
 PRIORIDAD_CIERRE = -1000
 DURACION_SALIDA = 10.0  # minutos que tarda en alejarse del acceso (animación de salida)
@@ -99,7 +100,7 @@ class MundoSim:
         if p.cancelado:
             return
         if self.accesos[acceso_id].estado == EstadoAcceso.cerrado:
-            destino = self._mejor_acceso_abierto()  # sale ya avisado del cierre: va directo a otra entrada
+            destino = self._mejor_acceso_abierto(acceso_id)  # sale ya avisado del cierre: va directo a otra entrada
             if destino is not None:
                 acceso_id, ruta_id = destino.id, self.esc.acceso(destino.id).rutas[0].id
         c = CamionVivo(p, acceso_id, ruta_id, t_salida=self.env.now, t_llegada=t_llegada, t_estado=self.env.now,
@@ -155,13 +156,14 @@ class MundoSim:
         """Manda el camión a la entrada abierta con menos espera, con el tiempo del rodeo. False si no hay ninguna."""
         sugerido = self.accesos.get(c.desvio_a) if c.desvio_a else None
         c.desvio_a = None
-        destino = sugerido if sugerido is not None and sugerido.estado == EstadoAcceso.abierto else self._mejor_acceso_abierto()
+        origen = c.acceso_id
+        destino = sugerido if sugerido is not None and sugerido.estado == EstadoAcceso.abierto else self._mejor_acceso_abierto(origen)
         if destino is None:
             return False
         restante = max(0.0, c.t_llegada - self.env.now) if c.estado == EstadoCamion.en_ruta else 0.0
         c.acceso_id, c.ruta_id = destino.id, self.esc.acceso(destino.id).rutas[0].id
         c.estado, c.t_estado, c.t_salida = EstadoCamion.en_ruta, self.env.now, self.env.now
-        c.t_llegada = self.env.now + max(restante, DESVIO_MIN)
+        c.t_llegada = self.env.now + max(restante, DESVIO_MIN + self._rodeo(origen, destino.id))
         return True
 
     def _notificar_cita(self, p: CamionPlan, estado: str) -> None:
@@ -214,7 +216,7 @@ class MundoSim:
             if a is destino or a.estado != EstadoAcceso.abierto:
                 continue
             cola = list(a.en_fila)
-            while cola and len(cola) / capacidad(a) > llegan / capacidad(destino) + DESVIO_MIN:
+            while cola and len(cola) / capacidad(a) > llegan / capacidad(destino) + DESVIO_MIN + self._rodeo(a.id, destino.id):
                 c = cola.pop()  # el último de la fila
                 if c.proceso is not None and c.proceso.is_alive:
                     c.desvio_a = destino.id
@@ -256,9 +258,16 @@ class MundoSim:
     def fila_total(self) -> int:
         return sum(len(a.en_fila) for a in self.accesos.values())
 
-    def _mejor_acceso_abierto(self) -> AccesoVivo | None:
+    def _rodeo(self, desde_id: str | None, hacia_id: str) -> float:
+        """Minutos extra por cambiar de corredor (norte, sur, urbana) entre dos entradas."""
+        if not desde_id:
+            return 0.0
+        return rodeo_min(self.esc.acceso(desde_id).entrada, self.esc.acceso(hacia_id).entrada)
+
+    def _mejor_acceso_abierto(self, desde_id: str | None = None) -> AccesoVivo | None:
+        """Entrada abierta con menor espera + rodeo desde el corredor por el que viene el camión."""
         abiertos = [a for a in self.accesos.values() if a.estado == EstadoAcceso.abierto]
-        return min(abiertos, key=lambda a: self.espera_estimada(a.id), default=None)
+        return min(abiertos, key=lambda a: self.espera_estimada(a.id) + self._rodeo(desde_id, a.id), default=None)
 
     def avanzar(self, hasta: float) -> None:
         if hasta > self.env.now:

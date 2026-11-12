@@ -38,3 +38,18 @@ def test_asignar_reserva_lugar(esc):
 def test_candidatos_ordenados_por_puntaje(esc):
     c = Planificador(esc).candidatos(600.0, "A1")
     assert c == sorted(c) and len(c) > 1
+
+
+def test_cierre_reasigna_dentro_del_mismo_corredor(esc):
+    """Si su entrada del norte se cierra, el camión va a otra entrada del norte, no al sur."""
+    pl = Planificador(esc)
+    pl.cerrados.add("A3")
+    acceso, _ = pl.asignar(600.0, "A3")
+    assert esc.acceso(acceso).entrada == esc.acceso("A3").entrada
+
+
+def test_rodeo_entre_corredores():
+    from app.nucleo.corredores import rodeo_min
+
+    assert rodeo_min("norte", "norte") == 0 and rodeo_min(None, "sur") == 0
+    assert rodeo_min("norte", "sur") > rodeo_min("norte", "urbana") > 0
