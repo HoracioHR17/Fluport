@@ -58,7 +58,7 @@ def test_mapas_limitados_al_puerto():
 
     js = Path(__file__).resolve().parents[2] / "frontend" / "static" / "js"
     graficas = (js / "graficas.js").read_text(encoding="utf-8")
-    assert "maxBounds" in graficas and "maxBoundsViscosity: 1" in graficas and "minZoom" in graficas
+    assert "maxBounds: lim" in graficas and "maxBoundsViscosity: 1" in graficas and "setMinZoom" in graficas
     for f in ("publico.js", "agencia.js", "demo.js"):
         codigo = (js / f).read_text(encoding="utf-8")
         assert "F.mapaPuerto(" in codigo and "L.map(" not in codigo, f
