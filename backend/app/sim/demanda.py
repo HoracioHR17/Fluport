@@ -31,6 +31,7 @@ class CamionPlan:
     revision_aduanal: bool
     prioritario: bool
     cita_id: int | None = None
+    cancelado: bool = False  # cita cancelada/reprogramada antes de salir: el camión no se presenta
     es_demo: bool = False
     origen: str = "base"  # base | buque | urgente | cita
 

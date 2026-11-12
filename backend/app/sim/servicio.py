@@ -50,6 +50,12 @@ class ServicioSim:
             )
         self.sim = Simulador(self.esc, semilla, inicio, self.cfg.sim_velocidad, corrida_id=corrida_id)
         self.sim.publicador = self.publicar
+        if corrida_id:
+            pendientes = await asyncio.to_thread(self._citas_por_reinyectar)
+            for c in pendientes:  # la inyección modifica el simulador: se hace en el event loop
+                self.sim.inyectar_cita(**c)
+            if pendientes:
+                log.info("Citas activas reinyectadas en la simulación: %d", len(pendientes))
         self._t_pronostico_guardado = -1e9
         if self._tarea is None or self._tarea.done():
             self._tarea = asyncio.create_task(self._bucle(), name="fluport-sim")
@@ -120,10 +126,34 @@ class ServicioSim:
         if self.sim and self.persistencia.activa:
             await asyncio.to_thread(self.persistencia.finalizar_corrida, self.sim.corrida_id)
 
+    def _citas_por_reinyectar(self) -> list[dict]:
+        from app.citas.servicio import citas_por_reinyectar
+        from app.db.base import SessionLocal
+
+        try:
+            with SessionLocal() as db:
+                return citas_por_reinyectar(db, self.sim.ts())
+        except Exception:  # noqa: BLE001
+            log.exception("No se pudieron leer las citas activas")
+            return []
+
+    def _sincronizar_citas(self, cambios: list[tuple[int, str]], ahora: datetime) -> None:
+        from app.citas.servicio import aplicar_cambios, marcar_no_shows
+        from app.db.base import SessionLocal
+
+        try:
+            with SessionLocal() as db:
+                if cambios:
+                    aplicar_cambios(db, cambios)
+                marcar_no_shows(db, ahora)
+        except Exception:  # noqa: BLE001
+            log.exception("No se pudo sincronizar el estado de las citas")
+
     async def _escribir(self) -> None:
         if self.sim and self.persistencia.activa and self.sim.corrida_id:
             lecturas, eventos = self.sim.vaciar_pendientes()
             await asyncio.to_thread(self.persistencia.guardar, lecturas, eventos)
+            await asyncio.to_thread(self._sincronizar_citas, self.sim.vaciar_cambios_cita(), self.sim.ts())
         elif self.sim:
             self.sim.vaciar_pendientes()
 

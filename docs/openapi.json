@@ -399,6 +399,28 @@
     }
    }
   },
+  "/api/citas/resumen": {
+   "get": {
+    "tags": [
+     "citas"
+    ],
+    "summary": "Resumen",
+    "description": "Panel de cumplimiento: citas por estado, % cumplimiento y citas por acceso.",
+    "operationId": "resumen_api_citas_resumen_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ResumenCitas"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/citas/{cita_id}": {
    "get": {
     "tags": [
@@ -1636,6 +1658,44 @@
      "franjas"
     ],
     "title": "PronosticoOut"
+   },
+   "ResumenCitas": {
+    "properties": {
+     "total": {
+      "type": "integer",
+      "title": "Total"
+     },
+     "por_estado": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "propertyNames": {
+       "$ref": "#/components/schemas/EstadoCita"
+      },
+      "type": "object",
+      "title": "Por Estado"
+     },
+     "cumplimiento_pct": {
+      "type": "number",
+      "title": "Cumplimiento Pct"
+     },
+     "por_acceso": {
+      "additionalProperties": {
+       "type": "integer"
+      },
+      "type": "object",
+      "title": "Por Acceso"
+     }
+    },
+    "type": "object",
+    "required": [
+     "total",
+     "por_estado",
+     "cumplimiento_pct",
+     "por_acceso"
+    ],
+    "title": "ResumenCitas",
+    "description": "Panel de cumplimiento de citas."
    },
    "Salud": {
     "properties": {

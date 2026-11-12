@@ -5,6 +5,7 @@ Mundo B (con Fluport): llegada según la franja asignada por el planificador (si
 prioridad para carga refrigerada/peligrosa y desvío anticipado si su acceso está cerrado.
 """
 from collections import deque
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import simpy
@@ -56,6 +57,8 @@ class MundoSim:
         }
         self.planificador = Planificador(esc) if mundo == Mundo.B else None
         self.camiones: dict[str, CamionVivo] = {}
+        # notificación de cambios de estado de camiones con cita (solo se usa en el Mundo B)
+        self.al_cambiar_cita: Callable[[int, str], None] | None = None
         # Métricas acumuladas
         self.esperas_total = 0.0
         self.espera_max = 0.0
@@ -89,8 +92,11 @@ class MundoSim:
     def _camion(self, p: CamionPlan, acceso_id: str, ruta_id: str, t_llegada: float):
         salida = max(self.env.now, t_llegada - p.ruta_min)
         yield self.env.timeout(salida - self.env.now)
+        if p.cancelado:
+            return
         c = CamionVivo(p, acceso_id, ruta_id, t_salida=self.env.now, t_llegada=t_llegada, t_estado=self.env.now)
         self.camiones[p.id] = c
+        self._notificar_cita(p, "en_ruta")
         yield self.env.timeout(max(0.0, t_llegada - self.env.now))
 
         acc = self.accesos[c.acceso_id]
@@ -110,6 +116,7 @@ class MundoSim:
             self.esperas_total += espera
             self.espera_max = max(self.espera_max, espera)
             c.estado, c.t_estado = EstadoCamion.en_revision, self.env.now
+            self._notificar_cita(p, "cumplida")
             acc.en_revision += 1
             yield self.env.timeout(p.servicio_base * self.factor_servicio)
             acc.en_revision -= 1
@@ -120,6 +127,10 @@ class MundoSim:
         c.estado, c.t_estado = EstadoCamion.saliendo, self.env.now
         yield self.env.timeout(DURACION_SALIDA)
         del self.camiones[p.id]
+
+    def _notificar_cita(self, p: CamionPlan, estado: str) -> None:
+        if p.cita_id is not None and self.al_cambiar_cita is not None:
+            self.al_cambiar_cita(p.cita_id, estado)
 
     # ───────────── Eventos ─────────────
     def cerrar(self, acceso_id: str) -> None:

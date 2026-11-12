@@ -109,6 +109,15 @@ class CitaOut(Modelo):
     cita_anterior_id: int | None
 
 
+class ResumenCitas(Modelo):
+    """Panel de cumplimiento de citas."""
+
+    total: int
+    por_estado: dict[EstadoCita, int]
+    cumplimiento_pct: float  # cumplidas / (cumplidas + no_show)
+    por_acceso: dict[str, int]
+
+
 class SugerenciaRequest(Modelo):
     acceso_id: str | None = Field(None, description="None = considerar todos los accesos abiertos")
     desde: datetime
@@ -116,6 +125,12 @@ class SugerenciaRequest(Modelo):
     tipo_carga: TipoCarga
     duracion_min: int = 30
     max_resultados: int = Field(3, ge=1, le=10)
+
+    @model_validator(mode="after")
+    def _validar(self) -> "SugerenciaRequest":
+        if self.hasta <= self.desde:
+            raise ValueError("hasta debe ser posterior a desde")
+        return self
 
 
 class Sugerencia(Modelo):

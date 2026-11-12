@@ -40,6 +40,7 @@ Enums: `tipo_carga` (contenedor_20, contenedor_40, refrigerado, peligroso, grane
 | POST | `/api/citas` | `CitaCreate` | `CitaOut` (201) | M3 |
 | GET | `/api/citas?telefono=&transportista_id=&acceso_id=&estado=` | — | `CitaOut[]` | M3 |
 | POST | `/api/citas/sugerencias` | `SugerenciaRequest` | `Sugerencia[]` (top 3) | M3 |
+| GET | `/api/citas/resumen` | — | `ResumenCitas` (por estado, % cumplimiento, por acceso) | M3 |
 | GET | `/api/citas/{id}` | — | `CitaOut` | M3 |
 | PATCH | `/api/citas/{id}` | `CitaReprogramar` | `CitaOut` (nueva, con `cita_anterior_id`) | M3 |
 | DELETE | `/api/citas/{id}` | — | `CitaOut` (cancelada) | M3 |
@@ -59,6 +60,13 @@ Payload de `EventoCreate.payload` por tipo:
 - `cierre_acceso` / `reapertura`: `{}` + `acceso_id`
 - `carga_urgente`: `{camiones, tipo_carga}`
 - `personalizado`: libre (reservado para el giro)
+
+Notas de citas:
+- Las horas de las citas están en **tiempo simulado** (`ts_sim`). Una cita no puede empezar más de 30 min antes del reloj actual (422).
+- `telefono` se normaliza a `+<dígitos>` (acepta `whatsapp:+52…`); si no existe, se crea el transportista.
+- Errores: 404 acceso/cita/transportista inexistente · 409 acceso cerrado, cita no activa o camión ya en camino · 422 ventana inválida o teléfono inválido.
+- Ciclo de estados: `agendada → en_ruta → cumplida` (lo actualiza el simulador) · `reprogramada` / `cancelada` (por la API) · `no_show` si la ventana terminó hace más de 60 min sin salir.
+- Sugerencias: franjas de 30 min dentro de `[desde, hasta]` en accesos abiertos, ordenadas por espera prevista (pronóstico a 12 h; más allá, carga agendada vs. capacidad); `ahorro_vs_pico_min` = espera de la peor franja de la ventana − espera de la sugerida.
 
 Notas de simulación:
 - `velocidad` = segundos simulados por segundo real (60 → 1 s real = 1 min simulado; 600 → 10 min).

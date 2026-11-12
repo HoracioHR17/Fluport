@@ -71,6 +71,9 @@ class Simulador:
         self._seq_evento = 0
         self._rng_eventos = random.Random(semilla + 7919)
         self.publicador: Callable[[str], None] | None = None  # lo asigna el servicio en vivo
+        self.citas: dict[int, CamionPlan] = {}  # citas inyectadas por la API (M3)
+        self.cambios_cita: list[tuple[int, str]] = []  # (cita_id, nuevo estado) por escribir en la BD
+        self.mundos[Mundo.B].al_cambiar_cita = lambda cid, est: self.cambios_cita.append((cid, est))
         self._asegurar_demanda()
 
     # ───────────── Tiempo ─────────────
@@ -218,8 +221,27 @@ class Simulador:
         plan = crear_camion(self.esc, rng, f"C{cita_id:05d}", max(self.t, self.a_minuto(inicio)),
                             acceso_id=acceso_id, tipo_carga=tipo_carga, origen="cita")
         plan.cita_id, plan.es_demo, plan.con_cita, plan.no_show, plan.cumple = cita_id, es_demo, True, False, True
+        self.citas[cita_id] = plan
         self._alimentar([plan])
         return plan.id
+
+    def cancelar_cita(self, cita_id: int) -> bool:
+        """Retira el camión de una cita si aún no sale. Devuelve False si ya estaba en camino o no existe."""
+        plan = self.citas.get(cita_id)
+        if plan is None or any(plan.id in m.camiones for m in self.mundos.values()):
+            return False
+        plan.cancelado = True
+        franja = int(plan.llegada_deseada // 30)
+        self.demanda_conocida[(plan.acceso_id, franja)] -= 1
+        pl = self.mundos[Mundo.B].planificador
+        if pl is not None and pl.ocupacion[(plan.acceso_id, franja)] > 0:
+            pl.ocupacion[(plan.acceso_id, franja)] -= 1
+        del self.citas[cita_id]
+        return True
+
+    def vaciar_cambios_cita(self) -> list[tuple[int, str]]:
+        cambios, self.cambios_cita = self.cambios_cita, []
+        return cambios
 
     # ───────────── KPIs ─────────────
     def kpis(self, mundo: Mundo) -> Kpis:

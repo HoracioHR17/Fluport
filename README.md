@@ -36,8 +36,12 @@ Abrir `http://localhost:8000` (tablero) · `http://localhost:8000/publico/` (vec
 ```bash
 cd backend
 pip install -r requirements-dev.txt
-pytest                 # todas (≈15 s)
+pytest                 # todas las que no necesitan PostgreSQL (≈15 s)
 pytest -m "not lento"  # sin la prueba de entrenamiento
+
+# con PostgreSQL (incluye citas), usando una base aparte que se borra y recrea:
+sudo -u postgres createdb -O fluport fluport_test
+FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fluport_test pytest
 ```
 
 ---
@@ -235,3 +239,31 @@ pytest -m "not lento"  # sin la prueba de entrenamiento
   - Fuente del sistema (Arial/Helvetica): **Por qué:** no requiere descargas ni CDN, carga al instante y se lee bien en pantallas pequeñas.
 
 - **Herramientas de IA:** Claude (Opus 5.5) extrajo del documento de identidad solo lo relativo al diseño, lo tradujo a tokens CSS y a la correspondencia con la API, alineó los umbrales del backend y verificó las pruebas.
+
+### 2026-11-11 18:15 · `#007` · M3 Citas: sugerir, agendar, reprogramar, cancelar y medir cumplimiento
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/app/citas/servicio.py` | Toda la lógica de citas. | `sugerir()`: recorre las franjas de 30 min de la ventana pedida en las casetas abiertas, estima la espera de cada una y devuelve las mejores (menor espera; en empate, la más cercana a lo pedido; ligera preferencia por la caseta pedida) con su semáforo y los minutos que ahorra frente a la peor franja; `espera_estimada()` usa el pronóstico de 12 h y, más allá, la carga agendada contra la capacidad; `crear()` valida caseta y horario, encuentra o crea al transportista por teléfono, asigna prioridad a carga refrigerada/peligrosa, guarda la cita y **la inyecta en el simulador**; `reprogramar()` crea una cita nueva ligada a la anterior y retira el camión original; `cancelar()`; `listar()` con filtros; `resumen()` (citas por estado, % de cumplimiento, citas por caseta); `aplicar_cambios()` pasa a la BD los estados que ocurrieron en la simulación (en_ruta, cumplida); `marcar_no_shows()`; `citas_por_reinyectar()` tras un reset; `normalizar_telefono()` (acepta el formato `whatsapp:+52…` de Twilio); `ErrorCita` con su código HTTP. |
+  | `backend/app/api/citas.py` (implementado) | Rutas de citas. | `POST /api/citas`, `GET /api/citas` (filtros por teléfono, transportista, caseta, estado), `POST /api/citas/sugerencias`, nuevo `GET /api/citas/resumen`, `GET/PATCH/DELETE /api/citas/{id}`; traduce `ErrorCita` a 404/409/422. |
+  | `backend/app/contracts/schemas.py` (modificado) | Contratos. | Nuevo `ResumenCitas`; `SugerenciaRequest` valida que `hasta` sea posterior a `desde`. |
+  | `backend/app/sim/demanda.py`, `mundo.py`, `motor.py` (modificados) | Simulación con citas reales. | `CamionPlan.cancelado`: el camión de una cita cancelada no sale; `MundoSim.al_cambiar_cita` avisa cuando un camión con cita sale (en_ruta) y cuando empieza su revisión (cumplida); `Simulador.cancelar_cita()` lo retira y libera su lugar en la franja; `vaciar_cambios_cita()`. |
+  | `backend/app/sim/servicio.py` (modificado) | Servicio en vivo. | Cada 5 ticks sincroniza en la BD los estados de las citas y marca no-shows; al iniciar o reiniciar la simulación vuelve a inyectar las citas activas. |
+  | `backend/tests/conftest.py` (modificado) | Pruebas. | Con `FLUPORT_TEST_DATABASE_URL` las pruebas usan una base aparte que se borra y recrea; sin ella, las de citas con BD se omiten. |
+  | `backend/tests/test_citas.py` (15) | Pruebas de citas. | Sin BD: teléfono, sugerencias ordenadas y dentro de la ventana, evita caseta cerrada, ventana pasada, cancelación en el simulador, aviso en_ruta→cumplida. Con BD: crear, prioridad, listar/obtener, errores (404, 422, 409), reprogramar, cancelar, sugerencias por API, cumplimiento y resumen, reinyección tras reset. |
+  | `backend/tests/test_api.py` (modificado) | — | Ajustes por las rutas de citas ya implementadas. |
+  | `docs/contracts.md`, `docs/openapi.json` (actualizados) | Contratos. | Ruta `/api/citas/resumen`, reglas de horario, errores y ciclo de estados. |
+
+- **Funcionalidad:** un transportista (o el asistente, en M4) puede pedir los 3 mejores horarios para llegar en una ventana, agendar uno, cambiarlo o cancelarlo. Cada cita aparece como un camión en el Mundo B de la simulación y su estado se actualiza solo: pasa a "en ruta" cuando sale y a "cumplida" cuando llega a la caseta; si nunca sale, queda como no-show. El panel de cumplimiento muestra cuántas citas hay en cada estado, el % de cumplimiento y las citas por caseta. Probado con el servidor en vivo: sugerencia → cita → `cumplida` automática. Pruebas: 90 con PostgreSQL de prueba, 81 sin él.
+
+- **Tecnologías usadas:**
+  - `SQLAlchemy` ORM · `Session`, `select()`, `db.get()`: ver `aae10d9`. Aquí se usan consultas con filtros combinables y `flush()` para obtener el id de la cita antes de inyectarla en el simulador y confirmar (`commit`) solo si todo salió bien.
+  - `FastAPI` · `Depends(get_db)`: inyección de dependencias. **Por qué:** cada petición recibe su propia sesión de BD y se cierra al terminar, sin código repetido en cada ruta.
+  - Excepciones de dominio (`ErrorCita`) con código HTTP: **Por qué:** la lógica de citas no depende de FastAPI (la reutilizará el asistente por WhatsApp) y la API solo traduce el error a la respuesta.
+  - `re` (expresiones regulares, biblioteca estándar): **Por qué:** normaliza teléfonos de distintas fuentes (formulario, Twilio) a un único formato para encontrar al mismo transportista.
+  - `asyncio.to_thread`: ver `d1a97ad`. Aquí la sincronización de estados de citas con la BD corre fuera del event loop; las modificaciones al simulador (inyectar citas) se hacen siempre dentro del loop.
+  - Patrón **callback** (`al_cambiar_cita`): **Por qué:** el simulador avisa de los cambios de estado sin conocer la BD; el servicio decide cuándo guardarlos.
+
+- **Herramientas de IA:** Claude (Opus 5.5) diseñó e implementó el flujo de citas y su integración con el simulador y el pronóstico, escribió 15 pruebas nuevas, verificó las 90 con PostgreSQL de prueba y el flujo completo con el servidor en vivo.

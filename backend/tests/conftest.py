@@ -1,13 +1,16 @@
 """Configuración común de las pruebas.
 
-Las pruebas NO usan tu PostgreSQL ni tu modelo entrenado: se apunta a una BD inexistente
-(el simulador sigue funcionando sin persistir) y se desactiva el entrenamiento automático.
-Debe ejecutarse antes de importar `app`, por eso las variables se fijan aquí.
+Las pruebas NO usan tu base `fluport` ni tu modelo entrenado:
+- Si defines FLUPORT_TEST_DATABASE_URL (una base de prueba aparte, p. ej. `fluport_test`), las pruebas
+  que necesitan PostgreSQL (citas) la usan: crean las tablas y las vacían antes de cada módulo.
+- Si no, se apunta a una BD inexistente: el simulador funciona sin persistir y las pruebas de citas se omiten.
+Se desactiva el entrenamiento automático. Debe ejecutarse antes de importar `app`.
 """
 import os
 from datetime import datetime, timedelta, timezone
 
-os.environ["FLUPORT_DATABASE_URL"] = "postgresql+psycopg://nadie:nada@127.0.0.1:1/inexistente"
+TEST_DB = os.environ.get("FLUPORT_TEST_DATABASE_URL")
+os.environ["FLUPORT_DATABASE_URL"] = TEST_DB or "postgresql+psycopg://nadie:nada@127.0.0.1:1/inexistente"
 os.environ["FLUPORT_PRONOSTICO_AUTOENTRENAR"] = "false"
 os.environ["FLUPORT_SIM_VELOCIDAD"] = "60"
 
@@ -30,3 +33,34 @@ def esc():
 def sim(esc):
     """Simulador sin eventos automáticos (resultados deterministas y fáciles de razonar)."""
     return Simulador(esc, semilla=42, inicio=INICIO, eventos_auto=False)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _crear_esquema_de_prueba():
+    """Con BD de prueba, crea el esquema desde cero una vez por sesión de pruebas."""
+    if TEST_DB:
+        from app.db.base import Base, engine
+        from app.db.models import Acceso
+
+        assert Acceso.__tablename__  # importar los modelos registra todas las tablas
+        Base.metadata.drop_all(engine)
+        Base.metadata.create_all(engine)
+    yield
+
+
+@pytest.fixture(scope="session")
+def esquema_bd():
+    """Engine de la BD de prueba; omite la prueba si no hay BD de prueba."""
+    if not TEST_DB:
+        pytest.skip("define FLUPORT_TEST_DATABASE_URL para correr las pruebas con PostgreSQL")
+    from app.db.base import engine
+
+    return engine
+
+
+def vaciar_tablas(engine) -> None:
+    from sqlalchemy import text
+
+    with engine.begin() as c:
+        c.execute(text("TRUNCATE aviso, mensaje_asistente, cita, transportista, pronostico, evento_sim, "
+                       "lectura_congestion, sim_corrida RESTART IDENTITY CASCADE"))

@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
+from tests.conftest import TEST_DB
 
 
 @pytest.fixture(scope="module")
@@ -14,9 +15,9 @@ def cliente():
         yield c
 
 
-def test_salud_sin_bd(cliente):
+def test_salud(cliente):
     r = cliente.get("/api/salud").json()
-    assert r["estado"] == "ok" and r["bd"] is False and r["simulador"] == "corriendo"
+    assert r["estado"] == "ok" and r["bd"] is bool(TEST_DB) and r["simulador"] == "corriendo"
 
 
 def test_raiz_redirige_al_tablero(cliente):
@@ -87,7 +88,6 @@ def test_reset_cambia_semilla(cliente):
 
 
 def test_endpoints_pendientes_responden_501(cliente):
-    assert cliente.get("/api/citas").status_code == 501
     assert cliente.get("/api/publico/zonas").status_code == 501
 
 
