@@ -7,12 +7,12 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.assistant import agente as ag
-from app.config import get_settings
-from app.contracts.enums import EstadoCita, TipoEventoSim
-from app.contracts.schemas import EventoCreate
-from app.messaging import twilio
-from app.messaging.avisos import CitaActiva, revisar
+from app.modulos.mensajeria.adaptadores import twilio
+from app.modulos.mensajeria.asistente import agente as ag
+from app.modulos.mensajeria.dominio.avisos import CitaActiva, revisar
+from app.nucleo.config import get_settings
+from app.nucleo.contracts.enums import EstadoCita, TipoEventoSim
+from app.nucleo.contracts.schemas import EventoCreate
 from tests.conftest import vaciar_tablas
 
 TOKEN = "token-de-prueba"
@@ -38,7 +38,7 @@ def envios(monkeypatch):
         return True, "SM123"
 
     monkeypatch.setattr(twilio, "enviar", falso)
-    import app.messaging.servicio as ms
+    import app.modulos.mensajeria.servicio as ms
     monkeypatch.setattr(ms.twilio, "enviar", falso)
     return lista
 
@@ -174,8 +174,8 @@ def test_webhook_responde_por_whatsapp(cliente, twilio_conf, envios):
 
 
 def test_ciclo_de_avisos_guarda_publica_y_envia(cliente, twilio_conf, envios):
-    from app.messaging.servicio import ciclo_avisos
-    from app.sim.servicio import servicio
+    from app.modulos.mensajeria.servicio import ciclo_avisos
+    from app.modulos.simulacion.servicio import servicio
 
     sim = servicio.sim
     inicio = sim.ts() + timedelta(minutes=20)
@@ -192,12 +192,12 @@ def test_ciclo_de_avisos_guarda_publica_y_envia(cliente, twilio_conf, envios):
     lista = cliente.get("/api/avisos").json()
     assert lista[0]["tipo"] == "turno_30min"
     # el aviso quedó en el historial del asistente (para responder "SÍ" con contexto)
-    from app.assistant.agente import cargar_historial
-    from app.contracts.enums import Canal
-    from app.db.base import SessionLocal
+    from app.modulos.mensajeria.asistente.agente import cargar_historial
+    from app.nucleo.contracts.enums import Canal
+    from app.nucleo.db.base import SessionLocal
 
     with SessionLocal() as db:
-        from app.db.models import MensajeAsistente
+        from app.nucleo.db.models import MensajeAsistente
         assert db.query(MensajeAsistente).filter_by(remitente="+522290000005", rol="model").count() == 1
         historial = cargar_historial(db, Canal.whatsapp, "+522290000005")
         assert historial[0]["role"] == "user" and "aviso automático" in historial[0]["parts"][0]["text"]
@@ -213,8 +213,8 @@ def test_si_a_un_aviso_reprograma(cliente, twilio_conf, envios):
     """Flujo completo: aviso de cierre con alternativa → el transportista responde SÍ → cita reprogramada."""
     import time
 
-    from app.messaging.servicio import ciclo_avisos
-    from app.sim.servicio import servicio
+    from app.modulos.mensajeria.servicio import ciclo_avisos
+    from app.modulos.simulacion.servicio import servicio
 
     sim = servicio.sim
     inicio = (sim.ts() + timedelta(hours=2)).replace(second=0, microsecond=0)

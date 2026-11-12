@@ -13,6 +13,7 @@ TEST_DB = os.environ.get("FLUPORT_TEST_DATABASE_URL")
 os.environ["FLUPORT_DATABASE_URL"] = TEST_DB or "postgresql+psycopg://nadie:nada@127.0.0.1:1/inexistente"
 os.environ["FLUPORT_PRONOSTICO_AUTOENTRENAR"] = "false"
 os.environ["FLUPORT_SIM_VELOCIDAD"] = "60"
+os.environ["FLUPORT_ASISTENTE_WEB_ACTIVO"] = "true"  # las pruebas del asistente usan el canal HTTP
 # Aísla las pruebas de tu .env: sin llaves reales nunca se llama a Gemini, Twilio ni Telegram.
 for _var in ("LLM_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_WEBHOOK_URL",
              "TELEGRAM_TOKEN", "TELEGRAM_WEBHOOK_SECRET"):
@@ -20,8 +21,8 @@ for _var in ("LLM_API_KEY", "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_W
 
 import pytest  # noqa: E402
 
-from app.sim.escenario import cargar_escenario  # noqa: E402
-from app.sim.motor import Simulador  # noqa: E402
+from app.modulos.simulacion.dominio.escenario import cargar_escenario  # noqa: E402
+from app.modulos.simulacion.dominio.motor import Simulador  # noqa: E402
 
 TZ = timezone(timedelta(hours=-6))
 INICIO = datetime(2026, 11, 12, 4, 0, tzinfo=TZ)
@@ -43,8 +44,8 @@ def sim(esc):
 def _crear_esquema_de_prueba():
     """Con BD de prueba, crea el esquema desde cero una vez por sesión de pruebas."""
     if TEST_DB:
-        from app.db.base import Base, engine
-        from app.db.models import Acceso
+        from app.nucleo.db.base import Base, engine
+        from app.nucleo.db.models import Acceso
 
         assert Acceso.__tablename__  # importar los modelos registra todas las tablas
         Base.metadata.drop_all(engine)
@@ -57,7 +58,7 @@ def esquema_bd():
     """Engine de la BD de prueba; omite la prueba si no hay BD de prueba."""
     if not TEST_DB:
         pytest.skip("define FLUPORT_TEST_DATABASE_URL para correr las pruebas con PostgreSQL")
-    from app.db.base import engine
+    from app.nucleo.db.base import engine
 
     return engine
 

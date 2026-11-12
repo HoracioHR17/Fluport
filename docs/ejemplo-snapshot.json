@@ -1,135 +1,268 @@
 {
-  "tipo": "snapshot",
-  "data": {
-    "corrida_id": 1,
-    "tick": 570,
-    "ts_sim": "2026-11-12T09:30:00-06:00",
-    "velocidad": 60.0,
-    "estado": "corriendo",
-    "clima": "normal",
-    "mundos": {
-      "A": {
-        "camiones": [
-          {
-            "id": "T-0001",
-            "acceso_id": "A1",
-            "ruta_id": "R-A1-norte",
-            "progreso": 0.42,
-            "estado": "en_ruta",
-            "tipo_carga": "contenedor_40",
-            "cita_id": null,
-            "es_demo": false
-          },
-          {
-            "id": "T-0002",
-            "acceso_id": "A2",
-            "ruta_id": "R-A2-sur",
-            "progreso": 1.0,
-            "estado": "en_fila",
-            "tipo_carga": "refrigerado",
-            "cita_id": 17,
-            "es_demo": true
-          }
-        ],
-        "camiones_ocultos": 0,
-        "accesos": [
-          {
-            "acceso_id": "A1",
-            "estado": "abierto",
-            "en_fila": 38,
-            "en_revision": 3,
-            "espera_min": 52.5,
-            "semaforo": "rojo",
-            "atendidos_hora": 42.0
-          },
-          {
-            "acceso_id": "A2",
-            "estado": "cerrado",
-            "en_fila": 0,
-            "en_revision": 0,
-            "espera_min": 0.0,
-            "semaforo": "verde",
-            "atendidos_hora": 0.0
-          }
-        ],
-        "kpis": {
-          "espera_prom_min": 42.0,
-          "espera_max_min": 84.0,
-          "horas_camion_espera": 117.8,
-          "camiones_atendidos": 310,
-          "pico_fila": 50
+  "corrida_id": 2,
+  "tick": 20,
+  "ts_sim": "2026-11-12T04:20:00-06:00",
+  "velocidad": 60.0,
+  "estado": "corriendo",
+  "clima": "normal",
+  "mundos": {
+    "A": {
+      "camiones": [
+        {
+          "id": "C00001",
+          "acceso_id": "A1",
+          "ruta_id": "R-A1-1",
+          "progreso": 1.0,
+          "estado": "en_ruta",
+          "tipo_carga": "granel",
+          "cita_id": 1,
+          "es_demo": true,
+          "agencia_id": null
+        },
+        {
+          "id": "T00-0017",
+          "acceso_id": "A1",
+          "ruta_id": "R-A1-1",
+          "progreso": 1.0,
+          "estado": "en_revision",
+          "tipo_carga": "contenedor_20",
+          "cita_id": null,
+          "es_demo": false,
+          "agencia_id": "AG04"
+        },
+        {
+          "id": "T00-0002",
+          "acceso_id": "A1",
+          "ruta_id": "R-A1-1",
+          "progreso": 1.0,
+          "estado": "en_revision",
+          "tipo_carga": "contenedor_40",
+          "cita_id": null,
+          "es_demo": false,
+          "agencia_id": "AG03"
         }
+      ],
+      "camiones_ocultos": 0,
+      "accesos": [
+        {
+          "acceso_id": "A1",
+          "estado": "abierto",
+          "en_fila": 0,
+          "en_revision": 2,
+          "espera_min": 0.2,
+          "semaforo": "verde",
+          "atendidos_hora": 0.0
+        },
+        {
+          "acceso_id": "A2",
+          "estado": "abierto",
+          "en_fila": 0,
+          "en_revision": 1,
+          "espera_min": 0.1,
+          "semaforo": "verde",
+          "atendidos_hora": 3.0
+        },
+        {
+          "acceso_id": "A3",
+          "estado": "abierto",
+          "en_fila": 0,
+          "en_revision": 0,
+          "espera_min": 0.0,
+          "semaforo": "verde",
+          "atendidos_hora": 1.0
+        }
+      ],
+      "kpis": {
+        "espera_prom_min": 0.0,
+        "espera_max_min": 0.0,
+        "horas_camion_espera": 0.0,
+        "camiones_atendidos": 4,
+        "pico_fila": 0
       },
-      "B": {
-        "camiones": [
-          {
-            "id": "T-0001",
-            "acceso_id": "A1",
-            "ruta_id": "R-A1-norte",
-            "progreso": 0.42,
-            "estado": "en_ruta",
-            "tipo_carga": "contenedor_40",
-            "cita_id": null,
-            "es_demo": false
-          },
-          {
-            "id": "T-0002",
-            "acceso_id": "A2",
-            "ruta_id": "R-A2-sur",
-            "progreso": 1.0,
-            "estado": "en_fila",
-            "tipo_carga": "refrigerado",
-            "cita_id": 17,
-            "es_demo": true
-          }
-        ],
-        "camiones_ocultos": 0,
-        "accesos": [
-          {
-            "acceso_id": "A1",
-            "estado": "abierto",
-            "en_fila": 14,
-            "en_revision": 3,
-            "espera_min": 18.0,
-            "semaforo": "verde",
-            "atendidos_hora": 42.0
-          },
-          {
-            "acceso_id": "A2",
-            "estado": "cerrado",
-            "en_fila": 0,
-            "en_revision": 0,
-            "espera_min": 0.0,
-            "semaforo": "verde",
-            "atendidos_hora": 0.0
-          }
-        ],
-        "kpis": {
-          "espera_prom_min": 14.4,
-          "espera_max_min": 28.8,
-          "horas_camion_espera": 43.4,
-          "camiones_atendidos": 310,
-          "pico_fila": 26
+      "flota": {
+        "AG01": {
+          "en_ruta": 0,
+          "en_fila": 0,
+          "en_revision": 0,
+          "dentro": 0,
+          "atendidos": 0,
+          "espera_prom_min": 0.0
+        },
+        "AG02": {
+          "en_ruta": 2,
+          "en_fila": 0,
+          "en_revision": 1,
+          "dentro": 1,
+          "atendidos": 1,
+          "espera_prom_min": 0.0
+        },
+        "AG03": {
+          "en_ruta": 1,
+          "en_fila": 0,
+          "en_revision": 1,
+          "dentro": 0,
+          "atendidos": 0,
+          "espera_prom_min": 0.0
+        },
+        "AG04": {
+          "en_ruta": 2,
+          "en_fila": 0,
+          "en_revision": 1,
+          "dentro": 1,
+          "atendidos": 1,
+          "espera_prom_min": 0.0
+        },
+        "AG05": {
+          "en_ruta": 1,
+          "en_fila": 0,
+          "en_revision": 0,
+          "dentro": 1,
+          "atendidos": 1,
+          "espera_prom_min": 0.0
+        },
+        "AG06": {
+          "en_ruta": 1,
+          "en_fila": 0,
+          "en_revision": 0,
+          "dentro": 1,
+          "atendidos": 1,
+          "espera_prom_min": 0.0
         }
       }
     },
-    "comparacion": {
-      "horas_ahorradas": 73.5,
-      "diesel_l_evitado": 183.8,
-      "costo_mxn_evitado": 4778.0,
-      "co2_kg_evitado": 492.5,
-      "reduccion_espera_pct": 65.7,
-      "reduccion_pico_fila_pct": 52.0
-    },
-    "eventos_recientes": [
-      {
-        "id": 3,
-        "tipo": "cierre_acceso",
-        "acceso_id": "A2",
-        "ts_sim": "2026-11-12T09:10:00-06:00",
-        "payload": {}
+    "B": {
+      "camiones": [
+        {
+          "id": "C00001",
+          "acceso_id": "A1",
+          "ruta_id": "R-A1-1",
+          "progreso": 1.0,
+          "estado": "en_ruta",
+          "tipo_carga": "granel",
+          "cita_id": 1,
+          "es_demo": true,
+          "agencia_id": null
+        },
+        {
+          "id": "T00-0017",
+          "acceso_id": "A1",
+          "ruta_id": "R-A1-1",
+          "progreso": 1.0,
+          "estado": "en_revision",
+          "tipo_carga": "contenedor_20",
+          "cita_id": null,
+          "es_demo": false,
+          "agencia_id": "AG04"
+        },
+        {
+          "id": "T00-0002",
+          "acceso_id": "A1",
+          "ruta_id": "R-A1-1",
+          "progreso": 1.0,
+          "estado": "en_revision",
+          "tipo_carga": "contenedor_40",
+          "cita_id": null,
+          "es_demo": false,
+          "agencia_id": "AG03"
+        }
+      ],
+      "camiones_ocultos": 0,
+      "accesos": [
+        {
+          "acceso_id": "A1",
+          "estado": "abierto",
+          "en_fila": 0,
+          "en_revision": 2,
+          "espera_min": 0.2,
+          "semaforo": "verde",
+          "atendidos_hora": 0.0
+        },
+        {
+          "acceso_id": "A2",
+          "estado": "abierto",
+          "en_fila": 0,
+          "en_revision": 1,
+          "espera_min": 0.1,
+          "semaforo": "verde",
+          "atendidos_hora": 3.0
+        },
+        {
+          "acceso_id": "A3",
+          "estado": "abierto",
+          "en_fila": 0,
+          "en_revision": 0,
+          "espera_min": 0.0,
+          "semaforo": "verde",
+          "atendidos_hora": 1.0
+        }
+      ],
+      "kpis": {
+        "espera_prom_min": 0.0,
+        "espera_max_min": 0.0,
+        "horas_camion_espera": 0.0,
+        "camiones_atendidos": 4,
+        "pico_fila": 0
+      },
+      "flota": {
+        "AG01": {
+          "en_ruta": 0,
+          "en_fila": 0,
+          "en_revision": 0,
+          "dentro": 0,
+          "atendidos": 0,
+          "espera_prom_min": 0.0
+        },
+        "AG02": {
+          "en_ruta": 2,
+          "en_fila": 0,
+          "en_revision": 1,
+          "dentro": 1,
+          "atendidos": 1,
+          "espera_prom_min": 0.0
+        },
+        "AG03": {
+          "en_ruta": 1,
+          "en_fila": 0,
+          "en_revision": 1,
+          "dentro": 0,
+          "atendidos": 0,
+          "espera_prom_min": 0.0
+        },
+        "AG04": {
+          "en_ruta": 2,
+          "en_fila": 0,
+          "en_revision": 1,
+          "dentro": 1,
+          "atendidos": 1,
+          "espera_prom_min": 0.0
+        },
+        "AG05": {
+          "en_ruta": 1,
+          "en_fila": 0,
+          "en_revision": 0,
+          "dentro": 1,
+          "atendidos": 1,
+          "espera_prom_min": 0.0
+        },
+        "AG06": {
+          "en_ruta": 1,
+          "en_fila": 0,
+          "en_revision": 0,
+          "dentro": 1,
+          "atendidos": 1,
+          "espera_prom_min": 0.0
+        }
       }
-    ],
-    "etiqueta": "SIMULACIÓN"
-  }
+    }
+  },
+  "comparacion": {
+    "horas_ahorradas": 0.0,
+    "diesel_l_evitado": 0.0,
+    "costo_mxn_evitado": 0.0,
+    "co2_kg_evitado": 0.0,
+    "reduccion_espera_pct": 0.0,
+    "reduccion_pico_fila_pct": 0.0
+  },
+  "eventos_recientes": [],
+  "etiqueta": "SIMULACIÓN"
 }

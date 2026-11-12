@@ -107,11 +107,33 @@
     });
     return picos;
   }
+  /** Prepara una ruta [[lat, lon], …] para ubicar camiones por su progreso 0–1 (distancias acumuladas). */
+  function prepararRuta(coords) {
+    var acum = [0];
+    for (var i = 1; i < coords.length; i++) {
+      var dy = coords[i][0] - coords[i - 1][0], dx = coords[i][1] - coords[i - 1][1];
+      acum.push(acum[i - 1] + Math.sqrt(dx * dx + dy * dy));
+    }
+    return { coords: coords, acum: acum, total: acum[acum.length - 1] || 1 };
+  }
+
+  /** Punto [lat, lon] a una fracción `progreso` (0–1) del recorrido de la ruta. */
+  function posicion(ruta, progreso) {
+    var d = Math.max(0, Math.min(1, progreso)) * ruta.total, a = ruta.acum, c = ruta.coords;
+    for (var i = 1; i < a.length; i++) {
+      if (d <= a[i]) {
+        var t = (d - a[i - 1]) / ((a[i] - a[i - 1]) || 1);
+        return [c[i - 1][0] + t * (c[i][0] - c[i - 1][0]), c[i - 1][1] + t * (c[i][1] - c[i - 1][1])];
+      }
+    }
+    return c[c.length - 1];
+  }
+
   function horaMas(iso, minutos) { return hora(new Date(new Date(iso).getTime() + minutos * 60000)); }
 
   window.Fluport = {
     SEMAFORO: SEMAFORO, el: el, reemplazar: reemplazar, chip: chip, hora: hora, fecha: fecha,
     zonaHoraria: zonaHoraria, num: num, api: api, conectarSimulacion: conectarSimulacion,
-    horasPico: horasPico, horaMas: horaMas
+    horasPico: horasPico, prepararRuta: prepararRuta, posicion: posicion
   };
 })();

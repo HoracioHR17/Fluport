@@ -1,5 +1,5 @@
 """Planificador de franjas (Mundo B)."""
-from app.sim.planificador import FRANJA_MIN, Planificador
+from app.modulos.simulacion.dominio.planificador import FRANJA_MIN, Planificador
 
 
 def test_elige_la_franja_menos_cargada(esc):

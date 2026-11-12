@@ -3,9 +3,9 @@ from datetime import timedelta
 
 from fastapi.testclient import TestClient
 
-from app.contracts.enums import Semaforo, TipoEventoSim
-from app.contracts.schemas import EventoCreate, FranjaPronostico, PronosticoOut
-from app.publico.servicio import horas_pico, zonas
+from app.modulos.publico.servicio import horas_pico, zonas
+from app.nucleo.contracts.enums import Semaforo, TipoEventoSim
+from app.nucleo.contracts.schemas import EventoCreate, FranjaPronostico, PronosticoOut
 from tests.conftest import INICIO
 
 

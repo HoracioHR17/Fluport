@@ -4,11 +4,16 @@ from datetime import datetime, timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from app.assistant import agente as ag
-from app.assistant.agente import HERRAMIENTAS, Asistente, Herramientas, instrucciones
-from app.assistant.llm import ErrorLLM
-from app.contracts.enums import Canal, OrigenCita
-from app.contracts.schemas import AsistenteRequest
+from app.modulos.mensajeria.asistente import agente as ag
+from app.modulos.mensajeria.asistente.agente import (
+    HERRAMIENTAS,
+    Asistente,
+    Herramientas,
+    instrucciones,
+)
+from app.modulos.mensajeria.puertos import ErrorLLM
+from app.nucleo.contracts.enums import Canal, OrigenCita
+from app.nucleo.contracts.schemas import AsistenteRequest
 from tests.conftest import vaciar_tablas
 
 
@@ -45,7 +50,7 @@ def test_instrucciones_incluyen_hora_y_casetas(sim):
 
 
 def test_respaldo_sin_llm(sim):
-    from app.config import get_settings
+    from app.nucleo.config import get_settings
 
     a = Asistente()
     assert get_settings().llm_api_key == "" and a.cliente is None
@@ -77,7 +82,7 @@ def test_sugerir_horario_con_fecha_sin_zona(sim):
 def entorno(esquema_bd):
     vaciar_tablas(esquema_bd)
     from app.main import app
-    from app.sim.servicio import servicio
+    from app.modulos.simulacion.servicio import servicio
 
     with TestClient(app) as c:
         c.post("/api/sim/control", json={"accion": "pause"})
@@ -182,7 +187,7 @@ def test_cliente_gemini_formato(monkeypatch):
 
     import httpx
 
-    from app.assistant.llm import ClienteGemini
+    from app.modulos.mensajeria.adaptadores.gemini import ClienteGemini
 
     capturado = {}
 
@@ -227,7 +232,7 @@ def test_respaldo_si_el_principal_esta_saturado(monkeypatch):
 
     import httpx
 
-    from app.assistant.llm import ClienteGemini
+    from app.modulos.mensajeria.adaptadores.gemini import ClienteGemini
 
     vistos = []
 
@@ -254,7 +259,7 @@ def test_timeout_pasa_al_respaldo_y_luego_falla(monkeypatch):
     import httpx
     import pytest as _pytest
 
-    from app.assistant.llm import ClienteGemini
+    from app.modulos.mensajeria.adaptadores.gemini import ClienteGemini
 
     llamadas = []
 
@@ -274,7 +279,7 @@ def test_error_400_no_usa_respaldo(monkeypatch):
     import httpx
     import pytest as _pytest
 
-    from app.assistant.llm import ClienteGemini
+    from app.modulos.mensajeria.adaptadores.gemini import ClienteGemini
 
     llamadas = []
 
@@ -289,7 +294,7 @@ def test_error_400_no_usa_respaldo(monkeypatch):
 
 
 def test_plantillas(sim):
-    from app.assistant.agente import redactar
+    from app.modulos.mensajeria.asistente.agente import redactar
 
     t = redactar("sugerir_horario", {"opciones": [{"acceso_id": "A2", "caseta": "Caseta Paso del Toro",
                                                    "inicio": "2026-11-12T09:00", "espera_estimada_min": 3.4}]}, sim)
@@ -300,7 +305,7 @@ def test_plantillas(sim):
 
 
 def test_formato_whatsapp():
-    from app.assistant.agente import formato_whatsapp
+    from app.modulos.mensajeria.asistente.agente import formato_whatsapp
 
     assert formato_whatsapp("## Opciones\n1. **07:30** - A1\n__nota__") == "Opciones\n1. *07:30* - A1\n_nota_"
 
@@ -308,3 +313,12 @@ def test_formato_whatsapp():
 def test_request_canal():
     assert AsistenteRequest(canal=Canal.whatsapp, remitente="x", texto="y").canal == "whatsapp"
     assert datetime  # noqa: B018
+
+
+def test_canal_web_desactivado_por_defecto(entorno, monkeypatch):
+    """Sin la bandera, nadie puede hablar con el asistente haciéndose pasar por otro teléfono."""
+    from app.nucleo.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "asistente_web_activo", False)
+    r = entorno[0].post("/api/asistente/mensaje", json={"canal": "web", "remitente": "+522290000001", "texto": "hola"})
+    assert r.status_code == 404

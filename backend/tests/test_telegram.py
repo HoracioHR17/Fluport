@@ -6,10 +6,10 @@ import httpx
 import pytest
 from fastapi.testclient import TestClient
 
-from app.assistant import agente as ag
-from app.config import get_settings
-from app.messaging import bot_telegram as bot
-from app.messaging import telegram
+from app.modulos.mensajeria import bot_telegram as bot
+from app.modulos.mensajeria.adaptadores import telegram
+from app.modulos.mensajeria.asistente import agente as ag
+from app.nucleo.config import get_settings
 from tests.conftest import vaciar_tablas
 
 CHAT = 777000111
@@ -136,7 +136,7 @@ def cliente(esquema_bd):
 
 
 def _sim():
-    from app.sim.servicio import servicio
+    from app.modulos.simulacion.servicio import servicio
 
     return servicio.sim
 
@@ -156,7 +156,7 @@ def test_contacto_ajeno_se_rechaza(cliente, tg_conf, enviados):
 
 
 def test_registro_y_conversacion(cliente, tg_conf, enviados):
-    from app.db.base import SessionLocal
+    from app.nucleo.db.base import SessionLocal
 
     r = cliente.portal.call(bot.procesar_update, _sim(),
                             _msg(contacto={"phone_number": "5212290000888", "user_id": CHAT, "first_name": "Raúl"}))
@@ -176,8 +176,8 @@ def test_registro_y_conversacion(cliente, tg_conf, enviados):
 
 
 def test_aviso_por_telegram(cliente, tg_conf, enviados, monkeypatch):
-    from app.messaging import twilio
-    from app.messaging.servicio import ciclo_avisos
+    from app.modulos.mensajeria.adaptadores import twilio
+    from app.modulos.mensajeria.servicio import ciclo_avisos
 
     whatsapp = []
 

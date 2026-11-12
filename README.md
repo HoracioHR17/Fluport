@@ -19,6 +19,9 @@ Cientos de camiones llegan al puerto todos los días a las mismas horas. Se form
 6. **Vista de agencia:** cada agencia da de alta a sus transportistas, les asigna citas con el pronóstico de espera y supervisa su flota en el mapa, el estado de cada cita (sin confirmar, confirmada, pedida por el chofer, en ruta, cumplida), los avisos y lo que requiere su atención.
 7. **Panel de demostración:** controla la simulación (velocidad y eventos como cierres, buques o norte) y compara el mundo *sin Fluport* con el *con Fluport*: ahorro en horas, diésel, costo y CO₂.
 
+## Arquitectura
+Monolito modular hexagonal: un solo proceso FastAPI dividido en módulos (`simulacion`, `pronostico`, `citas`, `agencias`, `mensajeria`, `publico`) que se comunican por sus servicios y dependen de **puertos** (interfaces) en lugar de tecnologías concretas; el simulador, PostgreSQL, Telegram, WhatsApp y Gemini son **adaptadores** que `app/main.py` conecta. Detalle, diagrama y reglas de dependencia en [`docs/arquitectura.md`](docs/arquitectura.md); las reglas se verifican con pruebas.
+
 ## Cómo usarlo
 **Demo en línea:** _(enlace pendiente)_
 
@@ -584,3 +587,56 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 - **Tecnologías usadas:** las mismas del proyecto.
 
 - **Herramientas de IA:** el equipo analizó el comportamiento del asistente y definió la regla; se apoyó en Claude (Opus 5.5) como asistente para escribir el código y la prueba, que el equipo revisó y aprobó.
+
+### 2026-11-12 00:12 · `#021` · Auditoría y limpieza del proyecto
+
+- **Justificación del cambio:** antes de la entrega, el equipo auditó el código con análisis estático (`ruff`, `vulture`) y una búsqueda de funciones sin referencias, y revisó a mano cada hallazgo para separar el código muerto real de los falsos positivos (rutas de FastAPI, campos de Pydantic, clases CSS generadas en JavaScript).
+
+- **Qué se cambió:**
+
+  | Archivo | Hallazgo | Acción |
+  |---|---|---|
+  | `backend/app/api/_stub.py` | Módulo del esqueleto inicial sin ninguna referencia. | Eliminado. |
+  | `frontend/static/js/tablero.js` → `demo.js` | Desde que la agencia tiene su propio `agencia.js`, la mitad del archivo (agencia, citas, transportistas e invitación) ya no se ejecutaba en ninguna página. | Reescrito como `demo.js` solo con lo del panel de demostración (de 27 a 15 KB). |
+  | `frontend/static/js/comun.js`, `agencia.js`, `demo.js` | `prepararRuta()` y `posicion()` estaban duplicadas en dos archivos. | Movidas a `comun.js` (`F.prepararRuta`, `F.posicion`); `horaMas` deja de exportarse porque solo se usa dentro de `comun.js`. |
+  | `frontend/static/css/app.css` | Reglas de las vistas pública, de agencia y de citas anteriores al rediseño, que ninguna página usa. | Eliminadas; el archivo queda solo para el panel de demostración (de 11 a 8 KB). |
+  | `backend/app/config.py` | `sim_cumplimiento_sugerencia` no se leía en ningún lado (el valor real viene del escenario). | Eliminado. |
+  | `backend/app/api/asistente.py`, `config.py`, `.env.example` | **Punto débil:** `POST /api/asistente/mensaje` no autentica al remitente; en una URL pública cualquiera podría agendar o cancelar citas a nombre de otro teléfono. | Queda desactivado por defecto (`FLUPORT_ASISTENTE_WEB_ACTIVO=false`, responde 404); se activa solo para pruebas locales. Prueba nueva. |
+  | `backend/app/prediction/features.py` | `zip()` sin `strict`: si llegadas y capacidad tuvieran distinto largo, se truncaría sin aviso. | `zip(..., strict=True)`. |
+  | `docs/ejemplo-snapshot.json` | Ejemplo del contrato M0 sin los campos actuales (`flota`, `agencia_id`). | Regenerado desde la simulación. |
+  | `docs/despliegue.md` | — | Indica desactivar el canal web del asistente al publicar. |
+
+- **Hallazgos que se conservan a propósito:** el canal de WhatsApp con Twilio (respaldo documentado en `#016`); la tabla `buque` y el enum `EstadoBuque` (sin uso todavía, reservados para integrar el programa de buques; quitarlos requiere una migración); `diesel_precio_mxn_l` en el escenario (dato de la hoja de Datos que documenta el supuesto de costo); los `print()` de `entrenar.py` e `historico.py` (son scripts de línea de comandos); las importaciones dentro de funciones (evitan importaciones circulares entre la simulación, las citas y la mensajería).
+
+- **Funcionalidad:** sin cambios visibles; el proyecto queda más pequeño y sin código que no se ejecuta, y el despliegue público no expone el canal HTTP del asistente. Verificado en Chrome (panel de demostración, agencia y vista pública sin errores de JavaScript). Pruebas: 170 con PostgreSQL de prueba.
+
+- **Tecnologías usadas:** `ruff` (linter de Python) y `vulture` (detector de código muerto), usados solo para la auditoría; no se agregan al proyecto.
+
+- **Herramientas de IA:** el equipo definió el alcance de la auditoría y decidió qué conservar; se apoyó en Claude (Opus 5.5) como asistente para correr el análisis, clasificar los hallazgos y aplicar la limpieza, que el equipo revisó y aprobó.
+
+### 2026-11-12 00:25 · `#022` · Arquitectura de monolito modular hexagonal
+
+- **Justificación del cambio:** el equipo comparó arquitecturas (monolito en capas, monolito modular hexagonal, microservicios, orientada a eventos, serverless y CQRS) y eligió el **monolito modular hexagonal**: conserva la simplicidad de un solo proceso para la demo y deja fronteras limpias para que, en un entorno real, la simulación se sustituya por datos de las casetas y la mensajería o el pronóstico se extraigan como servicios. El comportamiento no cambia.
+
+- **Qué se cambió:**
+
+  | Antes | Ahora | Por qué |
+  |---|---|---|
+  | `app/config.py`, `app/contracts/`, `app/db/` | `app/nucleo/` (más `colas.py`, `puertos.py`, `dependencias.py`) | Núcleo compartido que no depende de ningún módulo. |
+  | `app/sim/*`, `app/api/sim.py`, `app/api/accesos.py` | `app/modulos/simulacion/` (`dominio/`, `adaptadores/persistencia_pg.py`, `servicio.py`, `historico.py`, `api.py`, `api_accesos.py`) | La simulación es un módulo más y el **adaptador** que implementa el puerto `Operacion`. |
+  | `app/prediction/*`, `app/api/pronostico.py` | `app/modulos/pronostico/` (`dominio/features.py`, `pronosticador.py`, `entrenar.py`, `api.py`) | Módulo de pronóstico; `entrenar_y_cargar()` como gancho. |
+  | `app/citas/servicio.py`, `app/api/citas.py` | `app/modulos/citas/` | Usa el puerto `Operacion` (`acceso_abierto`, `espera_por_agenda`, `tiene_cita`…) en lugar del simulador. |
+  | `app/api/agencias.py` | `app/modulos/agencias/api.py` | Módulo de agencias. |
+  | `app/messaging/*`, `app/assistant/*`, `app/api/asistente.py` | `app/modulos/mensajeria/` (`puertos.py`, `adaptadores/gemini.py`, `telegram.py`, `twilio.py`, `dominio/avisos.py`, `asistente/agente.py`, `servicio.py`, `bot_telegram.py`, `api.py`) | Puertos `ModeloLenguaje` y `CanalMensajeria`; Telegram y WhatsApp se eligen desde un registro de canales (`CANALES`). |
+  | `app/publico/servicio.py`, `app/api/publico.py` | `app/modulos/publico/` | Vista pública sobre el puerto `Operacion`. |
+  | El servicio de simulación importaba citas, mensajería y pronóstico | `Ganchos` en `simulacion/servicio.py`, conectados en `main.py` | La simulación ya no conoce a los demás módulos. |
+  | Las APIs pedían el simulador al servicio de simulación | `nucleo/dependencias.operacion()` y `publicar()` | Los adaptadores de entrada no saben qué implementa la operación. |
+  | `FRANJA_MIN` y las fórmulas de fila en el pronóstico | `nucleo/colas.py` | Las usan simulación, pronóstico y citas sin depender entre sí. |
+  | — | `docs/arquitectura.md`, `backend/tests/test_arquitectura.py` (4 pruebas) | Diagrama, reglas de dependencia y su verificación automática (encontró y se corrigió una dependencia de la vista pública con el dominio del pronóstico). |
+  | — | `tools/bitacora.py` | Lista los commits y las entradas de la bitácora con número provisional, para poner los hashes. |
+
+- **Funcionalidad:** idéntica; API, WebSocket, bot y páginas verificados (las tres páginas sin errores de JavaScript en Chrome, `alembic check` sin diferencias). Comandos nuevos: `python -m app.modulos.simulacion.historico` y `python -m app.modulos.pronostico.entrenar`. Pruebas: 174 con PostgreSQL de prueba.
+
+- **Tecnologías usadas:** `typing.Protocol` (biblioteca estándar) para definir los puertos sin herencia: cualquier clase que tenga los métodos cumple el puerto; `ast` (biblioteca estándar) para que las pruebas lean las importaciones y hagan cumplir las reglas de dependencia.
+
+- **Herramientas de IA:** el equipo eligió la arquitectura y sus reglas; se apoyó en Claude (Opus 5.5) como asistente para mover los archivos, reescribir las importaciones, escribir los puertos, la prueba de arquitectura y la documentación, que el equipo revisó y aprobó.

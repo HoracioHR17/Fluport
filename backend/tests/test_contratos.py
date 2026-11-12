@@ -6,10 +6,12 @@ from pydantic import ValidationError
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.schema import CreateTable
 
-from app.contracts.enums import Semaforo, semaforo_de
-from app.contracts.schemas import CitaCreate, SimControl
-from app.db.base import Base
-from app.db.models import Acceso  # importar los modelos registra las tablas en Base.metadata
+from app.nucleo.contracts.enums import Semaforo, semaforo_de
+from app.nucleo.contracts.schemas import CitaCreate, SimControl
+from app.nucleo.db.base import Base
+from app.nucleo.db.models import (
+    Acceso,  # importar los modelos registra las tablas en Base.metadata
+)
 
 T = datetime(2026, 11, 12, 10, tzinfo=timezone(timedelta(hours=-6)))
 

@@ -5,7 +5,7 @@ import math
 import pytest
 from pydantic import ValidationError
 
-from app.sim.escenario import RUTA_ESCENARIO, Escenario
+from app.modulos.simulacion.dominio.escenario import RUTA_ESCENARIO, Escenario
 
 
 def _datos():

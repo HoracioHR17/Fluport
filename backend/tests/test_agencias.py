@@ -6,11 +6,11 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from app.contracts.enums import EstadoCamion, Mundo, TipoCarga, TipoEventoSim
-from app.contracts.schemas import EventoCreate
-from app.messaging import bot_telegram as bot
-from app.messaging import telegram
-from app.publico.servicio import zonas
+from app.modulos.mensajeria import bot_telegram as bot
+from app.modulos.mensajeria.adaptadores import telegram
+from app.modulos.publico.servicio import zonas
+from app.nucleo.contracts.enums import EstadoCamion, Mundo, TipoCarga, TipoEventoSim
+from app.nucleo.contracts.schemas import EventoCreate
 from tests.conftest import vaciar_tablas
 
 TEL = "+522290007001"
@@ -93,7 +93,7 @@ def test_cita_de_agencia_y_filtros(cliente):
     assert cliente.get("/api/citas/resumen?agencia_id=AG02").json()["total"] == 0
     assert cliente.get("/api/avisos?agencia_id=AG01").status_code == 200
     # el camión de la cita aparece en la simulación como de la agencia
-    from app.sim.servicio import servicio
+    from app.modulos.simulacion.servicio import servicio
 
     assert servicio.sim.citas[cita["id"]].agencia_id == "AG01"
 
@@ -125,8 +125,8 @@ def test_alta_de_transportista(cliente):
 
 
 def test_bot_solo_vincula_numeros_dados_de_alta(cliente, monkeypatch):
-    from app.db.base import SessionLocal
-    from app.sim.servicio import servicio
+    from app.modulos.simulacion.servicio import servicio
+    from app.nucleo.db.base import SessionLocal
 
     async def falso(chat_id, texto, teclado=None):
         return True, "1"
@@ -150,10 +150,10 @@ def test_bot_solo_vincula_numeros_dados_de_alta(cliente, monkeypatch):
 
 
 def test_cita_asignada_se_confirma_o_rechaza_en_el_bot(cliente, monkeypatch):
-    from app.db.base import SessionLocal
-    from app.db.models import Aviso, Cita
-    from app.messaging.servicio import notificar_asignacion
-    from app.sim.servicio import servicio
+    from app.modulos.mensajeria.servicio import notificar_asignacion
+    from app.modulos.simulacion.servicio import servicio
+    from app.nucleo.db.base import SessionLocal
+    from app.nucleo.db.models import Aviso, Cita
 
     enviados = []
 
@@ -162,7 +162,7 @@ def test_cita_asignada_se_confirma_o_rechaza_en_el_bot(cliente, monkeypatch):
         return True, "1"
 
     monkeypatch.setattr(telegram, "enviar", falso)
-    from app.config import get_settings
+    from app.nucleo.config import get_settings
 
     monkeypatch.setattr(get_settings(), "telegram_token", "123:ABC")
     sim, chat = servicio.sim, 888000222

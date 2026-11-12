@@ -1,11 +1,10 @@
-/* Fluport · estilos de las pantallas (usa tokens.css) */
+/* Fluport · estilos del panel de demostración (/demo/). Las vistas pública y de agencia usan ui.css. */
 * { box-sizing: border-box; }
 body { margin: 0; min-height: 100vh; }
 a { color: var(--abismo); }
 a:hover { color: #1d4a73; }
 button, select, input { font-family: var(--fuente); }
 .oculto { display: none !important; }
-.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .tenue { color: #4A5B6B; }
 .cifra { font-weight: 700; font-variant-numeric: tabular-nums; }
 
@@ -107,46 +106,8 @@ h1.titulo-seccion { font-size: 28px; }
 .kpis { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 12px; }
 .kpis dd { margin: 2px 0 0; font-size: 24px; }
 
-/* ---------- Citas ---------- */
-.estados { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
-.estados > div { background: #FFFFFF; border-radius: 10px; padding: 14px; font-size: 14px; }
-.estados b { display: block; font-size: 28px; font-variant-numeric: tabular-nums; }
-.tabla-caja { overflow-x: auto; background: #FFFFFF; border-radius: 10px; }
-.tabla { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 640px; }
-.tabla th { text-align: left; padding: 12px 14px; font-size: 13px; color: #4A5B6B; }
-.tabla td { padding: 12px 14px; border-top: 1px solid #EEF2F5; }
-.pastilla { background: var(--bruma); border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 700; white-space: nowrap; }
-.formulario { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; align-items: end; }
-.sugerencias { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
-.sugerencia { background: #FFFFFF; border-radius: 10px; padding: 14px; display: flex; flex-direction: column; gap: 8px; }
-
-/* ---------- Vista pública ---------- */
-.publico { max-width: 560px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
-.publico__cab { display: flex; justify-content: space-between; align-items: center; }
-.publico h1 { margin: 0; font-size: 28px; line-height: 1.15; }
-.zona { border-radius: 14px; padding: 16px; gap: 12px; }
-.zona__espera { font-size: 36px; }
-.zona__detalle { background: var(--bruma); border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
-
-/* ---------- Agencia ---------- */
-.flota { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-.flota > div { background: var(--bruma); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
-.flota b { display: block; font-size: 24px; }
-.invitacion { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
-.qr { background: #FFFFFF; padding: 8px; border-radius: 8px; line-height: 0; flex-shrink: 0; }
-.qr svg { width: 132px; height: 132px; }
-
-/* ---------- Vista pública: contingencia y bot ---------- */
-.alerta { background: #FBEAE8; color: var(--abismo); border-left: 4px solid #D9574B; border-radius: 10px; padding: 12px 14px; font-size: 15px; font-weight: 700; }
-.cta-bot { flex-direction: row; justify-content: space-between; align-items: center; gap: 16px; border-radius: 14px; }
-.cta-bot .boton { align-self: flex-start; margin-top: 4px; }
-.contingencia { font-size: 14px; font-weight: 700; border-radius: 8px; padding: 6px 10px; align-self: flex-start; }
-.contingencia--normal { background: #EAF6F0; } .contingencia--lenta { background: #FCF3DF; }
-.contingencia--saturada, .contingencia--cerrada { background: #FBEAE8; }
-
 @media (max-width: 640px) {
   .encabezado__in, .principal { padding-left: 16px; padding-right: 16px; }
   .reloj { text-align: left; }
   .mapa { height: 360px; }
-  .cta-bot { flex-direction: column; align-items: flex-start; }
 }

@@ -3,9 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from app.contracts.enums import Mundo, TipoEventoSim
-from app.contracts.schemas import EventoCreate
-from app.prediction.features import (
+from app.modulos.pronostico.dominio.features import (
     COLUMNAS,
     HORIZONTES,
     capacidad_franja,
@@ -13,7 +11,9 @@ from app.prediction.features import (
     espera_de_fila,
     proyeccion_fluida,
 )
-from app.prediction.pronosticador import VERSION_RESPALDO, Pronosticador
+from app.modulos.pronostico.pronosticador import VERSION_RESPALDO, Pronosticador
+from app.nucleo.contracts.enums import Mundo, TipoEventoSim
+from app.nucleo.contracts.schemas import EventoCreate
 
 
 def test_proyeccion_fluida():
@@ -76,7 +76,7 @@ def test_entrenamiento_corto_y_prediccion(sim, tmp_path):
     """Entrena con pocos días en un archivo temporal (no toca backend/modelos/)."""
     import joblib
 
-    from app.prediction.entrenar import entrenar
+    from app.modulos.pronostico.entrenar import entrenar
 
     ruta = tmp_path / "m.joblib"
     met = entrenar(dias=3, semilla=5, persistir=False, ruta=ruta)

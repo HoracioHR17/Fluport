@@ -1,12 +1,12 @@
-"""Entorno de Alembic: toma la URL de app.config y el metadata de los modelos."""
+"""Entorno de Alembic: toma la URL de app.nucleo.config y el metadata de los modelos."""
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from app.config import get_settings
-from app.db import models  # noqa: F401  (registra las tablas en el metadata)
-from app.db.base import Base
+from alembic import context
+from app.nucleo.config import get_settings
+from app.nucleo.db import models  # noqa: F401  (registra las tablas en el metadata)
+from app.nucleo.db.base import Base
 
 config = context.config
 config.set_main_option("sqlalchemy.url", get_settings().database_url)

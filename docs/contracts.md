@@ -1,7 +1,7 @@
 # Fluport — Contratos (M0)
 
 > Congelados. Cualquier cambio requiere aprobación del desarrollador, una nueva migración Alembic y una entrada en la bitácora.
-> Fuente de verdad en código: `backend/app/contracts/` (enums + schemas) y `backend/app/db/models.py`.
+> Fuente de verdad en código: `backend/app/nucleo/contracts/` (enums + schemas) y `backend/app/nucleo/db/models.py`.
 > Especificación completa: `docs/openapi.json` (también en `/docs` con la app corriendo). Ejemplo de mensaje WS: `docs/ejemplo-snapshot.json`.
 
 ## 1. Convenciones
@@ -112,7 +112,9 @@ Herramientas:
 
 ## 6. Estructura del repo
 ```
-backend/app/{api,sim,prediction,assistant,messaging,db,contracts}   # un agente por carpeta
+backend/app/main.py                                                 # raíz de composición
+backend/app/nucleo/{config,colas,puertos,dependencias,contracts,db} # núcleo compartido
+backend/app/modulos/{simulacion,pronostico,citas,agencias,mensajeria,publico}  # ver docs/arquitectura.md
 backend/alembic/                                                    # migraciones
 frontend/{agencia,demo,publico,static/{js,css,vendor}}              # sin build, sin npm
 docs/                                                               # contratos, openapi, ejemplos

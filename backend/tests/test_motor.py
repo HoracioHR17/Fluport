@@ -1,8 +1,14 @@
 """Motor: mundos A/B con la misma demanda, eventos, KPIs y snapshots."""
 import pytest
 
-from app.contracts.enums import Clima, EstadoAcceso, Mundo, TipoCarga, TipoEventoSim
-from app.contracts.schemas import EventoCreate, SimSnapshot
+from app.nucleo.contracts.enums import (
+    Clima,
+    EstadoAcceso,
+    Mundo,
+    TipoCarga,
+    TipoEventoSim,
+)
+from app.nucleo.contracts.schemas import EventoCreate, SimSnapshot
 from tests.conftest import INICIO
 
 
@@ -15,7 +21,7 @@ def test_ambos_mundos_reciben_la_misma_demanda(sim):
 
 
 def test_fluport_reduce_la_espera_en_un_dia_congestionado(esc):
-    from app.sim.motor import Simulador
+    from app.modulos.simulacion.dominio.motor import Simulador
 
     esc.cumplimiento_sugerencia, esc.con_cita = 1.0, 1.0  # todos agendan y siguen la sugerencia
     s = Simulador(esc, 3, INICIO, eventos_auto=False)

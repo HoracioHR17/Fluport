@@ -26,7 +26,7 @@ def test_paginas(cliente, ruta, texto):
 
 
 @pytest.mark.parametrize("ruta", [
-    "/static/css/tokens.css", "/static/css/app.css", "/static/js/comun.js", "/static/js/tablero.js",
+    "/static/css/tokens.css", "/static/css/app.css", "/static/js/comun.js", "/static/js/demo.js",
     "/static/js/publico.js", "/static/vendor/leaflet/leaflet.js", "/static/vendor/leaflet/leaflet.css",
     "/static/favicon.svg", "/static/vendor/qrcode/qrcode.js", "/static/js/agencia.js", "/static/css/ui.css",
 ])

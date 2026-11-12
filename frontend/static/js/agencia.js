@@ -139,24 +139,6 @@
   }
 
   // ───────────── Flota ─────────────
-  function prepararRuta(coords) {
-    var acum = [0];
-    for (var i = 1; i < coords.length; i++) {
-      var dy = coords[i][0] - coords[i - 1][0], dx = coords[i][1] - coords[i - 1][1];
-      acum.push(acum[i - 1] + Math.sqrt(dx * dx + dy * dy));
-    }
-    return { coords: coords, acum: acum, total: acum[acum.length - 1] || 1 };
-  }
-  function posicion(r, p) {
-    var d = Math.max(0, Math.min(1, p)) * r.total;
-    for (var i = 1; i < r.acum.length; i++) {
-      if (d <= r.acum[i]) {
-        var t = (d - r.acum[i - 1]) / ((r.acum[i] - r.acum[i - 1]) || 1), a = r.coords[i - 1], b = r.coords[i];
-        return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])];
-      }
-    }
-    return r.coords[r.coords.length - 1];
-  }
   function iconoCaseta(id, a) {
     var cerrada = a && a.estado === "cerrado";
     var texto = (cerrada ? "" : (a && a.semaforo === "rojo" ? "▲ " : "● ")) + nombreCaseta(id) + " · " + (cerrada ? "cerrada" : F.num(a ? a.espera_min : 0) + " min");
@@ -224,7 +206,7 @@
         if (!r) return;
         var p = c.progreso;
         if (c.estado === "en_fila") { fila[c.acceso_id] = (fila[c.acceso_id] || 0) + 1; p = Math.max(0.55, 1 - 0.006 * fila[c.acceso_id]); }
-        var pos = posicion(r, p), st = estiloCamion(c, c.id === estado.seleccion);
+        var pos = F.posicion(r, p), st = estiloCamion(c, c.id === estado.seleccion);
         vistos[c.id] = true;
         if (m.camiones[c.id]) { m.camiones[c.id].setLatLng(pos); m.camiones[c.id].setStyle(st); }
         else m.camiones[c.id] = L.circleMarker(pos, Object.assign({ interactive: false }, st)).addTo(m.mapa);
@@ -463,7 +445,7 @@
       $("mapa") ? F.api("/api/accesos/rutas") : Promise.resolve({ features: [] })]);
     res[0].forEach(function (a) { estado.accesos[a.id] = a; if ($("cita-caseta")) $("cita-caseta").appendChild(el("option", { value: a.id }, a.nombre)); });
     res[2].features.filter(function (f) { return f.properties.tipo === "ruta"; }).forEach(function (f) {
-      estado.rutas[f.properties.ruta_id] = prepararRuta(f.geometry.coordinates.map(function (c) { return [c[1], c[0]]; }));
+      estado.rutas[f.properties.ruta_id] = F.prepararRuta(f.geometry.coordinates.map(function (c) { return [c[1], c[0]]; }));
     });
     estado.agencias = res[1];
     if (!estado.agencias.length) throw new Error("no hay agencias registradas");

@@ -1,9 +1,9 @@
 """Mundo de simulación: ciclo de vida del camión, prioridad, cierres y desvíos."""
 import random
 
-from app.contracts.enums import EstadoAcceso, EstadoCamion, Mundo, TipoCarga
-from app.sim.demanda import crear_camion
-from app.sim.mundo import MundoSim
+from app.modulos.simulacion.dominio.demanda import crear_camion
+from app.modulos.simulacion.dominio.mundo import MundoSim
+from app.nucleo.contracts.enums import EstadoAcceso, EstadoCamion, Mundo, TipoCarga
 
 
 def _camion(esc, id_, t, acceso="A1", **kw):

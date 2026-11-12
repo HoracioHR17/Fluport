@@ -1,4 +1,9 @@
-"""Punto de entrada: una sola app FastAPI sirve API, WebSocket y frontend estático."""
+"""Raíz de composición: arma la aplicación y conecta los módulos con sus adaptadores.
+
+Una sola app FastAPI sirve la API, el WebSocket y el frontend estático (monolito modular). Aquí, y solo aquí, se
+decide qué implementa cada puerto: la operación del puerto es el simulador; los ganchos de la simulación llaman a
+citas, mensajería y pronóstico.
+"""
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -9,15 +14,36 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.api import accesos, agencias, asistente, citas, pronostico, publico, sim
-from app.config import get_settings
-from app.contracts.enums import EstadoSim
-from app.contracts.schemas import Salud
-from app.db.base import engine
-from app.messaging.bot_telegram import polling
-from app.sim.servicio import SimNoIniciada, servicio
+from app.modulos.agencias import api as agencias
+from app.modulos.citas import api as citas
+from app.modulos.citas.servicio import reinyectar_desde_bd, sincronizar_desde_operacion
+from app.modulos.mensajeria import api as asistente
+from app.modulos.mensajeria.bot_telegram import polling
+from app.modulos.mensajeria.servicio import ciclo_avisos
+from app.modulos.pronostico import api as pronostico
+from app.modulos.pronostico.pronosticador import entrenar_y_cargar, pronosticador
+from app.modulos.publico import api as publico
+from app.modulos.simulacion import api as sim
+from app.modulos.simulacion import api_accesos as accesos
+from app.modulos.simulacion.servicio import Ganchos, SimNoIniciada, servicio
+from app.nucleo import dependencias
+from app.nucleo.config import get_settings
+from app.nucleo.contracts.enums import EstadoSim, Mundo
+from app.nucleo.contracts.schemas import Salud
+from app.nucleo.db.base import engine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+# ───────────── Puertos → adaptadores ─────────────
+dependencias.configurar(operacion=servicio.requerir, publicar=servicio.publicar)
+servicio.ganchos = Ganchos(
+    citas_por_reinyectar=reinyectar_desde_bd,
+    sincronizar_citas=sincronizar_desde_operacion,
+    ciclo_avisos=ciclo_avisos,
+    pronostico=lambda sim: pronosticador.obtener(sim, Mundo.B),
+    hay_modelo=lambda: pronosticador.paquete is not None,
+    entrenar_modelo=entrenar_y_cargar,
+)
 
 VERSION = "0.1.0"
 FRONTEND = Path(__file__).resolve().parents[2] / "frontend"

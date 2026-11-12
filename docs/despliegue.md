@@ -69,7 +69,7 @@ Opcional, para que el túnel arranque solo: `sudo cloudflared --config ~/.cloudf
 
 - Desactiva la suspensión automática (Configuración → Energía) y deja el cargador conectado.
 - Ten un hotspot del celular como respaldo de internet.
-- En `backend/.env`: `FLUPORT_TELEGRAM_MODO=polling` y `FLUPORT_TELEGRAM_SOLO_REGISTRADOS=true`.
+- En `backend/.env`: `FLUPORT_TELEGRAM_MODO=polling`, `FLUPORT_TELEGRAM_SOLO_REGISTRADOS=true` y `FLUPORT_ASISTENTE_WEB_ACTIVO=false` (el canal HTTP del asistente no autentica al remitente).
 
 ## 6. Proteger el panel de demostración y el de agencias (recomendado, gratis)
 

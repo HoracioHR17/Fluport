@@ -4,10 +4,10 @@ from datetime import timedelta
 import pytest
 from fastapi.testclient import TestClient
 
-from app.citas import servicio as citas
-from app.citas.servicio import ErrorCita, normalizar_telefono
-from app.contracts.enums import Mundo, TipoCarga, TipoEventoSim
-from app.contracts.schemas import EventoCreate, SugerenciaRequest
+from app.modulos.citas import servicio as citas
+from app.modulos.citas.servicio import ErrorCita, normalizar_telefono
+from app.nucleo.contracts.enums import Mundo, TipoCarga, TipoEventoSim
+from app.nucleo.contracts.schemas import EventoCreate, SugerenciaRequest
 from tests.conftest import INICIO, vaciar_tablas
 
 TEL = "whatsapp:+52 229 000 0001"
@@ -102,7 +102,7 @@ def _crear(c, horas=2.0, acceso="A1", tipo="contenedor_40", tel=TEL):
 
 
 def test_crear_cita(cliente):
-    from app.sim.servicio import servicio
+    from app.modulos.simulacion.servicio import servicio
 
     r = _crear(cliente)
     assert r.status_code == 201, r.text
@@ -145,7 +145,7 @@ def test_reprogramar(cliente):
 
 
 def test_cancelar(cliente):
-    from app.sim.servicio import servicio
+    from app.modulos.simulacion.servicio import servicio
 
     cita = _crear(cliente, horas=4).json()
     r = cliente.delete(f"/api/citas/{cita['id']}")
@@ -166,8 +166,8 @@ def test_sugerencias_api(cliente):
 
 
 def test_cumplimiento(cliente):
-    from app.db.base import SessionLocal
-    from app.sim.servicio import servicio
+    from app.modulos.simulacion.servicio import servicio
+    from app.nucleo.db.base import SessionLocal
 
     cita = _crear(cliente, horas=0.6, acceso="A2").json()
     servicio.avanzar_minutos(150)
@@ -180,7 +180,7 @@ def test_cumplimiento(cliente):
 
 
 def test_reset_reinyecta_citas_activas(cliente):
-    from app.sim.servicio import servicio
+    from app.modulos.simulacion.servicio import servicio
 
     cita = _crear(cliente, horas=2).json()
     cliente.post("/api/sim/control", json={"accion": "reset", "semilla": 3})

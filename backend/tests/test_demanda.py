@@ -2,8 +2,14 @@
 import random
 from collections import Counter
 
-from app.contracts.enums import TipoCarga
-from app.sim.demanda import MIN_DIA, crear_camion, demanda_dia, ola_buque, poisson
+from app.modulos.simulacion.dominio.demanda import (
+    MIN_DIA,
+    crear_camion,
+    demanda_dia,
+    ola_buque,
+    poisson,
+)
+from app.nucleo.contracts.enums import TipoCarga
 
 
 def test_misma_semilla_y_dia_dan_la_misma_demanda(esc):
