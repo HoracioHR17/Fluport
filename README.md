@@ -141,7 +141,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo diseñó e implementó el simulador y su API, y lo verificó: corridas de 3 días con dos semillas, cierre y reapertura de acceso (en A la fila crece en el acceso cerrado; en B los camiones se desvían), inyección de una cita de demo, servidor en vivo con cliente WebSocket (snapshots, eventos, pausa que congela el reloj, reset sin perder la conexión), errores 422 y escritura de lecturas y eventos en PostgreSQL 16. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 17:20 · `#003` · Datos del puerto integrados al simulador
+### 2026-11-11 17:20 · `8e7dbea` · Datos del puerto integrados al simulador
 
 - **Qué se agregó:**
 
@@ -164,7 +164,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo leyó la hoja de datos, convirtió cada valor al formato del escenario, adaptó el modelo a los datos nuevos (cita, revisión aduanal, buques Poisson, costo por hora) y calibró con 8 semillas de 7 días contra la hoja «Validación»; verificó la API en vivo (casetas, evento norte con factor 1.43 y KPIs). Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 17:30 · `#004` · M2 Pronóstico de congestión a 12 horas
+### 2026-11-11 17:30 · `8e7dbea` · M2 Pronóstico de congestión a 12 horas
 
 - **Qué se agregó:**
 
@@ -194,7 +194,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo diseñó las variables y el esquema de entrenamiento, comparó variantes (predicción directa vs. residuo, 14 vs. 28 días) en 4 semillas de prueba, implementó el pronóstico en vivo y lo verificó con el servidor corriendo: arranque sin modelo, entrenamiento automático, cambio de versión, reacción al cierre de un acceso, error 404 y escritura de pronósticos en PostgreSQL. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 17:45 · `#005` · Suite de pruebas automáticas y corrección de dos errores
+### 2026-11-11 17:45 · `8e7dbea` · Suite de pruebas automáticas y corrección de dos errores
 
 - **Qué se agregó:**
 
@@ -226,7 +226,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo diseñó y escribió las pruebas, detectó con ellas los dos errores, los corrigió y verificó que las 75 pasan y que la calibración del simulador no cambió. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 17:50 · `#006` · Plan de diseño y semáforo alineado a la identidad visual
+### 2026-11-11 17:50 · `6ab12f1` · Plan de diseño y semáforo alineado a la identidad visual
 
 - **Qué se agregó:**
 
@@ -248,7 +248,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo extrajo del documento de identidad solo lo relativo al diseño, lo tradujo a tokens CSS y a la correspondencia con la API, alineó los umbrales del backend y verificó las pruebas. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 18:15 · `#007` · M3 Citas: sugerir, agendar, reprogramar, cancelar y medir cumplimiento
+### 2026-11-11 18:15 · `1aa348a` · M3 Citas: sugerir, agendar, reprogramar, cancelar y medir cumplimiento
 
 - **Qué se agregó:**
 
@@ -276,7 +276,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo diseñó e implementó el flujo de citas y su integración con el simulador y el pronóstico, escribió 15 pruebas nuevas, verificó las 90 con PostgreSQL de prueba y el flujo completo con el servidor en vivo. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 18:25 · `#008` · M7 API pública para vecinos
+### 2026-11-11 18:25 · `321958f` · M7 API pública para vecinos
 
 - **Qué se agregó:**
 
@@ -297,7 +297,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo diseñó e implementó la vista pública, amplió el contrato con los campos que necesita la pantalla y escribió 5 pruebas, incluida una de privacidad de la respuesta. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 18:50 · `#009` · M6 y M7 Frontend: tablero del operador y vista pública
+### 2026-11-11 18:50 · `0d1292c` · M6 y M7 Frontend: tablero del operador y vista pública
 
 - **Qué se agregó:**
 
@@ -328,7 +328,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo diseñó las pantallas (lienzo de diseño aprobado), las implementó en HTML, CSS y JavaScript conectadas a la API, las probó en Chrome automatizado en escritorio y celular, corrigió tres defectos encontrados (logotipo duplicado, horas en UTC, porcentaje engañoso al arrancar) y escribió 11 pruebas. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 18:55 · `#010` · M4 Asistente de citas con Gemini
+### 2026-11-11 18:55 · `99bab75` · M4 Asistente de citas con Gemini
 
 - **Qué se agregó:**
 
@@ -356,7 +356,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo consultó la documentación vigente de Gemini (formato REST, firmas de pensamiento, modelos estables), diseñó el asistente y sus herramientas, lo probó con un LLM simulado (14 pruebas) y corrigió con ellas la duplicación de teléfonos `+521`/`+52`. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 19:05 · `#011` · Ajustes del asistente tras la primera prueba con Gemini real
+### 2026-11-11 19:05 · `99bab75` · Ajustes del asistente tras la primera prueba con Gemini real
 
 - **Qué se agregó:**
 
@@ -372,7 +372,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo analizó la respuesta real de Gemini, ajustó instrucciones y orden de sugerencias, y agregó la prueba correspondiente. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 19:10 · `#012` · Asistente más rápido y robusto
+### 2026-11-11 19:10 · `99bab75` · Asistente más rápido y robusto
 
 - **Qué se agregó:**
 
@@ -391,7 +391,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo diagnosticó el tiempo agotado a partir del log del servidor, consultó la documentación de Gemini sobre niveles de razonamiento e implementó y probó los ajustes. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 19:20 · `#013` · Asistente: una sola llamada a Gemini por mensaje
+### 2026-11-11 19:20 · `99bab75` · Asistente: una sola llamada a Gemini por mensaje
 
 - **Qué se agregó:**
 
@@ -427,7 +427,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo diseñó la prueba de diagnóstico que aisló el problema (petición directa a Gemini fuera del servidor), implementó el respaldo y sus pruebas. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 19:35 · `#015` · M5 WhatsApp con Twilio y avisos proactivos
+### 2026-11-11 19:35 · `7580f6e` · M5 WhatsApp con Twilio y avisos proactivos
 
 - **Qué se agregó:**
 
@@ -525,7 +525,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo propuso el flujo por actores, implementó las agencias en la simulación, la base de datos, la API, el bot y las tres vistas, generó y verificó la migración, y escribió 10 pruebas nuevas. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 23:20 · `#018` · Rediseño de las vistas pública y de agencia, y flujo real de alta y asignación de citas
+### 2026-11-11 23:20 · `8881d80` · Rediseño de las vistas pública y de agencia, y flujo real de alta y asignación de citas
 
 - **Justificación del cambio:** el diseño del lienzo "Fluport · Rediseño de interfaces y flujo real" propone una navegación más limpia y un flujo de operación como el de un entorno real: la agencia da de alta a sus transportistas, les asigna citas y ellos las confirman desde Telegram; la agencia ve en todo momento en qué va cada cita. Esta entrada lleva ese diseño a la aplicación y agrega las piezas del flujo que caben antes de la demo. Quedan pendientes el inicio de sesión por agencia, el alta de agencias desde un panel de administración y la aprobación formal de las citas que pide un chofer.
 
@@ -549,7 +549,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo diseñó las vistas y el flujo en un lienzo de diseño, los llevó a la aplicación, implementó el alta, la asignación y la confirmación de citas, generó y verificó la migración, revisó las páginas en Chrome a tres tamaños de pantalla y escribió 3 pruebas nuevas. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 23:55 · `#019` · Panel de agencia dividido en pantallas por función, adaptable a celular
+### 2026-11-11 23:55 · `3c2efef` · Panel de agencia dividido en pantallas por función, adaptable a celular
 
 - **Justificación del cambio:** el panel de agencia concentraba todo en una sola página larga. Siguiendo el lienzo "Fluport · Panel de agencia por pantallas", cada función tiene ahora su propia pantalla y el resumen funciona como punto de partida que lleva a cada una. La navegación es más clara y cada pantalla carga solo lo que necesita (el mapa, por ejemplo, solo en Flota).
 
@@ -569,7 +569,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo diseñó las pantallas en un lienzo de diseño, las llevó a la aplicación, revisó cada una en Chrome a dos tamaños de pantalla y corrigió los desbordes encontrados. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-12 00:05 · `#020` · Sugerencia de horarios cuando el transportista no indica hora
+### 2026-11-12 00:05 · `08f7cc3` · Sugerencia de horarios cuando el transportista no indica hora
 
 - **Justificación del cambio:** el equipo detectó que el asistente no tenía una regla para cuando el transportista pide una cita sin decir la hora (podía preguntarla o escoger por su cuenta). Se decide que, sin hora, Fluport busque en todo el horizonte del pronóstico y ofrezca de inmediato las tres llegadas con menor espera, priorizando la más próxima cuando las esperas son similares.
 
@@ -588,7 +588,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo analizó el comportamiento del asistente y definió la regla; se apoyó en Claude (Opus 5.5) como asistente para escribir el código y la prueba, que el equipo revisó y aprobó.
 
-### 2026-11-12 00:12 · `#021` · Auditoría y limpieza del proyecto
+### 2026-11-12 00:12 · `339bdd3` · Auditoría y limpieza del proyecto
 
 - **Justificación del cambio:** antes de la entrega, el equipo auditó el código con análisis estático (`ruff`, `vulture`) y una búsqueda de funciones sin referencias, y revisó a mano cada hallazgo para separar el código muerto real de los falsos positivos (rutas de FastAPI, campos de Pydantic, clases CSS generadas en JavaScript).
 
@@ -614,7 +614,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo definió el alcance de la auditoría y decidió qué conservar; se apoyó en Claude (Opus 5.5) como asistente para correr el análisis, clasificar los hallazgos y aplicar la limpieza, que el equipo revisó y aprobó.
 
-### 2026-11-12 00:25 · `#022` · Arquitectura de monolito modular hexagonal
+### 2026-11-12 00:25 · `339bdd3` · Arquitectura de monolito modular hexagonal
 
 - **Justificación del cambio:** el equipo comparó arquitecturas (monolito en capas, monolito modular hexagonal, microservicios, orientada a eventos, serverless y CQRS) y eligió el **monolito modular hexagonal**: conserva la simplicidad de un solo proceso para la demo y deja fronteras limpias para que, en un entorno real, la simulación se sustituya por datos de las casetas y la mensajería o el pronóstico se extraigan como servicios. El comportamiento no cambia.
 
