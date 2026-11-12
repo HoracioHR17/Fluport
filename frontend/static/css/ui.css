@@ -383,3 +383,14 @@ a:hover { color: #13324F; }
   .grafica-barras__eje, .grafica-barras__in { height: 220px; }
 }
 @media (max-width: 380px) { .pub-estado .entradas { grid-template-columns: 1fr; } }
+
+/* Asignar cita desde la línea de tiempo (modal) */
+.modal { border: none; border-radius: 16px; padding: 24px; width: min(440px, calc(100% - 32px)); max-height: calc(100vh - 48px);
+  overflow: auto; box-shadow: 0 24px 64px rgba(10, 34, 56, .28); }
+.modal::backdrop { background: rgba(10, 34, 56, .45); }
+.modal .cabeza { margin-bottom: 4px; }
+.linea-tiempo__citas { cursor: pointer; }
+.linea-tiempo__citas:hover { box-shadow: inset 0 0 0 999px rgba(10, 34, 56, .04); }
+.linea-tiempo__guia { position: absolute; top: 0; bottom: 0; width: 2px; background: #0A2238; opacity: .35; pointer-events: none; }
+/* una sola agencia: el selector vacío no se muestra mientras carga */
+.ag-menu__agencia select:empty { display: none; }

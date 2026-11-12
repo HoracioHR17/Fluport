@@ -1002,3 +1002,23 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 - **Tecnologías usadas:** sin tecnologías nuevas. SimPy, FastAPI y Pydantic se usan como en entradas anteriores.
 
 - **Herramientas de IA:** el equipo decidió el alcance (quitar el mundo sin Fluport del código); se apoyó en Claude (Opus 5.5) como asistente para aplicar el cambio en motor, contratos, pronóstico, panel y pruebas, que el equipo revisó y aprobó.
+
+### 2026-11-12 10:10 · `#005` · Asignar citas desde la línea de tiempo (modal)
+
+- **Justificación del cambio:** el equipo quiso que la agencia eligiera el horario directamente sobre la línea de tiempo de cada caseta, en lugar de usar un formulario lateral. También quiso que el selector de agencia no apareciera mientras carga el panel.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `frontend/agencia/citas/index.html` | El formulario "Asignar cita" pasa a un `<dialog>` modal; la línea de tiempo ocupa todo el ancho; botón "Asignar cita" en la cabecera. | Se conservan los mismos campos (transportista, carga, caseta, desde, hasta) y la lista de sugerencias. |
+  | `frontend/static/js/agencia.js` | `abrirAsignar` y clic en la pista de cada caseta. | El punto tocado se convierte en hora (franja de 30 min, nunca en el pasado). Abre el modal con esa caseta y una ventana de 1 h, y busca de inmediato las mejores ventanas. Al asignar, el modal se cierra solo. Los enlaces `/agencia/citas/#asignar` de otras pantallas abren el modal. |
+  | `frontend/static/css/ui.css` | Estilos `.modal`, cursor y resaltado de la pista; selector de agencia oculto mientras está vacío. | — |
+
+- **Funcionalidad:** en `/agencia/citas` se toca un horario sobre la línea de una caseta y aparece el modal con las mejores ventanas para esa caseta y hora; se elige una y se asigna. El transportista recibe el aviso por su canal (Telegram o SMS).
+
+- **Tecnologías usadas:**
+  - Elemento `<dialog>` de HTML con `showModal()`: modal nativo del navegador, con fondo bloqueado, cierre con Esc y foco atrapado, sin librerías. Se eligió por accesibilidad y porque no agrega dependencias.
+  - `getBoundingClientRect()`: convierte la posición del clic en la pista en una hora de la ventana de 12 h que muestra la línea.
+
+- **Herramientas de IA:** el equipo definió la interacción; se apoyó en Claude (Opus 5.5) como asistente para escribir el modal, la conversión de clic a horario y los estilos, que el equipo revisó y aprobó.

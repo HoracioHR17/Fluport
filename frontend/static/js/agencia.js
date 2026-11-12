@@ -539,7 +539,12 @@
         el("div", { class: "linea-tiempo__nombre" }, [F.simbolo(e, 18), el("span", {}, nombreCaseta(id))]),
         el("div", { class: "linea-tiempo__pista" }, [
           el("div", { class: "linea-tiempo__calor", role: "img", "aria-label": "Espera pronosticada en " + nombreCaseta(id) }, calor),
-          el("div", { class: "linea-tiempo__citas", style: { height: alto + "px" } }, [el("div", { class: "linea-tiempo__ahora", style: { left: pct(ahora) + "%" }, "aria-hidden": "true" })].concat(bloques))
+          el("div", { class: "linea-tiempo__citas", style: { height: alto + "px" }, title: "Toca para asignar una cita en " + nombreCaseta(id),
+            onclick: function (ev) { // un toque en la pista abre el modal con esa caseta y ese horario
+              if (ev.target.closest(".bloque-cita")) return;
+              var r = ev.currentTarget.getBoundingClientRect();
+              abrirAsignar(id, ini + (ev.clientX - r.left) / r.width * (fin - ini));
+            } }, [el("div", { class: "linea-tiempo__ahora", style: { left: pct(ahora) + "%" }, "aria-hidden": "true" })].concat(bloques))
         ])
       ]);
     });
@@ -578,6 +583,22 @@
   function sumarDias(fecha, n) { var p = fecha.split("-").map(Number); return new Date(Date.UTC(p[0], p[1] - 1, p[2] + n)).toISOString().slice(0, 10); }
   function isoSimulado(hm, dias) { var ts = estado.snap.ts_sim; return sumarDias(F.fecha(ts), dias || 0) + "T" + hm + ":00" + F.zonaHoraria(ts); }
 
+  /** Abre el modal de asignación con la caseta y la franja de 30 min elegidas en la línea de tiempo. */
+  function abrirAsignar(accesoId, tMs) {
+    var modal = $("asignar");
+    if (!modal || !estado.snap) return;
+    var M = 30 * 60000, ahora = new Date(estado.snap.ts_sim).getTime();
+    var inicio = Math.floor((tMs || ahora) / M) * M;
+    if (inicio < ahora) inicio = Math.ceil(ahora / M) * M; // nunca en el pasado
+    var desde = F.hora(new Date(inicio).toISOString()), hasta = F.hora(new Date(inicio + 2 * M).toISOString());
+    $("cita-caseta").value = accesoId || "";
+    $("cita-desde").value = desde; $("cita-hasta").value = hasta;
+    $("asig-contexto").textContent = (accesoId ? nombreCaseta(accesoId) : "Cualquier caseta") + " · de " + desde + " a " + hasta;
+    $("estado-cita").textContent = ""; F.reemplazar($("sugerencias"), []);
+    if (!modal.open) modal.showModal();
+    if ($("cita-transportista").value) buscarHorarios({ preventDefault: function () {} });
+  }
+
   async function buscarHorarios(ev) {
     ev.preventDefault();
     if (!estado.snap) { $("estado-cita").textContent = "Esperando la simulación…"; return; }
@@ -612,6 +633,7 @@
       $("estado-cita").textContent = "Cita asignada a " + (t.alias || "el transportista") + " a las " + F.hora(c.ventana_inicio) + " en " + nombreCaseta(c.acceso_id) +
         (pendienteBot(t) ? ". Aún no está conectado a Telegram: compártele la invitación." : ". Se le avisó " + viaAviso(t) + ".");
       F.reemplazar($("sugerencias"), []);
+      if ($("asignar") && $("asignar").open) setTimeout(function () { $("asignar").close(); }, 1800);
       await cargarTransportistas(); await cargarCitas(); cargarAvisos();
     } catch (e) { $("estado-cita").textContent = "No se pudo asignar: " + e.message; }
   }
@@ -821,7 +843,12 @@
     botonesFiltro("filtro-trans", [["todos", "Todos"], ["sin_bot", "Sin Telegram"]], estado.filtroTrans, function (v) { estado.filtroTrans = v; renderTransportistas(); });
     botonesFiltro("filtro-avisos", FILTROS_AVISOS, estado.filtroAvisos, function (v) { estado.filtroAvisos = v; renderAvisos(); });
     if ($("buscar-camion")) $("buscar-camion").addEventListener("input", function () { estado.busqueda = this.value.trim(); renderFlota(); });
-    if ($("form-cita")) { $("form-cita").addEventListener("submit", buscarHorarios); $("cita-desde").value = "09:00"; $("cita-hasta").value = "15:00"; }
+    if ($("form-cita")) {
+      $("form-cita").addEventListener("submit", buscarHorarios); $("cita-desde").value = "09:00"; $("cita-hasta").value = "15:00";
+      $("btn-asignar").addEventListener("click", function () { abrirAsignar("", null); });
+      $("cerrar-asignar").addEventListener("click", function () { $("asignar").close(); });
+      $("cita-caseta").addEventListener("change", function () { $("asig-contexto").textContent = ""; });
+    }
     if ($("form-alta")) $("form-alta").addEventListener("submit", darDeAlta);
     if ($("invitacion")) { try { estado.bot = await F.api("/api/telegram/enlace"); } catch (e) { estado.bot = null; } }
     [].forEach.call(document.querySelectorAll("[data-simbolo]"), function (n) { n.appendChild(F.simbolo(n.dataset.simbolo, 18)); });
@@ -833,6 +860,7 @@
       if (m.tipo === "snapshot") {
         estado.snap = m.data; reloj(m.data); renderResumen(); renderFlota();
         if ($("linea-tiempo") && Date.now() - (estado.lineaEn || 0) > 5000) { estado.lineaEn = Date.now(); renderLineaTiempo(); }
+        if (location.hash === "#asignar" && $("asignar") && !estado.abrioHash) { estado.abrioHash = true; abrirAsignar("", null); }
       }
       else if (m.tipo === "aviso") { cargarAvisos(); cargarCitas(); }
     });

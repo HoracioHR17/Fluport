@@ -39,17 +39,19 @@
         <h1>Citas</h1>
         <span class="tenue" style="font-size:14px" id="reloj">Conectando…</span>
       </div>
-      <a class="btn btn--sec" href="/agencia/transportistas/">Alta de transportista</a>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn btn--sec" href="/agencia/transportistas/">Alta de transportista</a>
+        <button type="button" class="btn" id="btn-asignar">Asignar cita</button>
+      </div>
     </header>
     <main class="ag-main">
-      <div class="fila-2 fila-2--arriba">
-        <div class="ancho bloque">
+      <div class="bloque">
           <div class="cabeza">
             <div class="pildoras" role="group" aria-label="Filtro de citas" id="filtros"></div>
             <span class="tenue" style="font-size:14px" id="resumen-citas"></span>
           </div>
           <section class="tarjeta" aria-labelledby="t-linea">
-            <div class="cabeza"><h2 id="t-linea">Línea de tiempo por caseta</h2></div>
+            <div class="cabeza"><h2 id="t-linea">Línea de tiempo por caseta</h2><span class="tenue" style="font-size:13px">Toca un horario en la línea de una caseta para asignar una cita</span></div>
             <div class="linea-tiempo" id="linea-tiempo"></div>
             <ul class="simbologia simbologia--linea" aria-label="Leyenda">
               <li><span class="muestra muestra--ancha" style="background:#0A2238"></span>Asignada por la agencia</li>
@@ -67,9 +69,10 @@
               </table>
             </div>
           </section>
-        </div>
-        <aside class="tarjeta angosto" aria-labelledby="t-asig" id="asignar">
-          <h2 id="t-asig">Asignar cita</h2>
+      </div>
+      <dialog class="modal" id="asignar" aria-labelledby="t-asig">
+          <div class="cabeza"><h2 id="t-asig">Asignar cita</h2><button type="button" class="btn btn--sec btn--chico" id="cerrar-asignar" aria-label="Cerrar">✕</button></div>
+          <p class="tenue" id="asig-contexto" style="margin:0 0 8px;font-size:14px"></p>
           <form class="form form--columna" id="form-cita">
             <label class="campo">Transportista<select id="cita-transportista" required></select></label>
             <label class="campo">Tipo de carga
@@ -91,8 +94,7 @@
           </form>
           <div class="sugerencias sugerencias--lista" id="sugerencias"></div>
           <p class="estado-msg" id="estado-cita" role="status"></p>
-        </aside>
-      </div>
+      </dialog>
     </main>
   </div>
 </div>
