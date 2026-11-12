@@ -13,8 +13,9 @@ Enlace de agencia: `t.me/<bot>?start=AG01` abre el chat con `/start AG01`; si el
 agencia, queda ligado a esa.
 
 Operación real (`telegram_solo_registrados`, activo por defecto): solo se vinculan números que una agencia dio de
-alta. Si un número sin alta comparte su contacto, el bot le pregunta a qué agencia pertenece (botones con las
-agencias o texto libre) y le envía la solicitud; si llegó con el enlace de una agencia, va directo a esa. La agencia
+alta. Si un número sin alta comparte su contacto, el bot le envía la solicitud a su agencia: si Fluport tiene una
+sola agencia (la demo: Tiburones Ecover Logistics) va directo a ella; si hay varias, le pregunta a cuál pertenece
+(botones o texto libre) o usa la del enlace con el que llegó. La agencia
 la aprueba o la rechaza en su panel y el bot le avisa. Las citas que asigna la agencia son obligatorias: el bot solo
 avisa (no se confirman con SÍ / NO); si el transportista pide cancelarla, se le avisa a la agencia para que decida.
 """
@@ -49,7 +50,7 @@ REGISTRADO = ("Listo ✅ Ya te identifiqué con el número terminado en {fin}.\n
               "Toca *📍 Entradas cerca de mí* para ver cuál te conviene desde donde estás.")
 CONTACTO_AJENO = "Por seguridad solo puedo registrar *tu propio* número. Usa el botón para compartirlo."
 LIGADO = "Quedaste ligado a la agencia *{nombre}*; ahí verán tus citas y tu camión."
-PEDIR_AGENCIA = ("Tu número aún no está dado de alta en Fluport. ¿A qué *agencia aduanal* perteneces?\n"
+PEDIR_AGENCIA = ("Tu número aún no está dado de alta en Fluport. ¿A qué *agencia* perteneces?\n"
                  "Elige una de la lista o escribe su nombre y le envío tu solicitud de alta.")
 AGENCIA_NO_ENCONTRADA = "No encontré esa agencia. Elige una de la lista o escribe su nombre como aparece."
 SOLICITUD_ENVIADA = ("Listo 📨 Envié tu solicitud de alta a *{nombre}*. Te aviso aquí en cuanto la revisen.")
@@ -205,6 +206,8 @@ def registrar_contacto(db: Session, chat_id: int, telefono: str, nombre: str | N
         t = Transportista(alias=nombre or f"Transportista {tel[-4:]}", telefono=tel, es_demo=True)
         db.add(t)
     t.telegram_chat_id = chat_id
+    if agencia_id is None and t.agencia_id is None and (unica := agencias.agencia_unica(db)) is not None:
+        agencia_id = unica.id  # con una sola agencia, todo transportista nuevo es de ella
     if agencia_id is not None and t.agencia_id is None:  # la agencia que lo dio de alta no se reemplaza
         t.agencia_id = agencia_id
     db.commit()

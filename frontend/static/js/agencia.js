@@ -736,6 +736,10 @@
     var inicial = [pedida, guardada].filter(function (x) { return x && ids.indexOf(x) >= 0; })[0] || ids[0];
     F.reemplazar($("agencia"), estado.agencias.map(function (a) { return el("option", { value: a.id }, a.nombre); }));
     $("agencia").value = inicial;
+    if (estado.agencias.length === 1) { // una sola agencia: se muestra su nombre en lugar del selector
+      $("agencia").classList.add("oculto");
+      $("agencia").parentNode.appendChild(el("strong", { class: "ag-menu__nombre" }, estado.agencias[0].nombre));
+    }
     $("agencia").addEventListener("change", function () { elegirAgencia(this.value); });
     $("btn-menu").addEventListener("click", function () {
       var menu = document.querySelector(".ag-menu"), abierto = !menu.classList.contains("ag-menu--abierto");

@@ -38,7 +38,9 @@ class AccesoParam(BaseModel):
 
 
 class AgenciaParam(BaseModel):
-    """Agencia (empresa transportista) de la demo; `participacion` = parte de los camiones simulados que son suyos."""
+    """Agencia (empresa transportista) de la demo; `participacion` = parte de los camiones simulados que son suyos.
+
+    Si las participaciones suman menos de 1, el resto son camiones de otros transportistas, sin agencia en Fluport."""
 
     id: str
     nombre: str
@@ -149,13 +151,13 @@ class Escenario(BaseModel):
         """Agencia de un camión simulado: fija por su id (crc32) para no alterar los números aleatorios."""
         if not self.agencias:
             return None
-        total = sum(a.participacion for a in self.agencias)
+        total = max(1.0, sum(a.participacion for a in self.agencias))
         u = (zlib.crc32(camion_id.encode()) % 10_000) / 10_000 * total
         for a in self.agencias:
             u -= a.participacion
             if u < 0:
                 return a.id
-        return self.agencias[-1].id
+        return None  # camión de otro transportista (no es de ninguna agencia de Fluport)
 
     def acceso(self, acceso_id: str) -> AccesoParam:
         for a in self.accesos:

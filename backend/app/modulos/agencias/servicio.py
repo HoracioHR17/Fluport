@@ -45,6 +45,12 @@ def buscar_agencia(db: Session, texto: str) -> Agencia | None:
     return candidatas[0] if len(candidatas) == 1 else None
 
 
+def agencia_unica(db: Session) -> Agencia | None:
+    """La agencia, si Fluport tiene solo una (entonces no hace falta preguntarle al transportista cuál es)."""
+    lista = list(db.scalars(select(Agencia).order_by(Agencia.id).limit(2)))
+    return lista[0] if len(lista) == 1 else None
+
+
 def nombres_agencias(db: Session) -> list[str]:
     return list(db.scalars(select(Agencia.nombre).order_by(Agencia.id)))
 
@@ -57,7 +63,10 @@ def solicitud_abierta(db: Session, chat_id: int) -> SolicitudAlta | None:
 
 def abrir_solicitud(db: Session, chat_id: int, telefono: str, nombre: str | None,
                     agencia_id: str | None = None) -> SolicitudAlta:
-    """Crea (o actualiza) la solicitud abierta del chat. Con agencia queda `pendiente`; sin ella, `sin_agencia`."""
+    """Crea (o actualiza) la solicitud abierta del chat. Con agencia queda `pendiente`; sin ella, `sin_agencia`.
+    Si solo hay una agencia, la solicitud va directo a ella."""
+    if agencia_id is None and (unica := agencia_unica(db)) is not None:
+        agencia_id = unica.id
     s = solicitud_abierta(db, chat_id)
     if s is None:
         s = SolicitudAlta(telegram_chat_id=chat_id, telefono=telefono, nombre="")

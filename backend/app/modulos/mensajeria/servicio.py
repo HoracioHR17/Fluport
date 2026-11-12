@@ -187,7 +187,7 @@ async def ciclo_avisos(sim: Operacion, publicar) -> list[AvisoOut]:
 ALTA_APROBADA = ("¡Bienvenido! ✅ *{agencia}* aprobó tu alta en Fluport.\n"
                  "Escríbeme, por ejemplo: _llego mañana a las 9 con un contenedor de 40_ o _¿cómo está la fila?_")
 ALTA_RECHAZADA = ("*{agencia}* no aprobó tu solicitud de alta. Si crees que es un error, comunícate con ellos; "
-                  "puedes volver a compartir tu número para elegir otra agencia.")
+                  "puedes volver a compartir tu número para enviar una nueva solicitud.")
 
 
 async def avisar_resultado_alta(chat_id: int, agencia: str, aprobada: bool) -> tuple[bool, str]:

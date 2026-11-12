@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import insert, text, update
+from sqlalchemy import delete, insert, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.engine import Engine
 
@@ -48,6 +48,12 @@ class Persistencia:
             if esc.agencias:  # las agencias de la demo también vienen del escenario
                 ag = pg_insert(m.Agencia).values([dict(id=a.id, nombre=a.nombre) for a in esc.agencias])
                 c.execute(ag.on_conflict_do_update(index_elements=[m.Agencia.id], set_={"nombre": ag.excluded.nombre}))
+                # agencias que ya no están en el escenario: sus transportistas y solicitudes pasan a la primera
+                # agencia vigente y luego se borran (así no quedan choferes ligados a una agencia que no existe)
+                ids, destino = [a.id for a in esc.agencias], esc.agencias[0].id
+                c.execute(update(m.Transportista).where(m.Transportista.agencia_id.not_in(ids)).values(agencia_id=destino))
+                c.execute(update(m.SolicitudAlta).where(m.SolicitudAlta.agencia_id.not_in(ids)).values(agencia_id=destino))
+                c.execute(delete(m.Agencia).where(m.Agencia.id.not_in(ids)))
 
     def crear_corrida(
         self, tipo: TipoCorrida, semilla: int, inicio: datetime, velocidad: float, parametros: dict[str, Any]

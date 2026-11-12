@@ -16,23 +16,23 @@ TEL = "+522290007001"
 
 
 # ───────────── Simulación (sin BD) ─────────────
-def test_escenario_trae_agencias(esc):
-    assert [a.id for a in esc.agencias] == ["AG01", "AG02", "AG03", "AG04", "AG05", "AG06"]
+def test_escenario_trae_una_sola_agencia(esc):
+    assert [(a.id, a.nombre) for a in esc.agencias] == [("AG01", "Tiburones Ecover Logistics")]
 
 
 def test_reparto_fijo_y_proporcional(esc):
     assert esc.agencia_de("T00-0001") == esc.agencia_de("T00-0001")  # determinista por id
     conteo = Counter(esc.agencia_de(f"T00-{i:04d}") for i in range(12000))
-    total = sum(a.participacion for a in esc.agencias)
-    for a in esc.agencias:
-        assert abs(conteo[a.id] / 12000 - a.participacion / total) < 0.03
+    parte = esc.agencias[0].participacion
+    assert abs(conteo["AG01"] / 12000 - parte) < 0.03
+    assert set(conteo) == {"AG01", None}  # el resto son camiones de otros transportistas
 
 
 def test_snapshot_trae_agencia_y_flota(sim):
     sim.avanzar(6 * 60)  # 10:00: hay camiones en ruta y en fila
     mb = sim.snapshot().mundos[Mundo.B]
-    assert mb.camiones and all(c.agencia_id in {"AG01", "AG02", "AG03", "AG04", "AG05", "AG06"} for c in mb.camiones)
-    assert set(mb.flota) == {"AG01", "AG02", "AG03", "AG04", "AG05", "AG06"}
+    assert mb.camiones and all(c.agencia_id in {"AG01", None} for c in mb.camiones)
+    assert set(mb.flota) == {"AG01"}
     # la flota cuenta todos los camiones activos, no solo los dibujados
     ms = sim.mundos[Mundo.B]
     en_fila = sum(1 for c in ms.camiones.values() if c.estado == EstadoCamion.en_fila)
@@ -41,9 +41,9 @@ def test_snapshot_trae_agencia_y_flota(sim):
 
 
 def test_cita_hereda_la_agencia_del_transportista(sim):
-    sim.inyectar_cita(9001, "A1", sim.ts() + timedelta(hours=1), TipoCarga.contenedor_40, agencia_id="AG02")
+    sim.inyectar_cita(9001, "A1", sim.ts() + timedelta(hours=1), TipoCarga.contenedor_40, agencia_id="AG01")
     sim.inyectar_cita(9002, "A1", sim.ts() + timedelta(hours=1), TipoCarga.contenedor_40)
-    assert sim.citas[9001].agencia_id == "AG02" and sim.citas[9002].agencia_id is None
+    assert sim.citas[9001].agencia_id == "AG01" and sim.citas[9002].agencia_id is None
 
 
 def test_contingencia_publica(sim):
@@ -74,7 +74,7 @@ def _ts(c, horas: float) -> str:
 
 def test_listar_agencias(cliente):
     r = cliente.get("/api/agencias").json()
-    assert [a["id"] for a in r] == ["AG01", "AG02", "AG03", "AG04", "AG05", "AG06"] and r[0]["nombre"]
+    assert [(a["id"], a["nombre"]) for a in r] == [("AG01", "Tiburones Ecover Logistics")]
 
 
 def test_cita_de_agencia_y_filtros(cliente):
@@ -87,9 +87,9 @@ def test_cita_de_agencia_y_filtros(cliente):
     assert len(ts) == 1 and ts[0]["telefono_fin"] == "7001" and ts[0]["citas_activas"] == 1
     assert "telefono" not in ts[0]  # el número completo no se expone
     assert [c["id"] for c in cliente.get("/api/citas?agencia_id=AG01").json()] == [cita["id"]]
-    assert cliente.get("/api/citas?agencia_id=AG02").json() == []
+    assert cliente.get("/api/citas?agencia_id=XX99").json() == []
     assert cliente.get("/api/citas/resumen?agencia_id=AG01").json()["total"] == 1
-    assert cliente.get("/api/citas/resumen?agencia_id=AG02").json()["total"] == 0
+    assert cliente.get("/api/citas/resumen?agencia_id=XX99").json()["total"] == 0
     assert cliente.get("/api/avisos?agencia_id=AG01").status_code == 200
     # el camión de la cita aparece en la simulación como de la agencia
     from app.modulos.simulacion.servicio import servicio
@@ -115,11 +115,13 @@ def _msg(texto=None, contacto=None, chat=888000222):
 
 
 def test_alta_de_transportista(cliente):
-    r = cliente.post("/api/agencias/AG02/transportistas",
+    r = cliente.post("/api/agencias/AG01/transportistas",
                      json={"alias": "Lupe Ramos", "telefono": "+522290007003", "placas": "xkl-45-21"})
     assert r.status_code == 201 and r.json()["placas"] == "XKL-45-21" and r.json()["telegram"] is False
-    otra = cliente.post("/api/agencias/AG03/transportistas", json={"alias": "Otra", "telefono": "+522290007003"})
-    assert otra.status_code == 409
+    # el mismo número dado de alta otra vez actualiza al transportista (no lo duplica)
+    otra = cliente.post("/api/agencias/AG01/transportistas", json={"alias": "Lupe Ramos", "telefono": "+522290007003",
+                                                                   "placas": "xkl-45-21"})
+    assert otra.status_code == 201 and otra.json()["id"] == r.json()["id"]
     assert cliente.post("/api/agencias/XX99/transportistas", json={"alias": "Xavier", "telefono": "+522290007004"}).status_code == 404
 
 
@@ -132,22 +134,21 @@ def test_bot_solo_vincula_numeros_dados_de_alta(cliente, monkeypatch):
 
     monkeypatch.setattr(telegram, "enviar", falso)
     sim = servicio.sim
-    # un número sin alta no se vincula: el bot le pregunta su agencia
+    # un número sin alta no se vincula: con una sola agencia, su solicitud va directo a ella
     r = cliente.portal.call(bot.procesar_update, sim,
                             _msg(contacto={"phone_number": "5212290007999", "user_id": 888000333}, chat=888000333))
-    assert r == bot.PEDIR_AGENCIA
+    assert r == bot.SOLICITUD_ENVIADA.format(nombre="Tiburones Ecover Logistics")
     with SessionLocal() as db:
         assert bot.transportista_de_chat(db, 888000333) is None
-    # el que dio de alta AG02 se vincula a AG02; un enlace de otra agencia no lo cambia
+    # el que dio de alta la agencia se vincula a ella
     chat = 888000222
-    assert cliente.portal.call(bot.procesar_update, sim, _msg("/start AG03")) == bot.BIENVENIDA
+    assert cliente.portal.call(bot.procesar_update, sim, _msg("/start AG01")) == bot.BIENVENIDA
     r = cliente.portal.call(bot.procesar_update, sim,
                             _msg(contacto={"phone_number": "5212290007003", "user_id": chat, "first_name": "Lupe"}))
-    assert "Consorcio Aduanero del Atlántico" in r
-    cliente.portal.call(bot.procesar_update, sim, _msg("/start AG03"))
+    assert "Tiburones Ecover Logistics" in r
     with SessionLocal() as db:
         t = bot.transportista_de_chat(db, chat)
-        assert t.agencia_id == "AG02" and t.alias == "Lupe Ramos"
+        assert t.agencia_id == "AG01" and t.alias == "Lupe Ramos"
 
 
 def test_cita_asignada_es_obligatoria_y_solo_se_avisa(cliente, monkeypatch):
@@ -179,21 +180,20 @@ def test_cita_asignada_es_obligatoria_y_solo_se_avisa(cliente, monkeypatch):
     cliente.portal.call(notificar_asignacion, sim, cita["id"], lambda _: None)
     assert enviados[-1][0] == chat and "Nueva cita" in enviados[-1][1] and "SÍ" not in enviados[-1][1]
     # la agencia la ve asignada
-    citas = {c["id"]: c for c in cliente.get("/api/citas?agencia_id=AG02").json()}
+    citas = {c["id"]: c for c in cliente.get("/api/citas?agencia_id=AG01").json()}
     assert citas[cita["id"]]["confirmada_en"] is not None
 
 
 def test_buscar_agencia_por_nombre_o_codigo(cliente):
-    from app.modulos.agencias.servicio import buscar_agencia
+    from app.modulos.agencias.servicio import agencia_unica, buscar_agencia
     from app.nucleo.db.base import SessionLocal
 
     with SessionLocal() as db:
-        assert buscar_agencia(db, "ag05").id == "AG05"
-        assert buscar_agencia(db, "Grupo Aduanal Altamar").id == "AG04"
-        assert buscar_agencia(db, "altamar").id == "AG04"
-        assert buscar_agencia(db, "  atlántico ").id == "AG02"
-        assert buscar_agencia(db, "agencia aduanal") is None  # ambigua / genérica
+        assert buscar_agencia(db, "ag01").id == "AG01"
+        assert buscar_agencia(db, "Tiburones Ecover Logistics").id == "AG01"
+        assert buscar_agencia(db, "tiburones").id == "AG01"
         assert buscar_agencia(db, "Transportes Pérez") is None
+        assert agencia_unica(db).id == "AG01"
 
 
 def test_solicitud_de_alta_desde_el_bot(cliente, monkeypatch):
@@ -212,36 +212,31 @@ def test_solicitud_de_alta_desde_el_bot(cliente, monkeypatch):
     sim, chat = servicio.sim, 888000444
     contacto = {"phone_number": "5212290007444", "user_id": chat, "first_name": "Toño"}
 
-    # sin alta: pregunta la agencia con botones de las agencias
-    assert cliente.portal.call(bot.procesar_update, sim, _msg(contacto=contacto, chat=chat)) == bot.PEDIR_AGENCIA
-    botones = [b[0]["text"] for b in enviados[-1][2]["keyboard"]]
-    assert "Grupo Aduanal Altamar" in botones and len(botones) == 6
-    # nombre que no existe → vuelve a preguntar; nombre parcial → solicitud a esa agencia
-    assert cliente.portal.call(bot.procesar_update, sim, _msg("Transportes Pérez", chat=chat)) == bot.AGENCIA_NO_ENCONTRADA
-    r = cliente.portal.call(bot.procesar_update, sim, _msg("altamar", chat=chat))
-    assert r == bot.SOLICITUD_ENVIADA.format(nombre="Grupo Aduanal Altamar")
+    # sin alta: con una sola agencia no se pregunta cuál; la solicitud va directo a ella
+    r = cliente.portal.call(bot.procesar_update, sim, _msg(contacto=contacto, chat=chat))
+    assert r == bot.SOLICITUD_ENVIADA.format(nombre="Tiburones Ecover Logistics")
     r = cliente.portal.call(bot.procesar_update, sim, _msg("¿ya?", chat=chat))
     assert "sigue en revisión" in r
 
-    # la agencia la ve en su panel (y otra agencia no)
-    pend = cliente.get("/api/agencias/AG04/solicitudes").json()
-    assert [(p["nombre"], p["telefono_fin"]) for p in pend] == [("Toño", "7444")]
-    assert cliente.get("/api/agencias/AG01/solicitudes").json() == []
-    sid = pend[0]["id"]
-    assert cliente.post(f"/api/agencias/AG01/solicitudes/{sid}/aprobar").status_code == 404
+    # la agencia la ve en su panel
+    pend = cliente.get("/api/agencias/AG01/solicitudes").json()
+    toño = [p for p in pend if p["telefono_fin"] == "7444"]
+    assert [(p["nombre"], p["telefono_fin"]) for p in toño] == [("Toño", "7444")]
+    sid = toño[0]["id"]
+    assert cliente.post(f"/api/agencias/XX99/solicitudes/{sid}/aprobar").status_code == 404
 
     # aprueba: queda dado de alta, ligado al chat, y el bot le avisa
-    r = cliente.post(f"/api/agencias/AG04/solicitudes/{sid}/aprobar", json={"placas": "abc-12-34"})
+    r = cliente.post(f"/api/agencias/AG01/solicitudes/{sid}/aprobar", json={"placas": "abc-12-34"})
     assert r.status_code == 200 and r.json()["telegram"] is True and r.json()["placas"] == "ABC-12-34"
-    assert cliente.post(f"/api/agencias/AG04/solicitudes/{sid}/aprobar").status_code == 409
+    assert cliente.post(f"/api/agencias/AG01/solicitudes/{sid}/aprobar").status_code == 409
     with SessionLocal() as db:
         t = bot.transportista_de_chat(db, chat)
-        assert t.agencia_id == "AG04" and t.alias == "Toño"
+        assert t.agencia_id == "AG01" and t.alias == "Toño"
     assert any(c == chat and "aprobó tu alta" in txt for c, txt, _ in enviados)
-    assert cliente.get("/api/agencias/AG04/solicitudes").json() == []
+    assert all(p["telefono_fin"] != "7444" for p in cliente.get("/api/agencias/AG01/solicitudes").json())
 
 
-def test_solicitud_con_enlace_va_directo_y_se_puede_rechazar(cliente, monkeypatch):
+def test_solicitud_se_puede_rechazar_y_volver_a_enviar(cliente, monkeypatch):
     from app.modulos.simulacion.servicio import servicio
     from app.nucleo.config import get_settings
 
@@ -254,15 +249,15 @@ def test_solicitud_con_enlace_va_directo_y_se_puede_rechazar(cliente, monkeypatc
     monkeypatch.setattr(telegram, "enviar", falso)
     monkeypatch.setattr(get_settings(), "telegram_token", "123:ABC")
     sim, chat = servicio.sim, 888000555
-    cliente.portal.call(bot.procesar_update, sim, _msg("/start AG06", chat=chat))
+    cliente.portal.call(bot.procesar_update, sim, _msg("/start AG01", chat=chat))
     r = cliente.portal.call(bot.procesar_update, sim,
                             _msg(contacto={"phone_number": "5212290007555", "user_id": chat}, chat=chat))
-    assert r == bot.SOLICITUD_ENVIADA.format(nombre="Agencia Aduanal Horizonte")
-    sid = cliente.get("/api/agencias/AG06/solicitudes").json()[0]["id"]
-    r = cliente.post(f"/api/agencias/AG06/solicitudes/{sid}/rechazar")
+    assert r == bot.SOLICITUD_ENVIADA.format(nombre="Tiburones Ecover Logistics")
+    sid = [p for p in cliente.get("/api/agencias/AG01/solicitudes").json() if p["telefono_fin"] == "7555"][0]["id"]
+    r = cliente.post(f"/api/agencias/AG01/solicitudes/{sid}/rechazar")
     assert r.status_code == 200 and r.json()["estado"] == "rechazada"
     assert any(c == chat and "no aprobó" in txt for c, txt in enviados)
-    # puede volver a compartir su número y elegir otra agencia
+    # puede volver a compartir su número y enviar una nueva solicitud
     r = cliente.portal.call(bot.procesar_update, sim,
                             _msg(contacto={"phone_number": "5212290007555", "user_id": chat}, chat=chat))
-    assert r == bot.PEDIR_AGENCIA
+    assert r == bot.SOLICITUD_ENVIADA.format(nombre="Tiburones Ecover Logistics")
