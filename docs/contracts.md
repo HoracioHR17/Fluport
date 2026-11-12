@@ -52,7 +52,7 @@ Enums: `tipo_carga` (contenedor_20, contenedor_40, refrigerado, peligroso, grane
 | POST | `/api/asistente/mensaje` | `AsistenteRequest` | `AsistenteResponse` | M4 |
 | GET/POST | `/webhook/whatsapp` | WhatsApp Cloud API | verificación / 200 | M5 |
 | POST | `/webhook/telegram` | Telegram Bot API | 200 | M5 |
-| GET | `/api/publico/zonas` | — | `ZonaPublica[]` | M7 |
+| GET | `/api/publico/zonas` | — | `ZonaPublica[]` (por caseta: semáforo actual, horas pico de 12 h, mejor hora) | M7 |
 
 Payload de `EventoCreate.payload` por tipo:
 - `buque_atraca`: `{contenedores, terminal}`
@@ -67,6 +67,10 @@ Notas de citas:
 - Errores: 404 acceso/cita/transportista inexistente · 409 acceso cerrado, cita no activa o camión ya en camino · 422 ventana inválida o teléfono inválido.
 - Ciclo de estados: `agendada → en_ruta → cumplida` (lo actualiza el simulador) · `reprogramada` / `cancelada` (por la API) · `no_show` si la ventana terminó hace más de 60 min sin salir.
 - Sugerencias: franjas de 30 min dentro de `[desde, hasta]` en accesos abiertos, ordenadas por espera prevista (pronóstico a 12 h; más allá, carga agendada vs. capacidad); `ahorro_vs_pico_min` = espera de la peor franja de la ventana − espera de la sugerida.
+
+Notas de la vista pública:
+- Usa el Mundo B (operación con Fluport). Nunca incluye citas, transportistas, teléfonos ni la comparación A/B.
+- `horas_pico`: franjas consecutivas con semáforo Lento o Saturado unidas en intervalos; `semaforo` es el peor del intervalo.
 
 Notas de simulación:
 - `velocidad` = segundos simulados por segundo real (60 → 1 s real = 1 min simulado; 600 → 10 min).

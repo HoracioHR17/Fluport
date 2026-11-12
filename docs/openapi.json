@@ -852,6 +852,7 @@
      "publico"
     ],
     "summary": "Zonas",
+    "description": "Semáforo actual, horas pico de las próximas 12 h y mejor hora para circular, por caseta.",
     "operationId": "zonas_api_publico_zonas_get",
     "responses": {
      "200": {
@@ -1462,15 +1463,21 @@
      },
      "semaforo": {
       "$ref": "#/components/schemas/Semaforo"
+     },
+     "espera_max_min": {
+      "type": "number",
+      "title": "Espera Max Min"
      }
     },
     "type": "object",
     "required": [
      "inicio",
      "fin",
-     "semaforo"
+     "semaforo",
+     "espera_max_min"
     ],
-    "title": "HoraPico"
+    "title": "HoraPico",
+    "description": "Intervalo continuo con espera prevista Lenta o Saturada; `semaforo` es el peor del intervalo."
    },
    "Kpis": {
     "properties": {
@@ -2033,6 +2040,14 @@
    },
    "ZonaPublica": {
     "properties": {
+     "acceso_id": {
+      "type": "string",
+      "title": "Acceso Id"
+     },
+     "nombre": {
+      "type": "string",
+      "title": "Nombre"
+     },
      "zona": {
       "type": "string",
       "title": "Zona"
@@ -2044,12 +2059,28 @@
       "type": "number",
       "title": "Espera Min"
      },
+     "abierto": {
+      "type": "boolean",
+      "title": "Abierto"
+     },
      "horas_pico": {
       "items": {
        "$ref": "#/components/schemas/HoraPico"
       },
       "type": "array",
       "title": "Horas Pico"
+     },
+     "mejor_hora": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "date-time"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Mejor Hora"
      },
      "actualizado_en": {
       "type": "string",
@@ -2064,9 +2095,12 @@
     },
     "type": "object",
     "required": [
+     "acceso_id",
+     "nombre",
      "zona",
      "semaforo",
      "espera_min",
+     "abierto",
      "horas_pico",
      "actualizado_en"
     ],

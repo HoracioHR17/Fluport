@@ -1,0 +1,54 @@
+"""Vista pública (M7): horas pico agregadas y sin datos de operación."""
+from datetime import timedelta
+
+from fastapi.testclient import TestClient
+
+from app.contracts.enums import Semaforo, TipoEventoSim
+from app.contracts.schemas import EventoCreate, FranjaPronostico, PronosticoOut
+from app.publico.servicio import horas_pico, zonas
+from tests.conftest import INICIO
+
+
+def _pron(semaforos: list[str]) -> PronosticoOut:
+    esperas = {"verde": 5.0, "amarillo": 40.0, "rojo": 120.0}
+    return PronosticoOut(
+        acceso_id="A1", generado_en=INICIO, modelo_version="x",
+        franjas=[FranjaPronostico(inicio=INICIO + timedelta(minutes=30 * i), espera_min=esperas[s], semaforo=s)
+                 for i, s in enumerate(semaforos)],
+    )
+
+
+def test_horas_pico_unen_franjas_consecutivas():
+    picos = horas_pico(_pron(["verde", "amarillo", "rojo", "amarillo", "verde", "amarillo", "verde"]))
+    assert len(picos) == 2
+    assert picos[0].inicio == INICIO + timedelta(minutes=30) and picos[0].fin == INICIO + timedelta(minutes=120)
+    assert picos[0].semaforo == Semaforo.rojo and picos[0].espera_max_min == 120
+    assert picos[1].semaforo == Semaforo.amarillo
+
+
+def test_sin_congestion_no_hay_horas_pico():
+    assert horas_pico(_pron(["verde"] * 6)) == []
+
+
+def test_zonas_desde_el_simulador(sim):
+    sim.avanzar(6 * 60)
+    z = zonas(sim)
+    assert [x.acceso_id for x in z] == ["A1", "A2", "A3"]
+    assert all(x.abierto and x.mejor_hora is not None and x.etiqueta == "SIMULACIÓN" for x in z)
+
+
+def test_caseta_cerrada_en_rojo(sim):
+    sim.aplicar_evento(EventoCreate(tipo=TipoEventoSim.cierre_acceso, acceso_id="A2"))
+    a2 = next(x for x in zonas(sim) if x.acceso_id == "A2")
+    assert not a2.abierto and a2.semaforo == Semaforo.rojo
+
+
+def test_api_publica_sin_datos_de_operacion():
+    from app.main import app
+
+    with TestClient(app) as c:
+        r = c.get("/api/publico/zonas")
+        assert r.status_code == 200 and len(r.json()) == 3
+        texto = r.text.lower()
+        for prohibido in ("telefono", "transportista", "cita", "comparacion", "mundo"):
+            assert prohibido not in texto

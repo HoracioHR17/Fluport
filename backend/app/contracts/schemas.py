@@ -283,16 +283,23 @@ WsAviso.model_rebuild()
 
 # ───────────────────────────── Vista pública (M7) ─────────────────────────────
 class HoraPico(Modelo):
+    """Intervalo continuo con espera prevista Lenta o Saturada; `semaforo` es el peor del intervalo."""
+
     inicio: datetime
     fin: datetime
     semaforo: Semaforo
+    espera_max_min: float
 
 
 class ZonaPublica(Modelo):
+    acceso_id: str
+    nombre: str  # nombre público de la caseta
     zona: str
     semaforo: Semaforo
     espera_min: float
-    horas_pico: list[HoraPico]
+    abierto: bool
+    horas_pico: list[HoraPico]  # próximas 12 h
+    mejor_hora: datetime | None = None  # franja con menor espera prevista en las próximas 12 h
     actualizado_en: datetime
     etiqueta: str = "SIMULACIÓN"
 

@@ -87,10 +87,6 @@ def test_reset_cambia_semilla(cliente):
     assert r["semilla"] == 9 and r["estado"] == "corriendo"
 
 
-def test_endpoints_pendientes_responden_501(cliente):
-    assert cliente.get("/api/publico/zonas").status_code == 501
-
-
 def test_webhook_whatsapp_verificacion(cliente):
     ok = cliente.get("/webhook/whatsapp", params={"hub.mode": "subscribe", "hub.verify_token": "fluport-verify",
                                                   "hub.challenge": "42"})

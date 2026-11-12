@@ -267,3 +267,24 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - Patrón **callback** (`al_cambiar_cita`): **Por qué:** el simulador avisa de los cambios de estado sin conocer la BD; el servicio decide cuándo guardarlos.
 
 - **Herramientas de IA:** Claude (Opus 5.5) diseñó e implementó el flujo de citas y su integración con el simulador y el pronóstico, escribió 15 pruebas nuevas, verificó las 90 con PostgreSQL de prueba y el flujo completo con el servidor en vivo.
+
+### 2026-11-11 18:25 · `#008` · M7 API pública para vecinos
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/app/publico/servicio.py` | Arma la información pública por caseta. | `horas_pico()`: une las franjas consecutivas con semáforo Lento o Saturado del pronóstico de 12 h en intervalos (inicio, fin, peor semáforo y espera máxima); `zonas()`: para cada caseta, semáforo y espera actuales, si está abierta, horas pico y la mejor hora para circular (franja con menor espera prevista). Usa el Mundo B y solo datos agregados de tráfico. |
+  | `backend/app/api/publico.py` (implementado) | Ruta pública. | `GET /api/publico/zonas`. |
+  | `backend/app/contracts/schemas.py` (modificado) | Contratos. | `ZonaPublica` agrega `acceso_id`, `nombre`, `abierto` y `mejor_hora`; `HoraPico` agrega `espera_max_min`. |
+  | `backend/tests/test_publico.py` (5) | Pruebas. | Unión de franjas en horas pico, sin congestión no hay picos, zonas desde el simulador, caseta cerrada en rojo, y que la respuesta pública no contenga teléfonos, transportistas, citas ni la comparación A/B. |
+  | `backend/tests/test_api.py` (modificado) | — | Se retira la prueba de "pendiente" de la vista pública. |
+  | `docs/contracts.md`, `docs/openapi.json` (actualizados) | Contratos. | Campos nuevos y reglas de privacidad de la vista pública. |
+
+- **Funcionalidad:** cualquier vecino puede consultar, sin iniciar sesión, cómo está cada caseta en este momento (Fluye, Lento o Saturado), a qué horas de las próximas 12 h se espera congestión y cuál es la mejor hora para pasar. La respuesta nunca incluye datos personales ni de operación del puerto. Pruebas: 94 con PostgreSQL de prueba, 85 sin él.
+
+- **Tecnologías usadas:**
+  - `Pydantic`: ver `aae10d9`. Aquí el modelo `ZonaPublica` define exactamente qué campos salen a la vista pública; lo que no está en el esquema no se puede filtrar por error.
+  - `datetime.timedelta` (biblioteca estándar): aritmética de fechas. **Por qué:** calcula el fin de cada franja y detecta franjas consecutivas para unirlas en un solo intervalo de hora pico.
+
+- **Herramientas de IA:** Claude (Opus 5.5) diseñó e implementó la vista pública, amplió el contrato con los campos que necesita la pantalla y escribió 5 pruebas, incluida una de privacidad de la respuesta.
