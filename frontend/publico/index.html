@@ -6,35 +6,70 @@
 <title>Fluport · ¿Cómo están las entradas al puerto?</title>
 <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/css/tokens.css">
-<link rel="stylesheet" href="/static/css/app.css">
+<link rel="stylesheet" href="/static/css/ui.css">
 </head>
 <body>
-<div class="publico">
-  <header style="display:flex;flex-direction:column;gap:12px">
-    <div class="publico__cab">
-      <a class="logo" href="/publico/" aria-label="Fluport" style="font-size:26px">
-        <span><b>FLU</b><span style="font-weight:400">PORT</span></span>
-        <span class="logo__puntos" aria-hidden="true"><span class="p-fluye"></span><span class="p-lento"></span><span class="p-saturado"></span></span>
-      </a>
-      <span class="etiqueta-simulacion" id="etiqueta">SIMULACIÓN</span>
+<header class="pub-cab">
+  <div class="pub-cab__in">
+    <a class="marca" href="/publico/" aria-label="Fluport, inicio"><span><b>FLU</b>PORT</span><span class="marca__puntos" aria-hidden="true"><i></i><i></i><i></i></span></a>
+    <span class="sim" id="etiqueta">SIMULACIÓN</span>
+    <nav class="pub-nav" aria-label="Secciones">
+      <a href="#entradas" aria-current="page">Entradas</a>
+      <a href="#pronostico">Mejor hora</a>
+      <a href="#transportistas">Para transportistas</a>
+    </nav>
+    <a class="btn btn--sec" href="/agencia/">Acceso agencias</a>
+  </div>
+</header>
+
+<main class="pub-main">
+  <section id="entradas" aria-labelledby="t-hero" style="display:flex;flex-direction:column;gap:20px">
+    <div class="pub-hero">
+      <div>
+        <h1 id="t-hero">¿Cómo están las entradas al puerto?</h1>
+        <p class="tenue" style="margin:0" id="actualizado">Cargando…</p>
+      </div>
+      <p class="leyenda"><span>● Fluye · menos de 30 min</span><span>● Lento · 30 a 90 min</span><span>▲ Saturado · más de 90 min</span></p>
     </div>
-    <div>
-      <h1>¿Cómo están las entradas al puerto?</h1>
-      <p class="tenue" style="margin:6px 0 0;font-size:15px" id="actualizado">Cargando…</p>
+    <div class="alerta oculto" id="alerta" role="status">
+      <span class="alerta__icono" aria-hidden="true">▲</span>
+      <div style="display:flex;flex-direction:column;gap:4px"><strong id="alerta-titulo" style="font-size:17px"></strong><span class="tenue" id="alerta-texto"></span></div>
     </div>
-  </header>
-  <div id="alerta" class="alerta oculto" role="status"></div>
-  <section class="tarjeta cta-bot" id="cta-bot" aria-labelledby="t-bot">
-    <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
-      <h2 id="t-bot" style="margin:0;font-size:19px">¿Eres transportista?</h2>
-      <p style="margin:0;font-size:14px">Agenda, cambia o cancela tu cita en el bot de Telegram. Te avisamos si tu caseta se satura.</p>
-      <a class="boton" id="enlace-bot" href="#" target="_blank" rel="noopener">Agenda tu cita en Telegram</a>
-    </div>
-    <div class="qr" id="qr-bot" role="img" aria-label="Código QR del bot de Telegram"></div>
+    <div class="entradas" id="zonas" aria-live="polite"></div>
   </section>
-  <main id="zonas" aria-live="polite" style="display:flex;flex-direction:column;gap:12px"></main>
-  <p class="tenue" style="margin:4px 0 0;font-size:13px;line-height:1.45">● Fluye · menos de 30 min &nbsp;● Lento · 30 a 90 min &nbsp;▲ Saturado · más de 90 min. Datos de una simulación del tráfico de camiones; no muestran información personal.</p>
-</div>
+
+  <section id="pronostico" class="tarjeta" aria-labelledby="t-pron" style="padding:28px;gap:20px">
+    <div class="cabeza">
+      <h2 id="t-pron" style="font-size:24px">Pronóstico de las próximas 12 horas</h2>
+      <span class="tenue" style="font-size:14px">Cada bloque equivale a 30 minutos · pasa el cursor para ver la espera</span>
+    </div>
+    <div class="lineas"><div class="lineas__in" id="lineas"></div></div>
+  </section>
+
+  <section id="transportistas" class="bot" aria-labelledby="t-bot">
+    <div class="bot__texto">
+      <h2 id="t-bot">¿Eres transportista? Lleva tus citas en Telegram</h2>
+      <p>Consulta la cita que te asignó tu agencia, confírmala, pide un cambio y recibe avisos si tu entrada se satura o se cierra.</p>
+      <ol class="bot__pasos">
+        <li><b>1</b>Escanea el código o toca el botón</li>
+        <li><b>2</b>Comparte tu número registrado por tu agencia</li>
+        <li><b>3</b>Consulta y confirma tus citas en el chat</li>
+      </ol>
+      <a class="btn btn--verde" id="enlace-bot" href="#" target="_blank" rel="noopener" style="align-self:flex-start;font-size:17px;padding:14px 22px">Abrir el bot en Telegram</a>
+    </div>
+    <div class="bot__qr">
+      <div class="qr" id="qr-bot" role="img" aria-label="Código QR del bot de Telegram"></div>
+      <span id="usuario-bot"></span>
+    </div>
+  </section>
+</main>
+
+<footer class="pub-pie">
+  <div class="pub-pie__in">
+    <span>Datos de una simulación del tráfico de camiones. No muestran información personal.</span>
+    <a href="/agencia/" style="font-weight:700">¿Eres agencia aduanal? Entra a tu panel</a>
+  </div>
+</footer>
 <script src="/static/vendor/qrcode/qrcode.js"></script>
 <script src="/static/js/comun.js"></script>
 <script src="/static/js/publico.js"></script>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fluport · Flota en vivo</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="/static/css/tokens.css">
+<link rel="stylesheet" href="/static/css/ui.css">
+</head>
+<body data-vista="agencia" data-pantalla="flota">
+<div class="ag">
+  <aside class="ag-menu" aria-label="Menú de la agencia">
+    <div class="ag-menu__top">
+      <a class="marca" href="/agencia/" aria-label="Fluport, resumen de la agencia"><span><b>FLU</b>PORT</span><span class="marca__puntos" aria-hidden="true"><i></i><i></i><i></i></span></a>
+      <button type="button" class="ag-menu__boton" id="btn-menu" aria-expanded="false" aria-controls="menu-cuerpo" aria-label="Abrir menú">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+      </button>
+    </div>
+    <div class="ag-menu__cuerpo" id="menu-cuerpo">
+      <div class="ag-menu__agencia">
+        <label for="agencia">Agencia</label>
+        <select id="agencia"></select>
+      </div>
+      <nav class="ag-nav" aria-label="Secciones">
+      <a href="/agencia/"><span>Resumen</span><span class="contador oculto" data-contador="resumen"></span></a>
+      <a href="/agencia/flota/" aria-current="page"><span>Flota en vivo</span><span class="contador oculto" data-contador="flota"></span></a>
+      <a href="/agencia/citas/"><span>Citas</span><span class="contador oculto" data-contador="citas"></span></a>
+      <a href="/agencia/transportistas/"><span>Transportistas</span><span class="contador oculto" data-contador="transportistas"></span></a>
+      <a href="/agencia/avisos/"><span>Avisos</span><span class="contador oculto" data-contador="avisos"></span></a>
+      </nav>
+      <a class="ag-menu__pie" href="/publico/">Vista pública ↗</a>
+    </div>
+  </aside>
+
+  <div class="ag-cuerpo">
+    <header class="ag-cab">
+      <div class="ag-cab__titulo">
+        <h1>Flota en vivo</h1>
+        <span class="tenue" style="font-size:14px" id="reloj">Conectando…</span>
+      </div>
+      <span class="sim" id="etiqueta">SIMULACIÓN</span>
+      <a class="btn" href="/agencia/citas/#asignar">Asignar cita</a>
+    </header>
+    <main class="ag-main">
+      <div class="cabeza">
+        <div class="segmentos" role="group" aria-label="Filtro de la flota" id="filtro-flota"></div>
+        <label class="campo campo--linea">Buscar camión<input type="search" id="buscar-camion" placeholder="Placas, chofer o número"></label>
+      </div>
+      <div class="fila-2">
+        <section class="tarjeta ancho" aria-labelledby="t-mapa">
+          <div class="cabeza"><h2 id="t-mapa">Mapa</h2><span class="tenue" style="font-size:14px" id="resumen-mapa"></span></div>
+          <div class="mapa mapa--grande" id="mapa"></div>
+          <div class="leyenda-mapa"><span>● En ruta</span><span>■ En fila</span><span>● En revisión</span><span>◯ Con cita de un transportista registrado</span><span>Solo tus camiones</span></div>
+        </section>
+        <aside class="tarjeta angosto" aria-labelledby="t-sel">
+          <h2 id="t-sel">Camión seleccionado</h2>
+          <div id="ficha" aria-live="polite"></div>
+        </aside>
+      </div>
+      <section class="tarjeta" aria-labelledby="t-lista">
+        <div class="cabeza"><h2 id="t-lista">Camiones activos</h2><span class="tenue" style="font-size:14px">Ordenados por estado · toca uno para ver su ficha</span></div>
+        <div class="tabla-caja">
+          <table class="tabla">
+            <caption class="sr">Camiones activos de la agencia</caption>
+            <thead><tr><th scope="col">Camión</th><th scope="col">Transportista</th><th scope="col">Estado</th><th scope="col">Caseta</th><th scope="col">Carga</th><th scope="col">Cita</th></tr></thead>
+            <tbody id="tabla-camiones"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+<script src="/static/vendor/leaflet/leaflet.js"></script>
+<script src="/static/vendor/qrcode/qrcode.js"></script>
+<script src="/static/js/comun.js"></script>
+<script src="/static/js/agencia.js"></script>
+</body>
+</html>

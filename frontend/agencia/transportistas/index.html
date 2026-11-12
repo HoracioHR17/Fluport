@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fluport · Transportistas</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/css/tokens.css">
+<link rel="stylesheet" href="/static/css/ui.css">
+</head>
+<body data-vista="agencia" data-pantalla="transportistas">
+<div class="ag">
+  <aside class="ag-menu" aria-label="Menú de la agencia">
+    <div class="ag-menu__top">
+      <a class="marca" href="/agencia/" aria-label="Fluport, resumen de la agencia"><span><b>FLU</b>PORT</span><span class="marca__puntos" aria-hidden="true"><i></i><i></i><i></i></span></a>
+      <button type="button" class="ag-menu__boton" id="btn-menu" aria-expanded="false" aria-controls="menu-cuerpo" aria-label="Abrir menú">
+        <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"></path></svg>
+      </button>
+    </div>
+    <div class="ag-menu__cuerpo" id="menu-cuerpo">
+      <div class="ag-menu__agencia">
+        <label for="agencia">Agencia</label>
+        <select id="agencia"></select>
+      </div>
+      <nav class="ag-nav" aria-label="Secciones">
+      <a href="/agencia/"><span>Resumen</span><span class="contador oculto" data-contador="resumen"></span></a>
+      <a href="/agencia/flota/"><span>Flota en vivo</span><span class="contador oculto" data-contador="flota"></span></a>
+      <a href="/agencia/citas/"><span>Citas</span><span class="contador oculto" data-contador="citas"></span></a>
+      <a href="/agencia/transportistas/" aria-current="page"><span>Transportistas</span><span class="contador oculto" data-contador="transportistas"></span></a>
+      <a href="/agencia/avisos/"><span>Avisos</span><span class="contador oculto" data-contador="avisos"></span></a>
+      </nav>
+      <a class="ag-menu__pie" href="/publico/">Vista pública ↗</a>
+    </div>
+  </aside>
+
+  <div class="ag-cuerpo">
+    <header class="ag-cab">
+      <div class="ag-cab__titulo">
+        <h1>Transportistas</h1>
+        <span class="tenue" style="font-size:14px" id="reloj">Conectando…</span>
+      </div>
+      <span class="sim" id="etiqueta">SIMULACIÓN</span>
+      <a class="btn" href="/agencia/citas/#asignar">Asignar cita</a>
+    </header>
+    <main class="ag-main">
+      <div class="fila-2 fila-2--arriba">
+        <section class="tarjeta ancho" aria-labelledby="t-alta">
+          <h2 id="t-alta">Alta de transportista</h2>
+          <form class="form" id="form-alta">
+            <label class="campo">Nombre<input id="alta-nombre" autocomplete="off" required minlength="2"></label>
+            <label class="campo">Teléfono<input id="alta-tel" type="tel" inputmode="tel" autocomplete="off" placeholder="+52 229 000 0000" required></label>
+            <label class="campo">Placas<input id="alta-placas" autocomplete="off" placeholder="XKL-45-21"></label>
+            <button type="submit" class="btn">Dar de alta</button>
+          </form>
+          <p class="estado-msg" id="estado-alta" role="status"></p>
+          <p class="tenue" style="margin:0;font-size:13px">Solo los números dados de alta pueden conectarse al bot.</p>
+        </section>
+        <aside class="tarjeta angosto" aria-labelledby="t-inv">
+          <h2 id="t-inv">Invitación al bot</h2>
+          <div class="invitacion" id="invitacion"></div>
+        </aside>
+      </div>
+      <section class="tarjeta" aria-labelledby="t-lista">
+        <div class="cabeza">
+          <h2 id="t-lista">Mis transportistas</h2>
+          <div class="pildoras" role="group" aria-label="Filtro de transportistas" id="filtro-trans"></div>
+        </div>
+        <div class="tabla-caja">
+          <table class="tabla">
+            <caption class="sr">Transportistas de la agencia</caption>
+            <thead><tr><th scope="col">Nombre</th><th scope="col">Placas</th><th scope="col">Teléfono</th><th scope="col">Telegram</th><th scope="col">Citas activas</th><th scope="col">Próxima cita</th><th scope="col"><span class="sr">Acción</span></th></tr></thead>
+            <tbody id="tabla-trans"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>
+<script src="/static/vendor/qrcode/qrcode.js"></script>
+<script src="/static/js/comun.js"></script>
+<script src="/static/js/agencia.js"></script>
+</body>
+</html>
