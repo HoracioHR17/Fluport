@@ -15,8 +15,8 @@ Cientos de camiones llegan al puerto todos los días a las mismas horas. Se form
 2. **Pronóstico:** estima la espera de cada acceso durante las próximas 12 horas.
 3. **Citas:** sugiere los tres mejores horarios para llegar y permite agendar, cambiar o cancelar.
 4. **Vista pública:** estado de contingencia de cada entrada (normal, lenta, saturada o cerrada), espera estimada en tiempo real, horas pico y un acceso directo (botón y QR) al bot de Telegram.
-5. **Bot de Telegram (WhatsApp listo para conectarse):** cada transportista se registra con su número, agenda, cambia o cancela sus citas en lenguaje natural y recibe avisos si su caseta se satura o se cierra.
-6. **Vista de agencia:** cada agencia supervisa a sus transportistas: sus camiones en el mapa, su flota por estado, sus citas y los avisos que reciben, además del estado y el pronóstico de las casetas. Invita a sus choferes con un enlace del bot propio de la agencia.
+5. **Bot de Telegram (WhatsApp listo para conectarse):** el transportista que su agencia dio de alta se conecta con su número, recibe y confirma las citas que le asignan, pide o cambia citas en lenguaje natural y recibe avisos si su caseta se satura o se cierra.
+6. **Vista de agencia:** cada agencia da de alta a sus transportistas, les asigna citas con el pronóstico de espera y supervisa su flota en el mapa, el estado de cada cita (sin confirmar, confirmada, pedida por el chofer, en ruta, cumplida), los avisos y lo que requiere su atención.
 7. **Panel de demostración:** controla la simulación (velocidad y eventos como cierres, buques o norte) y compara el mundo *sin Fluport* con el *con Fluport*: ahorro en horas, diésel, costo y CO₂.
 
 ## Cómo usarlo
@@ -31,7 +31,9 @@ cp .env.example .env          # ajustar la conexión a PostgreSQL
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
-Abrir `http://localhost:8000/publico/` (vista pública, también en `/`) · `/agencia/` (agencias) · `/demo/` (panel de demostración) · `/docs` (API).
+Abrir `http://localhost:8000/publico/` (vista pública, también en `/`) · `/agencia/` (panel de agencia: resumen, flota, citas, transportistas y avisos) · `/demo/` (panel de demostración) · `/docs` (API).
+
+**Publicarlo en internet:** con Cloudflare Tunnel y un dominio propio, sin abrir puertos; ver [`docs/despliegue.md`](docs/despliegue.md).
 
 **Pruebas:**
 ```bash
@@ -48,6 +50,8 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
 ---
 
 ## Bitácora de IA
+
+Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La línea **Herramientas de IA** indica en qué tareas se apoyó en Claude (Opus 5.5).
 
 
 ### 2026-11-11 15:45 · `aae10d9` · Contratos M0 y esqueleto del proyecto
@@ -93,7 +97,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `StrEnum` (biblioteca estándar de Python 3.11+): enumeraciones cuyos valores son texto. **Por qué:** el mismo valor (`"contenedor_40"`) viaja idéntico en BD, JSON y código; un solo origen de verdad.
   - `StaticFiles` (FastAPI/Starlette): sirve archivos estáticos. **Por qué:** el frontend sin compilación se entrega desde el mismo servidor que la API.
 
-- **Herramientas de IA:** Claude (Opus 5.5) diseñó el esquema, los schemas, los routers y la migración; los verificó en un PostgreSQL 16 de prueba (migración de ida y vuelta, `alembic check` sin diferencias, arranque de la app, validación de entradas y verificación del webhook).
+- **Herramientas de IA:** el equipo diseñó el esquema, los schemas, los routers y la migración; los verificó en un PostgreSQL 16 de prueba (migración de ida y vuelta, `alembic check` sin diferencias, arranque de la app, validación de entradas y verificación del webhook). Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
 
 ### 2026-11-11 16:05 · `d1a97ad` · M1 Simulador en tiempo real (mundos A/B, eventos, WebSocket, histórico)
@@ -132,7 +136,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `zoneinfo` (biblioteca estándar): zonas horarias. **Por qué:** el reloj simulado arranca en hora de Veracruz (`America/Mexico_City`).
   - GeoJSON: formato estándar de datos geográficos. **Por qué:** Leaflet lo dibuja directamente; el mapa no necesita conocer el formato interno del escenario.
 
-- **Herramientas de IA:** Claude (Opus 5.5) diseñó e implementó el simulador y su API, y lo verificó: corridas de 3 días con dos semillas, cierre y reapertura de acceso (en A la fila crece en el acceso cerrado; en B los camiones se desvían), inyección de una cita de demo, servidor en vivo con cliente WebSocket (snapshots, eventos, pausa que congela el reloj, reset sin perder la conexión), errores 422 y escritura de lecturas y eventos en PostgreSQL 16.
+- **Herramientas de IA:** el equipo diseñó e implementó el simulador y su API, y lo verificó: corridas de 3 días con dos semillas, cierre y reapertura de acceso (en A la fila crece en el acceso cerrado; en B los camiones se desvían), inyección de una cita de demo, servidor en vivo con cliente WebSocket (snapshots, eventos, pausa que congela el reloj, reset sin perder la conexión), errores 422 y escritura de lecturas y eventos en PostgreSQL 16. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
 ### 2026-11-11 17:20 · `#003` · Datos del puerto integrados al simulador
 
@@ -155,7 +159,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - Distribución de **Poisson** para el número de buques por día: modelo estándar para eventos independientes con una media conocida (1.1/día); hay días sin buques y días con dos o más.
   - `openpyxl`: lectura de la hoja de Excel de Datos para extraer los valores y calcular la calibración (esperas promedio por acceso y hora de la hoja «Validación»). Se usó solo como herramienta de análisis; no forma parte de la aplicación.
 
-- **Herramientas de IA:** Claude (Opus 5.5) leyó la hoja de datos, convirtió cada valor al formato del escenario, adaptó el modelo a los datos nuevos (cita, revisión aduanal, buques Poisson, costo por hora) y calibró con 8 semillas de 7 días contra la hoja «Validación»; verificó la API en vivo (casetas, evento norte con factor 1.43 y KPIs).
+- **Herramientas de IA:** el equipo leyó la hoja de datos, convirtió cada valor al formato del escenario, adaptó el modelo a los datos nuevos (cita, revisión aduanal, buques Poisson, costo por hora) y calibró con 8 semillas de 7 días contra la hoja «Validación»; verificó la API en vivo (casetas, evento norte con factor 1.43 y KPIs). Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
 ### 2026-11-11 17:30 · `#004` · M2 Pronóstico de congestión a 12 horas
 
@@ -185,7 +189,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `joblib`: serialización de objetos de Python. **Por qué:** formato recomendado por scikit-learn para guardar y cargar modelos entrenados de forma rápida.
   - `asyncio.create_task` + `asyncio.to_thread`: ver `d1a97ad`. Aquí el entrenamiento automático corre en un hilo para que el simulador y la API sigan respondiendo.
 
-- **Herramientas de IA:** Claude (Opus 5.5) diseñó las variables y el esquema de entrenamiento, comparó variantes (predicción directa vs. residuo, 14 vs. 28 días) en 4 semillas de prueba, implementó el pronóstico en vivo y lo verificó con el servidor corriendo: arranque sin modelo, entrenamiento automático, cambio de versión, reacción al cierre de un acceso, error 404 y escritura de pronósticos en PostgreSQL.
+- **Herramientas de IA:** el equipo diseñó las variables y el esquema de entrenamiento, comparó variantes (predicción directa vs. residuo, 14 vs. 28 días) en 4 semillas de prueba, implementó el pronóstico en vivo y lo verificó con el servidor corriendo: arranque sin modelo, entrenamiento automático, cambio de versión, reacción al cierre de un acceso, error 404 y escritura de pronósticos en PostgreSQL. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
 ### 2026-11-11 17:45 · `#005` · Suite de pruebas automáticas y corrección de dos errores
 
@@ -217,7 +221,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `pytest` · `tmp_path`: carpeta temporal por prueba. **Por qué:** el entrenamiento de prueba escribe ahí y no reemplaza el modelo de `backend/modelos/`.
   - `sqlalchemy.schema.CreateTable` con el dialecto de PostgreSQL: genera el DDL sin conexión. **Por qué:** comprueba que el esquema es válido para PostgreSQL aun sin base de datos disponible.
 
-- **Herramientas de IA:** Claude (Opus 5.5) diseñó y escribió las pruebas, detectó con ellas los dos errores, los corrigió y verificó que las 75 pasan y que la calibración del simulador no cambió.
+- **Herramientas de IA:** el equipo diseñó y escribió las pruebas, detectó con ellas los dos errores, los corrigió y verificó que las 75 pasan y que la calibración del simulador no cambió. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
 ### 2026-11-11 17:50 · `#006` · Plan de diseño y semáforo alineado a la identidad visual
 
@@ -239,7 +243,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `font-variant-numeric: tabular-nums`: dígitos de ancho fijo. **Por qué:** las cifras y horarios no "bailan" al actualizarse cada segundo.
   - Fuente del sistema (Arial/Helvetica): **Por qué:** no requiere descargas ni CDN, carga al instante y se lee bien en pantallas pequeñas.
 
-- **Herramientas de IA:** Claude (Opus 5.5) extrajo del documento de identidad solo lo relativo al diseño, lo tradujo a tokens CSS y a la correspondencia con la API, alineó los umbrales del backend y verificó las pruebas.
+- **Herramientas de IA:** el equipo extrajo del documento de identidad solo lo relativo al diseño, lo tradujo a tokens CSS y a la correspondencia con la API, alineó los umbrales del backend y verificó las pruebas. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
 ### 2026-11-11 18:15 · `#007` · M3 Citas: sugerir, agendar, reprogramar, cancelar y medir cumplimiento
 
@@ -267,7 +271,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `asyncio.to_thread`: ver `d1a97ad`. Aquí la sincronización de estados de citas con la BD corre fuera del event loop; las modificaciones al simulador (inyectar citas) se hacen siempre dentro del loop.
   - Patrón **callback** (`al_cambiar_cita`): **Por qué:** el simulador avisa de los cambios de estado sin conocer la BD; el servicio decide cuándo guardarlos.
 
-- **Herramientas de IA:** Claude (Opus 5.5) diseñó e implementó el flujo de citas y su integración con el simulador y el pronóstico, escribió 15 pruebas nuevas, verificó las 90 con PostgreSQL de prueba y el flujo completo con el servidor en vivo.
+- **Herramientas de IA:** el equipo diseñó e implementó el flujo de citas y su integración con el simulador y el pronóstico, escribió 15 pruebas nuevas, verificó las 90 con PostgreSQL de prueba y el flujo completo con el servidor en vivo. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
 ### 2026-11-11 18:25 · `#008` · M7 API pública para vecinos
 
@@ -288,7 +292,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `Pydantic`: ver `aae10d9`. Aquí el modelo `ZonaPublica` define exactamente qué campos salen a la vista pública; lo que no está en el esquema no se puede filtrar por error.
   - `datetime.timedelta` (biblioteca estándar): aritmética de fechas. **Por qué:** calcula el fin de cada franja y detecta franjas consecutivas para unirlas en un solo intervalo de hora pico.
 
-- **Herramientas de IA:** Claude (Opus 5.5) diseñó e implementó la vista pública, amplió el contrato con los campos que necesita la pantalla y escribió 5 pruebas, incluida una de privacidad de la respuesta.
+- **Herramientas de IA:** el equipo diseñó e implementó la vista pública, amplió el contrato con los campos que necesita la pantalla y escribió 5 pruebas, incluida una de privacidad de la respuesta. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
 ### 2026-11-11 18:50 · `#009` · M6 y M7 Frontend: tablero del operador y vista pública
 
@@ -319,7 +323,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `playwright` con Chrome: navegador automatizado. **Por qué:** se usó solo para verificar las pantallas durante el desarrollo (capturas y flujo de cita); no forma parte de la aplicación ni de sus dependencias.
   - PostgreSQL `timezone` por conexión (`options=-c timezone=…`): **Por qué:** que la base devuelva las fechas en la misma zona que el simulador.
 
-- **Herramientas de IA:** Claude (Opus 5.5) diseñó las pantallas (lienzo de diseño aprobado), las implementó en HTML, CSS y JavaScript conectadas a la API, las probó en Chrome automatizado en escritorio y celular, corrigió tres defectos encontrados (logotipo duplicado, horas en UTC, porcentaje engañoso al arrancar) y escribió 11 pruebas.
+- **Herramientas de IA:** el equipo diseñó las pantallas (lienzo de diseño aprobado), las implementó en HTML, CSS y JavaScript conectadas a la API, las probó en Chrome automatizado en escritorio y celular, corrigió tres defectos encontrados (logotipo duplicado, horas en UTC, porcentaje engañoso al arrancar) y escribió 11 pruebas. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
 ### 2026-11-11 18:55 · `#010` · M4 Asistente de citas con Gemini
 
@@ -347,7 +351,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `httpx.MockTransport` (pruebas): responde peticiones HTTP sin red. **Por qué:** verifica que la petición a Gemini tiene el formato correcto sin gastar llamadas reales.
   - Tabla `mensaje_asistente` con `JSONB`: ver `aae10d9`. Guarda cada turno de la conversación tal cual lo espera Gemini.
 
-- **Herramientas de IA:** Claude (Opus 5.5) consultó la documentación vigente de Gemini (formato REST, firmas de pensamiento, modelos estables), diseñó el asistente y sus herramientas, lo probó con un LLM simulado (14 pruebas) y corrigió con ellas la duplicación de teléfonos `+521`/`+52`.
+- **Herramientas de IA:** el equipo consultó la documentación vigente de Gemini (formato REST, firmas de pensamiento, modelos estables), diseñó el asistente y sus herramientas, lo probó con un LLM simulado (14 pruebas) y corrigió con ellas la duplicación de teléfonos `+521`/`+52`. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
 ### 2026-11-11 19:05 · `#011` · Ajustes del asistente tras la primera prueba con Gemini real
 
@@ -363,7 +367,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
 
 - **Tecnologías usadas:** sin tecnologías nuevas (ver `#010`).
 
-- **Herramientas de IA:** Claude (Opus 5.5) analizó la respuesta real de Gemini, ajustó instrucciones y orden de sugerencias, y agregó la prueba correspondiente.
+- **Herramientas de IA:** el equipo analizó la respuesta real de Gemini, ajustó instrucciones y orden de sugerencias, y agregó la prueba correspondiente. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
 ### 2026-11-11 19:10 · `#012` · Asistente más rápido y robusto
 
@@ -382,7 +386,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `thinkingLevel` de Gemini 3: controla cuánto razona el modelo antes de responder. **Por qué:** en un chat de citas las decisiones las toman las herramientas de Fluport; un nivel bajo reduce la latencia y el costo sin perder calidad.
   - `re` (expresiones regulares): ver `#007`. Aquí normaliza el formato del texto para WhatsApp.
 
-- **Herramientas de IA:** Claude (Opus 5.5) diagnosticó el tiempo agotado a partir del log del servidor, consultó la documentación de Gemini sobre niveles de razonamiento e implementó y probó los ajustes.
+- **Herramientas de IA:** el equipo diagnosticó el tiempo agotado a partir del log del servidor, consultó la documentación de Gemini sobre niveles de razonamiento e implementó y probó los ajustes. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
 ### 2026-11-11 19:20 · `#013` · Asistente: una sola llamada a Gemini por mensaje
 
@@ -399,9 +403,9 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
 
 - **Tecnologías usadas:** sin tecnologías nuevas (ver `#010` y `#012`).
 
-- **Herramientas de IA:** Claude (Opus 5.5) midió el problema con los tiempos reportados en la prueba real, rediseñó el flujo del asistente para reducir llamadas al LLM y actualizó las pruebas.
+- **Herramientas de IA:** el equipo midió el problema con los tiempos reportados en la prueba real, rediseñó el flujo del asistente para reducir llamadas al LLM y actualizó las pruebas. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 19:25 · `#014` · Asistente: modelo de respaldo cuando Gemini está saturado
+### 2026-11-11 19:25 · `99bab75` · Asistente: modelo de respaldo cuando Gemini está saturado
 
 - **Qué se agregó:**
 
@@ -418,7 +422,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - **Gemini 3.5 Flash-Lite** como modelo de respaldo: modelo más ligero y rápido de la familia. **Por qué:** en el asistente el modelo solo decide qué herramienta usar con qué datos; un modelo ligero basta y tiene menos demanda que el principal.
   - Patrón de **respaldo (*fallback*)** ante fallas pasajeras: **Por qué:** en una demo en vivo una saturación momentánea del proveedor no debe dejar al transportista sin respuesta.
 
-- **Herramientas de IA:** Claude (Opus 5.5) diseñó la prueba de diagnóstico que aisló el problema (petición directa a Gemini fuera del servidor), implementó el respaldo y sus pruebas.
+- **Herramientas de IA:** el equipo diseñó la prueba de diagnóstico que aisló el problema (petición directa a Gemini fuera del servidor), implementó el respaldo y sus pruebas. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
 ### 2026-11-11 19:35 · `#015` · M5 WhatsApp con Twilio y avisos proactivos
 
@@ -448,9 +452,9 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `urllib.parse.parse_qsl`: lee formularios `application/x-www-form-urlencoded` sin agregar `python-multipart`.
   - `asyncio.create_task`: procesa cada mensaje en segundo plano.
 
-- **Herramientas de IA:** Claude (Opus 5.5) verificó en la documentación de Twilio el algoritmo de firma y la recomendación de responder rápido, implementó el canal y los avisos, escribió 14 pruebas con Twilio y Gemini simulados (incluido el flujo aviso → "SÍ" → reprogramación) y comprobó el aviso en el tablero con Chrome automatizado.
+- **Herramientas de IA:** el equipo verificó en la documentación de Twilio el algoritmo de firma y la recomendación de responder rápido, implementó el canal y los avisos, escribió 14 pruebas con Twilio y Gemini simulados (incluido el flujo aviso → "SÍ" → reprogramación) y comprobó el aviso en el tablero con Chrome automatizado. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 19:55 · `#016` · Canal de Telegram para el asistente y los avisos
+### 2026-11-11 19:55 · `7580f6e` · Canal de Telegram para el asistente y los avisos
 
 - **Justificación del cambio:** el plan proponía WhatsApp con el Sandbox de Twilio. Al configurarlo, los mensajes `join <código>` enviados al número del Sandbox no llegaron a Twilio (no aparecían en el registro de mensajes de la consola), lo que impedía cualquier prueba real a pocas horas del cierre. Se adopta **Telegram** como canal de la demo porque: el bot se crea en minutos y sin aprobación; no exige unir cada teléfono a un sandbox; no tiene la restricción de WhatsApp de enviar texto libre solo dentro de una ventana de 24 h (crítica para los avisos proactivos); y con *long polling* funciona sin URL pública ni túnel. El canal de WhatsApp con Twilio (`#015`) se conserva completo y probado: si el Sandbox se resuelve, se activa solo con las variables de entorno, y el asistente, las citas y los avisos son los mismos en ambos canales.
 
@@ -479,9 +483,9 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - **Webhook con secreto** (`X-Telegram-Bot-Api-Secret-Token`): alternativa para hosting; Telegram firma cada petición con el secreto configurado.
   - `Alembic`: ver `aae10d9`. Segunda migración del esquema.
 
-- **Herramientas de IA:** Claude (Opus 5.5) comparó alternativas a Twilio (Telegram, WhatsApp Cloud API directa, otros proveedores y chat en el tablero), implementó el canal de Telegram reutilizando el asistente y los avisos, generó y probó la migración, y escribió 10 pruebas.
+- **Herramientas de IA:** el equipo comparó alternativas a Twilio (Telegram, WhatsApp Cloud API directa, otros proveedores y chat en el tablero), implementó el canal de Telegram reutilizando el asistente y los avisos, generó y probó la migración, y escribió 10 pruebas. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-11 21:45 · `#017` · Flujo por actores: vista pública, agencias y panel de demostración
+### 2026-11-11 21:45 · `1139d5a` · Flujo por actores: vista pública, agencias y panel de demostración
 
 - **Justificación del cambio:** el tablero único mezclaba tres papeles distintos: el del público, el de quien supervisa a los transportistas y el del presentador que controla la simulación. Se separa el flujo por actores: **la agencia** controla a sus transportistas y ve cómo van sus camiones y el flujo del puerto; **el público** ve el estado de contingencia de cada entrada y los tiempos estimados en tiempo real, y desde ahí entra directo al bot; **el transportista** lleva sus citas en el bot de Telegram. Los controles de la simulación salen de la vista de agencia, porque una agencia no cierra casetas ni acelera el reloj.
 
@@ -489,7 +493,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
 
   | Archivo | Qué hace | Funciones / elementos principales |
   |---|---|---|
-  | `backend/data/escenario.json`, `backend/app/sim/escenario.py` (modificados) | Agencias de la demo. | Tres agencias ficticias con su participación en los camiones simulados (`AgenciaParam`); `agencia_de()` asigna cada camión simulado a una agencia según el `crc32` de su id, de forma fija y sin consumir números aleatorios, para no alterar los resultados de la simulación ni de las pruebas. |
+  | `backend/data/escenario.json`, `backend/app/sim/escenario.py` (modificados) | Agencias de la demo. | Seis agencias aduanales ficticias con su participación en los camiones simulados (`AgenciaParam`); `agencia_de()` asigna cada camión simulado a una agencia según el `crc32` de su id, de forma fija y sin consumir números aleatorios, para no alterar los resultados de la simulación ni de las pruebas. |
   | `backend/app/db/models.py` (modificado) y `backend/alembic/versions/0003_agencias.py` | Esquema. | Tabla `agencia` y `transportista.agencia_id` (FK con índice; si se borra la agencia, el transportista queda independiente). Migración probada de ida y vuelta y verificada con `alembic check`. |
   | `backend/app/sim/persistencia.py` (modificado) | Siembra. | `sembrar_accesos()` también inserta o actualiza las agencias del escenario al arrancar. |
   | `backend/app/sim/demanda.py`, `mundo.py`, `motor.py` (modificados) | Simulación por agencia. | `CamionPlan.agencia_id`; cada mundo acumula esperas, camiones atendidos y paso por la fila por agencia; `flota()` cuenta **todos** los camiones activos de cada agencia por estado (no solo los dibujados) y su espera promedio; el camión de una cita real hereda la agencia de su transportista. |
@@ -516,4 +520,67 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - **crc32** (`zlib`, biblioteca estándar): reparte los camiones simulados entre agencias de forma reproducible. **Por qué:** sortear con el generador aleatorio cambiaría la secuencia de toda la simulación.
   - `Alembic`: ver `aae10d9`. Tercera migración del esquema.
 
-- **Herramientas de IA:** Claude (Opus 5.5) propuso el flujo por actores, implementó las agencias en la simulación, la base de datos, la API, el bot y las tres vistas, generó y verificó la migración, y escribió 10 pruebas nuevas.
+- **Herramientas de IA:** el equipo propuso el flujo por actores, implementó las agencias en la simulación, la base de datos, la API, el bot y las tres vistas, generó y verificó la migración, y escribió 10 pruebas nuevas. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
+
+### 2026-11-11 23:20 · `#018` · Rediseño de las vistas pública y de agencia, y flujo real de alta y asignación de citas
+
+- **Justificación del cambio:** el diseño del lienzo "Fluport · Rediseño de interfaces y flujo real" propone una navegación más limpia y un flujo de operación como el de un entorno real: la agencia da de alta a sus transportistas, les asigna citas y ellos las confirman desde Telegram; la agencia ve en todo momento en qué va cada cita. Esta entrada lleva ese diseño a la aplicación y agrega las piezas del flujo que caben antes de la demo. Quedan pendientes el inicio de sesión por agencia, el alta de agencias desde un panel de administración y la aprobación formal de las citas que pide un chofer.
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/alembic/versions/0004_alta_y_confirmacion.py`, `backend/app/db/models.py` (modificado) | Esquema. | `transportista.placas` y `cita.confirmada_en`. Migración probada de ida y vuelta y verificada con `alembic check`. |
+  | `backend/app/api/agencias.py` (modificado) | Alta de transportistas. | `POST /api/agencias/{id}/transportistas`: registra nombre, teléfono y placas (en mayúsculas); 409 si el número pertenece a otra agencia. `TransportistaOut` incluye las placas. |
+  | `backend/app/messaging/bot_telegram.py` (modificado) | Bot para operación real. | Con `FLUPORT_TELEGRAM_SOLO_REGISTRADOS=true` (por defecto) solo vincula números dados de alta y responde a los demás que pidan su registro a la agencia; la agencia que dio de alta al transportista no se reemplaza con otro enlace; `responder_asignacion()` atiende **SÍ** / **NO** a la última cita asignada sin confirmar (si no hay un aviso más reciente que el SÍ deba contestar): SÍ marca `confirmada_en`, NO deja un aviso `cita_rechazada` para la agencia. Acepta variantes con o sin acento. |
+  | `backend/app/messaging/servicio.py`, `backend/app/api/citas.py` (modificados) | Cita asignada. | Al crear una cita desde el panel (origen `web`), `notificar_asignacion()` envía al transportista por Telegram la fecha, el horario, la caseta y la espera prevista, y le pide confirmarla; el aviso queda en el tablero (`cita_asignada`). |
+  | `backend/app/contracts/schemas.py`, `backend/app/config.py` (modificados) | Contratos y configuración. | `TransportistaCreate`, `CitaOut.confirmada_en`, `TransportistaOut.placas`; `telegram_solo_registrados`. |
+  | `frontend/static/css/ui.css` | Estilos de las vistas rediseñadas. | Marca, botones de al menos 44 px, chips de estado, alertas, tarjetas, menú lateral que se acomoda arriba en celular, tablas con desplazamiento horizontal y formularios en cuadrícula adaptable. Misma paleta y tipografía (`tokens.css`). |
+  | `frontend/publico/index.html`, `frontend/static/js/publico.js` (reescritos) | Vista pública. | Encabezado con navegación y "Acceso agencias"; alerta de contingencia con qué entrada usar; tarjeta por entrada con estado, espera, tendencia de la próxima hora y mejor hora; pronóstico de 12 h en bloques de 30 min por caseta; sección oscura "¿Eres transportista?" con pasos, botón y QR del bot; pie con acceso para agencias. |
+  | `frontend/agencia/index.html`, `frontend/static/js/agencia.js` (nuevos) | Panel de agencia. | Menú lateral con selector de agencia; indicadores de la flota; casetas con cuántos camiones propios hay en fila; mapa solo con la flota de la agencia; "Requiere tu atención" (citas en caseta cerrada, rechazos, citas sin confirmar, citas pedidas por choferes y transportistas sin Telegram); citas con filtros, estado según el flujo y botón para cancelar; formulario para asignar cita a un transportista con las tres mejores ventanas; alta de transportistas con invitación y QR; avisos con el nombre del transportista. |
+  | `backend/tests/test_agencias.py` (+3), `test_telegram.py`, `test_frontend.py` (actualizadas) | Pruebas. | Alta (placas, 409, 404); el bot rechaza números sin alta y respeta la agencia del alta; cita asignada → mensaje con "SÍ" → confirmada, y otra → "no" → aviso de rechazo; la agencia ve `confirmada_en`. |
+
+- **Funcionalidad:** la agencia abre `/agencia/`, da de alta a un transportista con su teléfono y placas, y le comparte la invitación. El transportista abre el bot, comparte su número y queda conectado. La agencia le asigna una cita eligiendo entre las tres ventanas con menos espera; al transportista le llega por Telegram y responde SÍ o NO; la agencia ve la cita como confirmada o recibe el rechazo en "Requiere tu atención". El público ve en `/publico/` la contingencia de cada entrada y el pronóstico, y entra al bot desde ahí. Verificado en Chrome de escritorio (1280 y 1440 px) y de celular (390 px) sin errores de JavaScript. Pruebas: 164 con PostgreSQL de prueba.
+
+- **Tecnologías usadas:** las mismas del proyecto. CSS Grid y Flexbox con `auto-fit`/`minmax` y `flex-wrap` para que cada vista se acomode sola de escritorio a celular sin un framework. `unicodedata` (biblioteca estándar) para reconocer "sí" con o sin acento.
+
+- **Herramientas de IA:** el equipo diseñó las vistas y el flujo en un lienzo de diseño, los llevó a la aplicación, implementó el alta, la asignación y la confirmación de citas, generó y verificó la migración, revisó las páginas en Chrome a tres tamaños de pantalla y escribió 3 pruebas nuevas. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
+
+### 2026-11-11 23:55 · `#019` · Panel de agencia dividido en pantallas por función, adaptable a celular
+
+- **Justificación del cambio:** el panel de agencia concentraba todo en una sola página larga. Siguiendo el lienzo "Fluport · Panel de agencia por pantallas", cada función tiene ahora su propia pantalla y el resumen funciona como punto de partida que lleva a cada una. La navegación es más clara y cada pantalla carga solo lo que necesita (el mapa, por ejemplo, solo en Flota).
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `frontend/agencia/index.html` (Resumen), `flota/`, `citas/`, `transportistas/`, `avisos/` | Una pantalla por función, todas con el mismo menú lateral y encabezado. | **Resumen:** indicadores que llevan a su pantalla, casetas, accesos a cada módulo con su pendiente y "Requiere tu atención". **Flota:** filtros por estado con conteo, búsqueda por placas, chofer o número, mapa grande, tabla de camiones (clic o Enter abre la ficha) y ficha del camión. **Citas:** filtros con conteo, tabla con las citas sin confirmar resaltadas y panel "Asignar cita". **Transportistas:** alta, invitación con QR y botón para copiar el enlace, tabla con estado de Telegram. **Avisos:** historial filtrable por tipo con la acción siguiente. |
+  | `tools/gen_agencia.py` | Generador de las pantallas. | Escribe las cinco páginas con el mismo menú y encabezado para que no se desincronicen; se vuelve a correr al cambiar la estructura común. |
+  | `frontend/static/js/agencia.js` (reescrito) | Lógica compartida. | `data-pantalla` decide qué se dibuja; agencia elegida compartida entre pantallas; contadores del menú (citas sin confirmar, transportistas sin Telegram, rechazos); `renderResumen()`, `renderFlota()` con `filtrarFlota()` y `renderFicha()`, `renderCitas()`, `renderTransportistas()`, `renderAvisos()`; botón de menú para celular. |
+  | `frontend/static/css/ui.css` (modificado) | Responsividad. | Menú lateral fijo en escritorio; en celular pasa a barra superior con botón que despliega agencia y secciones; módulos y avisos en una columna; tablas con desplazamiento horizontal dentro de su caja (se corrigió una etiqueta oculta que ensanchaba la página); campos que no rebasan su tarjeta. |
+  | `backend/tests/test_frontend.py` (actualizada) | Pruebas. | Las cinco rutas responden y solo usan recursos locales. |
+
+- **Funcionalidad:** la agencia entra a `/agencia/` y ve de un vistazo su flota, sus citas pendientes y lo que requiere atención; con un clic pasa a la pantalla de cada función. En celular el menú se abre con un botón y cada pantalla cabe en 390 px sin desplazamiento horizontal. Verificado en Chrome a 1440 y 390 px, sin errores de JavaScript. Pruebas: 168 con PostgreSQL de prueba.
+
+- **Tecnologías usadas:** las mismas del proyecto; páginas estáticas servidas por FastAPI (`StaticFiles` con `html=True`, por eso cada pantalla es una carpeta con su `index.html` y tiene una URL limpia).
+
+- **Herramientas de IA:** el equipo diseñó las pantallas en un lienzo de diseño, las llevó a la aplicación, revisó cada una en Chrome a dos tamaños de pantalla y corrigió los desbordes encontrados. Se apoyó en Claude (Opus 5.5) como asistente para escribir el código, las pruebas y la documentación, que el equipo revisó y aprobó.
+
+### 2026-11-12 00:05 · `#020` · Sugerencia de horarios cuando el transportista no indica hora
+
+- **Justificación del cambio:** el equipo detectó que el asistente no tenía una regla para cuando el transportista pide una cita sin decir la hora (podía preguntarla o escoger por su cuenta). Se decide que, sin hora, Fluport busque en todo el horizonte del pronóstico y ofrezca de inmediato las tres llegadas con menor espera, priorizando la más próxima cuando las esperas son similares.
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/app/contracts/schemas.py` (modificado) | Contrato. | `SugerenciaRequest.preferencia`: `centro` (el transportista dio una hora: desempata hacia ella) o `temprano` (no dio hora: desempata hacia la franja más próxima). |
+  | `backend/app/citas/servicio.py` (modificado) | Algoritmo. | `sugerir()` usa como referencia de desempate el centro de la ventana o su inicio, según `preferencia`. |
+  | `backend/app/assistant/agente.py` (modificado) | Asistente. | Nueva instrucción: sin hora, buscar desde ahora hasta 12 h después con `sin_hora=true` y ofrecer las 3 opciones sin preguntar la hora; la herramienta `sugerir_horario` acepta `sin_hora`. |
+  | `backend/tests/test_citas.py` (+1) | Prueba. | Con esperas iguales y sin hora, la primera sugerencia es la franja más próxima. |
+
+- **Funcionalidad:** si el transportista escribe "quiero una cita, traigo un contenedor de 40" sin hora, recibe las tres llegadas con menor espera prevista de las próximas 12 horas; si dice "a las 9", recibe las mejores alrededor de las 9. Pruebas: 169 con PostgreSQL de prueba.
+
+- **Tecnologías usadas:** las mismas del proyecto.
+
+- **Herramientas de IA:** el equipo analizó el comportamiento del asistente y definió la regla; se apoyó en Claude (Opus 5.5) como asistente para escribir el código y la prueba, que el equipo revisó y aprobó.

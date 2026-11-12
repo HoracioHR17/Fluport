@@ -209,6 +209,7 @@
           "citas"
         ],
         "summary": "Crear Cita",
+        "description": "Crea la cita. Si la asigna la agencia (origen web), el transportista la recibe en Telegram para confirmarla.",
         "operationId": "crear_cita_api_citas_post",
         "requestBody": {
           "required": true,
@@ -1038,6 +1039,57 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "agencias"
+        ],
+        "summary": "Alta Transportista",
+        "description": "La agencia da de alta a un transportista; solo los números dados de alta pueden vincularse al bot.",
+        "operationId": "alta_transportista_api_agencias__agencia_id__transportistas_post",
+        "parameters": [
+          {
+            "name": "agencia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agencia Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransportistaCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportistaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/salud": {
@@ -1504,6 +1556,18 @@
               }
             ],
             "title": "Cita Anterior Id"
+          },
+          "confirmada_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confirmada En"
           }
         },
         "type": "object",
@@ -2273,6 +2337,16 @@
             "minimum": 1.0,
             "title": "Max Resultados",
             "default": 3
+          },
+          "preferencia": {
+            "type": "string",
+            "enum": [
+              "centro",
+              "temprano"
+            ],
+            "title": "Preferencia",
+            "description": "Desempate entre esperas similares: la hora más cercana al centro de la ventana (el transportista dio una hora) o la más próxima (no dio hora)",
+            "default": "centro"
           }
         },
         "type": "object",
@@ -2307,6 +2381,39 @@
         ],
         "title": "TipoEventoSim"
       },
+      "TransportistaCreate": {
+        "properties": {
+          "alias": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 2,
+            "title": "Alias"
+          },
+          "telefono": {
+            "type": "string",
+            "title": "Telefono"
+          },
+          "placas": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "alias",
+          "telefono"
+        ],
+        "title": "TransportistaCreate",
+        "description": "Alta de un transportista por su agencia (solo números de prueba con consentimiento)."
+      },
       "TransportistaOut": {
         "properties": {
           "id": {
@@ -2332,6 +2439,17 @@
             "type": "boolean",
             "title": "Telegram",
             "default": false
+          },
+          "placas": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placas"
           },
           "citas_activas": {
             "type": "integer",

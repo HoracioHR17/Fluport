@@ -126,3 +126,12 @@ docs/                                                               # contratos,
 - `ZonaPublica.contingencia` ∈ `normal | lenta | saturada | cerrada` y `ZonaPublica.norte`.
 - Bot: `t.me/<bot>?start=<agencia_id>` liga al transportista con la agencia.
 - Páginas: `/` → `/publico/` · `/agencia/` · `/demo/` · `/operador/` → `/agencia/`.
+
+## Alta y confirmación (`#018`)
+- `POST /api/agencias/{id}/transportistas` (`TransportistaCreate`: alias, telefono, placas) → `TransportistaOut` (incluye `placas`); 409 si el número es de otra agencia.
+- `CitaOut.confirmada_en`: el transportista respondió SÍ en el bot a la cita asignada.
+- Citas con origen `web` se notifican al transportista (`aviso.tipo = cita_asignada`); un NO genera `cita_rechazada`.
+- `FLUPORT_TELEGRAM_SOLO_REGISTRADOS` (por defecto `true`): el bot solo vincula números dados de alta.
+
+## Panel de agencia por pantallas (`#019`)
+- `/agencia/` (resumen) · `/agencia/flota/` · `/agencia/citas/` · `/agencia/transportistas/` · `/agencia/avisos/`; la agencia elegida se comparte entre pantallas (`localStorage` o `?agencia=AG01`).
