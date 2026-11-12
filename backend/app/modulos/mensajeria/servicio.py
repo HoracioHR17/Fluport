@@ -1,4 +1,5 @@
-"""Orquestación de mensajería: ciclo de avisos proactivos, citas asignadas y resultado de las solicitudes de alta.
+"""Orquestación de mensajería: avisos proactivos, citas asignadas, canceladas o cambiadas por la agencia y resultado
+de las solicitudes de alta.
 
 Los avisos se envían por Telegram a los transportistas conectados al bot; los demás quedan registrados como
 fallidos para que la agencia los vea.
@@ -13,7 +14,7 @@ from sqlalchemy import select
 from app.modulos.mensajeria.adaptadores import telegram
 from app.modulos.mensajeria.asistente.agente import guardar_turnos
 from app.modulos.mensajeria.dominio.avisos import AvisoNuevo, CitaActiva, revisar
-from app.nucleo.contracts.enums import Canal, EstadoAviso, EstadoCita
+from app.nucleo.contracts.enums import Canal, EstadoAviso, EstadoCita, OrigenCita
 from app.nucleo.contracts.schemas import AvisoOut, WsAviso
 from app.nucleo.db.base import SessionLocal
 from app.nucleo.db.models import Aviso, Cita, Transportista
@@ -98,18 +99,68 @@ def mensaje_asignacion(sim: Operacion, cita_id: int) -> AvisoNuevo | None:
         return AvisoNuevo(c.id, t.id, t.telefono, "cita_asignada", texto, t.telegram_chat_id)
 
 
-async def notificar_asignacion(sim: Operacion, cita_id: int, publicar) -> AvisoOut | None:
-    """Envía al transportista la cita que le asignó su agencia y la deja en los avisos del tablero."""
-    a = await asyncio.to_thread(mensaje_asignacion, sim, cita_id)
+def mensaje_cancelacion(sim: Operacion, cita_id: int) -> AvisoNuevo | None:
+    """Aviso de que la agencia canceló la cita (solo si el transportista está conectado a Telegram)."""
+    with SessionLocal() as db:
+        c = db.get(Cita, cita_id)
+        t = c.transportista if c else None
+        if t is None or t.telegram_chat_id is None or not t.telefono:
+            return None
+        ini = c.ventana_inicio.astimezone(ZoneInfo(sim.cfg.zona_horaria))
+        agencia = t.agencia.nombre if t.agencia else "Tu agencia"
+        texto = (f"❌ *{agencia}* canceló tu cita *#{c.id}* del {ini:%d/%m} a las {ini:%H:%M} en "
+                 f"{sim.esc.acceso(c.acceso_id).nombre}.\nYa no tienes que presentarte. Si necesitas otra, "
+                 "escríbeme día, hora y tipo de carga.")
+        return AvisoNuevo(c.id, t.id, t.telefono, "cita_cancelada", texto, t.telegram_chat_id)
+
+
+def mensaje_reasignacion(sim: Operacion, cita_id: int) -> AvisoNuevo | None:
+    """Aviso de que la agencia cambió la cita (`cita_id` es la cita nueva, ligada a la anterior)."""
+    with SessionLocal() as db:
+        c = db.get(Cita, cita_id)
+        t = c.transportista if c else None
+        if t is None or t.telegram_chat_id is None or not t.telefono:
+            return None
+        zona = ZoneInfo(sim.cfg.zona_horaria)
+        ini, fin = c.ventana_inicio.astimezone(zona), c.ventana_fin.astimezone(zona)
+        agencia = t.agencia.nombre if t.agencia else "Tu agencia"
+        anterior = f" *#{c.cita_anterior_id}*" if c.cita_anterior_id else ""
+        texto = (f"🔁 *{agencia}* cambió tu cita{anterior}. Ahora es la *#{c.id}*:\n{ini:%d/%m} de {ini:%H:%M} a "
+                 f"{fin:%H:%M} · {sim.esc.acceso(c.acceso_id).nombre}")
+        if c.origen == OrigenCita.web:  # las citas de la agencia se confirman con SÍ / NO
+            texto += "\n¿La confirmas? Responde *SÍ* o *NO*."
+        else:
+            texto += "\nSi no te queda, escríbeme y la ajustamos."
+        return AvisoNuevo(c.id, t.id, t.telefono, "cita_reasignada", texto, t.telegram_chat_id)
+
+
+async def _notificar(armar, sim: Operacion, cita_id: int, publicar) -> AvisoOut | None:
+    """Arma el aviso de una cita, lo guarda, lo publica en el tablero y lo envía por Telegram."""
+    a = await asyncio.to_thread(armar, sim, cita_id)
     if a is None:
         return None
     out = await asyncio.to_thread(registrar_aviso, a)
     publicar(WsAviso(data=out).model_dump_json())
     enviado, detalle = await enviar_aviso(a)
     if not enviado:
-        log.warning("Cita asignada %s no enviada: %s", cita_id, detalle)
+        log.warning("Aviso %s de la cita %s no enviado: %s", a.tipo, cita_id, detalle)
     await asyncio.to_thread(marcar_aviso, out.id, enviado)
     return out
+
+
+async def notificar_asignacion(sim: Operacion, cita_id: int, publicar) -> AvisoOut | None:
+    """Envía al transportista la cita que le asignó su agencia y la deja en los avisos del tablero."""
+    return await _notificar(mensaje_asignacion, sim, cita_id, publicar)
+
+
+async def notificar_cancelacion(sim: Operacion, cita_id: int, publicar) -> AvisoOut | None:
+    """Avisa al transportista que su agencia canceló la cita."""
+    return await _notificar(mensaje_cancelacion, sim, cita_id, publicar)
+
+
+async def notificar_reasignacion(sim: Operacion, cita_id: int, publicar) -> AvisoOut | None:
+    """Avisa al transportista que su agencia cambió la cita (`cita_id` = cita nueva)."""
+    return await _notificar(mensaje_reasignacion, sim, cita_id, publicar)
 
 
 async def ciclo_avisos(sim: Operacion, publicar) -> list[AvisoOut]:

@@ -85,16 +85,25 @@ async def obtener_cita(cita_id: int, db: Session = Depends(get_db)) -> CitaOut:
 
 @router.patch("/{cita_id}", response_model=CitaOut)
 async def reprogramar_cita(cita_id: int, body: CitaReprogramar, db: Session = Depends(get_db)) -> CitaOut:
-    """Crea una cita nueva con `cita_anterior_id` y marca la original como `reprogramada`."""
+    """Crea una cita nueva con `cita_anterior_id`, marca la original como `reprogramada` y avisa al transportista."""
     try:
-        return citas.reprogramar(db, operacion(), cita_id, body)
+        nueva = citas.reprogramar(db, operacion(), cita_id, body)
     except ErrorCita as e:
         raise _http(e) from e
+    from app.modulos.mensajeria.servicio import en_segundo_plano, notificar_reasignacion
+
+    en_segundo_plano(notificar_reasignacion(operacion(), nueva.id, publicar))
+    return nueva
 
 
 @router.delete("/{cita_id}", response_model=CitaOut)
 async def cancelar_cita(cita_id: int, db: Session = Depends(get_db)) -> CitaOut:
+    """Cancela la cita (panel de la agencia) y le avisa al transportista por Telegram."""
     try:
-        return citas.cancelar(db, operacion(), cita_id)
+        cita = citas.cancelar(db, operacion(), cita_id)
     except ErrorCita as e:
         raise _http(e) from e
+    from app.modulos.mensajeria.servicio import en_segundo_plano, notificar_cancelacion
+
+    en_segundo_plano(notificar_cancelacion(operacion(), cita.id, publicar))
+    return cita

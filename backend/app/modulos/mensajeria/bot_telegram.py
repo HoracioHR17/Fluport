@@ -61,6 +61,9 @@ def _normal(texto: str) -> str:
     return "".join(c for c in sin_acentos if unicodedata.category(c) != "Mn").strip(" .!¡?¿,")
 
 
+AVISOS_DE_CITA = ("cita_asignada", "cita_reasignada")  # avisos que piden el SÍ / NO de la cita
+
+
 def cita_por_confirmar(db: Session, t: Transportista) -> Cita | None:
     """Última cita asignada por la agencia sin confirmar, si no hay un aviso más reciente que el SÍ deba responder."""
     c = db.scalar(select(Cita).where(Cita.transportista_id == t.id, Cita.estado == EstadoCita.agendada,
@@ -69,7 +72,7 @@ def cita_por_confirmar(db: Session, t: Transportista) -> Cita | None:
     if c is None:
         return None
     ultimo = db.scalar(select(func.max(Aviso.creado_en)).where(Aviso.transportista_id == t.id,
-                                                               Aviso.tipo != "cita_asignada"))
+                                                               Aviso.tipo.notin_(AVISOS_DE_CITA)))
     return None if ultimo is not None and ultimo > c.creada_en else c
 
 

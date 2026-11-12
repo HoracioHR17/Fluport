@@ -18,7 +18,7 @@ from app.modulos.mensajeria.adaptadores.gemini import ClienteGemini
 from app.modulos.mensajeria.puertos import ErrorLLM, ModeloLenguaje
 from app.modulos.pronostico.pronosticador import pronosticador
 from app.nucleo.config import get_settings
-from app.nucleo.contracts.enums import Canal, EstadoCita, Mundo, OrigenCita, TipoCarga
+from app.nucleo.contracts.enums import Canal, EstadoAviso, EstadoCita, Mundo, OrigenCita, TipoCarga
 from app.nucleo.contracts.schemas import (
     AccionAsistente,
     AsistenteRequest,
@@ -27,7 +27,7 @@ from app.nucleo.contracts.schemas import (
     CitaReprogramar,
     SugerenciaRequest,
 )
-from app.nucleo.db.models import Cita, MensajeAsistente, Transportista
+from app.nucleo.db.models import Aviso, Cita, MensajeAsistente, Transportista
 from app.nucleo.puertos import Operacion
 
 log = logging.getLogger("fluport.asistente")
@@ -65,12 +65,14 @@ HERRAMIENTAS: list[dict[str, Any]] = [
     },
     {
         "name": "reprogramar_cita",
-        "description": "Cambia el horario (y opcionalmente la caseta) de una cita agendada del transportista.",
+        "description": ("Cambia la caseta, el horario o ambos de una cita agendada del transportista. Para cambiar solo "
+                        "la caseta (p. ej. ya no entra por el norte sino por el sur), manda acceso_id y omite inicio: "
+                        "se conserva la hora."),
         "parameters": {"type": "object", "properties": {
             "cita_id": {"type": "integer"},
-            "inicio": {"type": "string", "description": "AAAA-MM-DDTHH:MM (hora de Veracruz)"},
-            "acceso_id": {"type": "string"},
-        }, "required": ["cita_id", "inicio"]},
+            "inicio": {"type": "string", "description": "AAAA-MM-DDTHH:MM (hora de Veracruz). Omitir para conservar la hora."},
+            "acceso_id": {"type": "string", "description": "Caseta nueva. Omitir para conservar la caseta."},
+        }, "required": ["cita_id"]},
     },
     {
         "name": "cancelar_cita",
@@ -88,9 +90,20 @@ HERRAMIENTAS: list[dict[str, Any]] = [
 DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
 
 
+def entradas(sim: Operacion) -> dict[str, list[str]]:
+    """Casetas por entrada al puerto: norte o sur según su latitud respecto al promedio de las casetas."""
+    accesos = sim.esc.accesos
+    centro = sum(a.lat for a in accesos) / len(accesos)
+    res: dict[str, list[str]] = {"norte": [], "sur": []}
+    for a in sorted(accesos, key=lambda a: -a.lat):
+        res["norte" if a.lat >= centro else "sur"].append(f"{a.id} ({a.nombre})")
+    return res
+
+
 def instrucciones(sim: Operacion) -> str:
     ahora = sim.ts()
     casetas = "; ".join(f"{a.id} = {a.nombre} ({a.zona})" for a in sim.esc.accesos)
+    por_entrada = "; ".join(f"entrada {k}: {', '.join(v)}" for k, v in entradas(sim).items() if v)
     return (
         "Eres el asistente de citas de FLUPORT para transportistas del puerto de Veracruz. "
         "Respondes por Telegram: en español, breve (máximo 6 líneas), cordial y claro, sin tecnicismos. "
@@ -98,6 +111,7 @@ def instrucciones(sim: Operacion) -> str:
         f"Fecha y hora actual (hora de Veracruz): {DIAS[ahora.weekday()]} {ahora:%Y-%m-%d %H:%M}. "
         "Es una SIMULACIÓN con datos sintéticos.\n"
         f"Casetas: {casetas}.\n"
+        f"Casetas por entrada al puerto: {por_entrada}.\n"
         f"Tipos de carga válidos: {', '.join(CARGAS)} (\"contenedor de 40\" = contenedor_40).\n"
         "Reglas:\n"
         "1. Para agendar: si el usuario da una hora aproximada, busca con sugerir_horario una ventana de 3 horas "
@@ -112,7 +126,12 @@ def instrucciones(sim: Operacion) -> str:
         "5. Nunca inventes horarios, esperas ni números de cita: usa solo lo que devuelvan las herramientas.\n"
         "6. Tú sugieres; la terminal conserva el control. Si algo falla, explícalo en una línea y ofrece alternativa.\n"
         "7. Si el usuario responde SÍ a un aviso tuyo que propone cambiar su cita, usa reprogramar_cita con el número "
-        "de cita, la hora y la caseta propuestas en ese aviso."
+        "de cita, la hora y la caseta propuestas en ese aviso.\n"
+        "8. Si el transportista avisa que cambió de entrada o de ruta (p. ej. \"ya no entro por el norte, voy por el "
+        "sur\" o \"mejor llego por Paso del Toro\"), cambia su cita con reprogramar_cita a una caseta de esa entrada "
+        "conservando la hora (omite inicio), salvo que también pida otra hora. Si esa entrada tiene varias casetas, "
+        "usa la primera de la lista. Si tiene varias citas activas y no queda claro cuál, pregúntale cuál.\n"
+        "9. Tu agencia se entera automáticamente de los cambios y cancelaciones que hagas por aquí; dilo si preguntan."
     )
 
 
@@ -184,25 +203,63 @@ class Herramientas:
                 "inicio": c.ventana_inicio.astimezone(self.zona).strftime("%Y-%m-%dT%H:%M"),
                 "espera_estimada_min": c.espera_estimada_min}
 
-    def h_reprogramar_cita(self, cita_id: int, inicio: str, acceso_id: str | None = None) -> dict[str, Any]:
-        self._mi_cita(cita_id)
-        ini = self._fecha(inicio)
+    def _hora(self, dt: datetime) -> str:
+        return f"{dt.astimezone(self.zona):%d/%m %H:%M}"
+
+    def _avisar_agencia(self, t: Transportista, cita_id: int, tipo: str, mensaje: str) -> bool:
+        """Deja el cambio del transportista en los avisos del panel de su agencia (no se envía por Telegram)."""
+        if t.agencia_id is None:
+            return False
+        self.db.add(Aviso(transportista_id=t.id, cita_id=cita_id, canal=Canal.telegram, tipo=tipo, mensaje=mensaje,
+                          estado=EstadoAviso.enviado, enviado_en=datetime.now().astimezone()))
+        self.db.commit()
+        return True
+
+    def h_reprogramar_cita(self, cita_id: int, inicio: str | None = None,
+                           acceso_id: str | None = None) -> dict[str, Any]:
+        original = self._mi_cita(cita_id)
+        if not inicio and not acceso_id:
+            return {"error": "indica la caseta nueva, la hora nueva o ambas"}
+        antes_acceso, antes_ini = original.acceso_id, original.ventana_inicio
+        if inicio:
+            ini = self._fecha(inicio)
+            fin = ini + timedelta(minutes=DURACION_CITA_MIN)
+        else:  # solo cambia la caseta: se conserva la ventana
+            ini, fin = original.ventana_inicio, original.ventana_fin
+        if (acceso_id or antes_acceso) == antes_acceso and ini == antes_ini:
+            return {"error": f"la cita {cita_id} ya está en esa caseta y a esa hora"}
         c = citas.reprogramar(self.db, self.sim, int(cita_id), CitaReprogramar(
-            acceso_id=acceso_id or None, ventana_inicio=ini, ventana_fin=ini + timedelta(minutes=DURACION_CITA_MIN)))
+            acceso_id=acceso_id or None, ventana_inicio=ini, ventana_fin=fin))
+        nueva = self.db.get(Cita, c.id)
+        nueva.confirmada_en = datetime.now().astimezone()  # la pidió el propio transportista: ya está confirmada
+        self.db.commit()
+        t = nueva.transportista
+        esc = self.sim.esc
+        avisada = self._avisar_agencia(t, c.id, "cambio_chofer",
+                             f"{t.alias} cambió su cita #{cita_id} ({esc.acceso(antes_acceso).nombre}, "
+                             f"{self._hora(antes_ini)}) → cita #{c.id}: {esc.acceso(c.acceso_id).nombre}, "
+                             f"{self._hora(c.ventana_inicio)}.")
         return {"cita_id": c.id, "cita_anterior_id": c.cita_anterior_id, "acceso_id": c.acceso_id,
+                "acceso_anterior_id": antes_acceso, "agencia_avisada": avisada,
                 "inicio": c.ventana_inicio.astimezone(self.zona).strftime("%Y-%m-%dT%H:%M"),
                 "espera_estimada_min": c.espera_estimada_min}
 
     def h_cancelar_cita(self, cita_id: int) -> dict[str, Any]:
-        self._mi_cita(cita_id)
+        cita = self._mi_cita(cita_id)
+        acceso, ini = cita.acceso_id, cita.ventana_inicio
         c = citas.cancelar(self.db, self.sim, int(cita_id))
-        return {"cita_id": c.id, "estado": c.estado.value}
+        t = self.db.get(Transportista, c.transportista_id)
+        avisada = self._avisar_agencia(t, c.id, "cancelacion_chofer",
+                             f"{t.alias} canceló su cita #{c.id} ({self.sim.esc.acceso(acceso).nombre}, "
+                             f"{self._hora(ini)}); reasígnala si hace falta.")
+        return {"cita_id": c.id, "estado": c.estado.value, "agencia_avisada": avisada}
 
     def h_mis_citas(self) -> dict[str, Any]:
         activas = [c for c in citas.listar(self.db, telefono=self.telefono)
                    if c.estado in (EstadoCita.agendada, EstadoCita.en_ruta)]
         return {"citas": [
-            {"cita_id": c.id, "acceso_id": c.acceso_id, "inicio": c.ventana_inicio.astimezone(self.zona).strftime("%Y-%m-%dT%H:%M"),
+            {"cita_id": c.id, "acceso_id": c.acceso_id, "caseta": self.sim.esc.acceso(c.acceso_id).nombre,
+             "inicio": c.ventana_inicio.astimezone(self.zona).strftime("%Y-%m-%dT%H:%M"),
              "tipo_carga": c.tipo_carga.value, "estado": c.estado.value}
             for c in activas
         ]}
@@ -233,10 +290,14 @@ def redactar(herramienta: str, r: dict[str, Any], sim: Operacion) -> str | None:
                 f"Espera estimada: ~{(r.get('espera_estimada_min') or 0):.0f} min. Te aviso por aquí si algo cambia.")
     if herramienta == "reprogramar_cita":
         nombre = sim.esc.acceso(r["acceso_id"]).nombre
-        return (f"Cambié tu cita: ahora es la *#{r['cita_id']}*, el *{_cuando(r['inicio'])}* en *{nombre}*.\n"
-                f"Espera estimada: ~{(r.get('espera_estimada_min') or 0):.0f} min.")
+        antes = r.get("acceso_anterior_id")
+        caseta = f" (antes {sim.esc.acceso(antes).nombre})" if antes and antes != r["acceso_id"] else ""
+        return (f"Cambié tu cita: ahora es la *#{r['cita_id']}*, el *{_cuando(r['inicio'])}* en *{nombre}*{caseta}.\n"
+                f"Espera estimada: ~{(r.get('espera_estimada_min') or 0):.0f} min."
+                + (" Ya le avisé a tu agencia." if r.get("agencia_avisada") else ""))
     if herramienta == "cancelar_cita":
-        return f"Cancelé tu cita *#{r['cita_id']}*. Si necesitas otra, dime día, hora y tipo de carga."
+        aviso = " y le avisé a tu agencia" if r.get("agencia_avisada") else ""
+        return f"Cancelé tu cita *#{r['cita_id']}*{aviso}. Si necesitas otra, dime día, hora y tipo de carga."
     if herramienta == "mis_citas":
         lista = r.get("citas") or []
         if not lista:
