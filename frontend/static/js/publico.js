@@ -1,11 +1,15 @@
 /* Fluport · vista pública: estado por caseta (/api/publico/zonas), mapa de accesos, pronóstico de 12 h
- * (/api/pronostico) y acceso al bot. Componentes visuales en graficas.js. */
+ * (/api/pronostico) y acceso al bot. Componentes visuales en graficas.js.
+ * Tiempo real: el estado de cada caseta se actualiza con cada snapshot del WebSocket /ws/sim (o sondeo de 1 s si
+ * el WebSocket falla); el pronóstico y la mejor hora se recargan por HTTP cada minuto. */
 (function () {
   "use strict";
   var F = window.Fluport, el = F.el, $ = function (id) { return document.getElementById(id); };
   var GRAVEDAD = { cerrado: 0, rojo: 1, amarillo: 2, verde: 3 };
   var ESCALA = 150; // min: tope de las barras y del velocímetro
-  var estado = { zonas: [], pron: {}, sel: null, accesos: {}, rutas: {}, mapa: null };
+  var estado = { zonas: [], pron: {}, sel: null, accesos: {}, rutas: {}, mapa: null, conexion: "", dibujadoEn: 0, pendiente: null };
+  var CONTINGENCIA = { verde: "normal", amarillo: "lenta", rojo: "saturada" };
+  var INTERVALO_DIBUJO_MS = 1000; // como máximo un redibujo por segundo aunque lleguen más snapshots
 
   function corto(nombre) { return nombre.replace("Caseta ", ""); }
   function est(z) { return F.estadoDe(z.semaforo, z.abierto); }
@@ -174,17 +178,44 @@
       var zonas = res[0];
       estado.pron = {};
       res[1].forEach(function (p) { estado.pron[p.acceso_id] = p; });
-      zonas.sort(function (a, b) { return GRAVEDAD[est(a)] - GRAVEDAD[est(b)] || b.espera_min - a.espera_min; });
       estado.zonas = zonas;
-      if (zonas[0]) {
-        $("actualizado").textContent = "Actualizado a las " + F.hora(zonas[0].actualizado_en) + " (hora simulada) · se recalcula cada 10 s";
-        $("etiqueta").textContent = zonas[0].etiqueta || "SIMULACIÓN";
-      }
-      renderAlerta(zonas); renderResumen(zonas); renderZonas(zonas); renderMejor(zonas); actualizarMapa(zonas);
-      renderPildoras(zonas); renderPronostico();
+      if (zonas[0]) $("etiqueta").textContent = zonas[0].etiqueta || "SIMULACIÓN";
+      dibujar();
+      renderPildoras(estado.zonas); renderPronostico();
     } catch (e) {
       F.reemplazar($("zonas"), [el("p", { class: "tarjeta", role: "alert" }, "No se pudo cargar la información. Reintentando…")]);
     }
+  }
+
+  // ───────────── Tiempo real ─────────────
+  function dibujar() {
+    var zonas = estado.zonas;
+    estado.dibujadoEn = Date.now();
+    zonas.sort(function (a, b) { return GRAVEDAD[est(a)] - GRAVEDAD[est(b)] || b.espera_min - a.espera_min; });
+    if (zonas[0]) {
+      var vivo = estado.conexion === "en-vivo" ? "En vivo" : estado.conexion === "sondeo" ? "Actualizando cada segundo" : "Actualizado";
+      $("actualizado").textContent = vivo + " · " + F.hora(zonas[0].actualizado_en) + " (hora simulada)";
+    }
+    renderAlerta(zonas); renderResumen(zonas); renderZonas(zonas); renderMejor(zonas); actualizarMapa(zonas);
+  }
+
+  /** Copia a cada caseta el estado instantáneo del Mundo B (con Fluport) que trae el snapshot. */
+  function aplicarSnapshot(s) {
+    if (!estado.zonas.length || !s || !s.mundos || !s.mundos.B) return;
+    var porId = {};
+    s.mundos.B.accesos.forEach(function (a) { porId[a.acceso_id] = a; });
+    estado.zonas.forEach(function (z) {
+      var a = porId[z.acceso_id];
+      if (!a) return;
+      z.abierto = a.estado === "abierto";
+      z.espera_min = a.espera_min; z.semaforo = a.semaforo; z.en_fila = a.en_fila;
+      z.contingencia = z.abierto ? CONTINGENCIA[a.semaforo] : "cerrada";
+      z.norte = s.clima === "norte";
+      z.actualizado_en = s.ts_sim;
+    });
+    var falta = INTERVALO_DIBUJO_MS - (Date.now() - estado.dibujadoEn);
+    if (falta <= 0) { dibujar(); return; }
+    if (!estado.pendiente) estado.pendiente = setTimeout(function () { estado.pendiente = null; dibujar(); }, falta);
   }
 
   async function cargarMapa() {
@@ -214,7 +245,10 @@
   }
 
   [].forEach.call(document.querySelectorAll("[data-simbolo]"), function (n) { n.appendChild(F.simbolo(n.dataset.simbolo, 20)); });
-  cargar().then(cargarMapa);
+  cargar().then(cargarMapa).then(function () {
+    F.conectarSimulacion(function (m) { if (m.tipo === "snapshot") aplicarSnapshot(m.data); },
+      function (e) { estado.conexion = e; });
+  });
   cargarBot();
-  setInterval(cargar, 10000);
+  setInterval(cargar, 60000); // pronóstico, mejor hora y nombres: cambian más lento que la fila
 })();

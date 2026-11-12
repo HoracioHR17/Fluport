@@ -10,8 +10,13 @@
     peligroso: "Peligroso", granel: "Granel", carga_general: "Carga general" };
   var ESTADO_CAMION = { en_ruta: { t: "En ruta", tono: "azul" }, en_fila: { t: "En fila", tono: "amarillo" },
     en_revision: { t: "En revisión", tono: "verde" }, dentro: { t: "Dentro", tono: "verde" }, saliendo: { t: "Saliendo", tono: "azul" } };
-  var TIPOS_AVISO = { turno_30min: "Recordatorio", saturacion: "Contingencia", cita_asignada: "Cita asignada", cita_rechazada: "Respuesta del chofer" };
-  var TONO_AVISO = { turno_30min: "verde", saturacion: "oscuro", cita_asignada: "azul", cita_rechazada: "rojo" };
+  var TIPOS_AVISO = { turno_30min: "Recordatorio", saturacion: "Contingencia", cita_asignada: "Cita asignada", cita_rechazada: "Respuesta del chofer",
+    cita_cancelada: "Cancelación avisada", cita_reasignada: "Cambio avisado", cambio_chofer: "Cambio del chofer", cancelacion_chofer: "Cancelación del chofer" };
+  var TONO_AVISO = { turno_30min: "verde", saturacion: "oscuro", cita_asignada: "azul", cita_rechazada: "rojo",
+    cita_cancelada: "oscuro", cita_reasignada: "azul", cambio_chofer: "azul", cancelacion_chofer: "rojo" };
+  // tipos que agrupa cada filtro de avisos (el resto filtra por su propio tipo)
+  var GRUPO_AVISOS = { cita_rechazada: ["cita_rechazada", "cambio_chofer", "cancelacion_chofer"], cita_asignada: ["cita_asignada", "cita_reasignada", "cita_cancelada"] };
+  var REASIGNAR = ["cita_rechazada", "cancelacion_chofer"];
   var ACTIVAS = { agendada: true, en_ruta: true };
 
   var estado = { agencia: null, agencias: [], accesos: {}, rutas: {}, snap: null, mapa: null, bot: null,
@@ -44,7 +49,7 @@
   // ───────────── Menú, contadores y reloj (todas las pantallas) ─────────────
   function contadores() {
     var pend = estado.citas.filter(sinConfirmar).length;
-    var rech = estado.avisos.filter(function (a) { return a.tipo === "cita_rechazada"; }).length;
+    var rech = estado.avisos.filter(function (a) { return REASIGNAR.indexOf(a.tipo) >= 0; }).length;
     var sinBot = estado.transportistas.filter(function (t) { return !t.telegram; }).length;
     [["citas", pend], ["avisos", rech], ["transportistas", sinBot + estado.solicitudes.length]].forEach(function (p) {
       var n = document.querySelector('[data-contador="' + p[0] + '"]');
@@ -199,8 +204,8 @@
     if (estado.snap) estado.snap.mundos.B.accesos.forEach(function (a) { if (a.estado === "cerrado") cerradas[a.acceso_id] = true; });
     var enCerrada = estado.citas.filter(function (c) { return c.estado === "agendada" && cerradas[c.acceso_id]; });
     if (enCerrada.length) items.push(["▲", "#FBEAE8", plural(enCerrada.length, "cita en caseta cerrada", "citas en caseta cerrada"), "Fluport avisó a los transportistas con una alternativa.", "Revisar citas", "/agencia/citas/"]);
-    estado.avisos.filter(function (a) { return a.tipo === "cita_rechazada"; }).slice(0, 2).forEach(function (r) {
-      items.push(["!", "#FBEAE8", "Un transportista no puede asistir", r.mensaje, "Reasignar", "/agencia/citas/#asignar"]);
+    estado.avisos.filter(function (a) { return REASIGNAR.indexOf(a.tipo) >= 0; }).slice(0, 2).forEach(function (r) {
+      items.push(["!", "#FBEAE8", r.tipo === "cancelacion_chofer" ? "Un transportista canceló su cita" : "Un transportista no puede asistir", r.mensaje.replace(/\*/g, ""), "Reasignar", "/agencia/citas/#asignar"]);
     });
     var sol = estado.solicitudes.length;
     if (sol) items.push(["+", "#E6F4EA", plural(sol, "solicitud de alta", "solicitudes de alta"), "Transportistas que pidieron unirse a tu agencia desde Telegram.", "Revisar", "/agencia/transportistas/"]);
@@ -592,15 +597,16 @@
   }
 
   // ───────────── Avisos ─────────────
-  var FILTROS_AVISOS = [["todos", "Todos"], ["cita_rechazada", "Respuestas de choferes"], ["saturacion", "Contingencias"], ["cita_asignada", "Citas asignadas"], ["turno_30min", "Recordatorios"]];
+  var FILTROS_AVISOS = [["todos", "Todos"], ["cita_rechazada", "Respuestas de choferes"], ["saturacion", "Contingencias"], ["cita_asignada", "Citas enviadas"], ["turno_30min", "Recordatorios"]];
 
   function renderAvisos() {
     if (!$("lista-avisos")) return;
     var t = porId(estado.transportistas);
-    var lista = estado.avisos.filter(function (a) { return estado.filtroAvisos === "todos" || a.tipo === estado.filtroAvisos; });
+    var grupo = GRUPO_AVISOS[estado.filtroAvisos] || [estado.filtroAvisos];
+    var lista = estado.avisos.filter(function (a) { return estado.filtroAvisos === "todos" || grupo.indexOf(a.tipo) >= 0; });
     F.reemplazar($("lista-avisos"), lista.length ? lista.map(function (a) {
       var quien = (t[a.transportista_id] || {}).alias || "Transportista #" + a.transportista_id;
-      var accion = a.tipo === "cita_rechazada" ? ["Reasignar", "/agencia/citas/#asignar"] : ["Ver citas", "/agencia/citas/"];
+      var accion = REASIGNAR.indexOf(a.tipo) >= 0 ? ["Reasignar", "/agencia/citas/#asignar"] : ["Ver citas", "/agencia/citas/"];
       return el("li", {}, [
         el("span", { class: "avisos__hora" }, F.hora(a.creado_en)),
         el("div", { class: "avisos__texto" }, [

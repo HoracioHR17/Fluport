@@ -89,20 +89,25 @@
   }
 
   // ───────────── Mapa del puerto (Leaflet) ─────────────
-  // Zona de trabajo: casetas La Antigua, San Julián y Paso del Toro y el recinto portuario. El mapa no deja salir
-  // de ella (ni con arrastre ni alejando) para que siempre muestre el entorno del puerto de Veracruz.
+  // Encuadre compacto: el puerto de Veracruz y sus tres casetas de acceso (La Antigua, San Julián, Paso del Toro)
+  // con sus rutas. No se puede desplazar fuera de esa zona ni alejar más allá del encuadre inicial.
   var PUERTO = { lat: 19.2045, lon: -96.1338, nombre: "Puerto de Veracruz" };
-  var LIMITES = [[18.98, -96.47], [19.44, -96.05]];
+  var LIMITES = [[19.02, -96.385], [19.385, -96.105]];
 
-  function mapaPuerto(div, puntos) {
+  function mapaPuerto(div) {
     if (!window.L) { div.appendChild(F.el("p", { style: { padding: "16px" } }, "No se pudo cargar el mapa.")); return null; }
     var lim = L.latLngBounds(LIMITES);
-    var mapa = L.map(div, { maxBounds: lim.pad(0.05), maxBoundsViscosity: 1, minZoom: 10, maxZoom: 16, zoomSnap: 0.5 });
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 16, minZoom: 10, bounds: lim.pad(0.1),
+    var mapa = L.map(div, { maxBounds: lim, maxBoundsViscosity: 1, zoomSnap: 0.25, maxZoom: 16 });
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 16,
       attribution: "&copy; colaboradores de OpenStreetMap" }).addTo(mapa);
-    var encuadre = L.latLngBounds((puntos || []).concat([[PUERTO.lat, PUERTO.lon]]));
-    mapa.fitBounds(encuadre.isValid() ? encuadre : lim, { padding: [24, 24] });
-    mapa.setMinZoom(Math.max(10, Math.floor(mapa.getZoom() * 2) / 2 - 0.5));
+    function encuadrar() {
+      var z = mapa.getBoundsZoom(lim, false);
+      mapa.setMinZoom(z);
+      if (mapa.getZoom() < z || !mapa._fluportListo) mapa.fitBounds(lim, { animate: false });
+      mapa._fluportListo = true;
+    }
+    encuadrar();
+    mapa.on("resize", encuadrar);
     L.marker([PUERTO.lat, PUERTO.lon], { keyboard: false, interactive: false, icon: L.divIcon({ className: "", iconSize: null, iconAnchor: [14, 14],
       html: '<span class="marcador-puerto"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect width="28" height="28" rx="6" fill="#0A2238"/>' +
         '<path d="M14 6 V21 M8 16 C8 22 20 22 20 16 M10 9 H18" stroke="#FFFFFF" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg><b>Puerto</b></span>' }) }).addTo(mapa);

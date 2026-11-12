@@ -61,5 +61,5 @@ Una sola familia sans serif del sistema, sin descargas: `font-family: Arial, Hel
 
 Camiones: flecha oscura orientada (en ruta), cuadro ámbar (en fila), anillo azul (en revisión o dentro), halo punteado (con cita), aro grueso (seleccionado). Citas: sólida oscura (confirmada), contorno punteado (sin confirmar), azul media (pedida por el chofer), verde (en ruta).
 
-Los mapas no salen de la zona del puerto de Veracruz (`maxBounds` con viscosidad total y zoom mínimo 10).
+Los mapas quedan en un encuadre compacto del puerto de Veracruz y sus tres casetas: `maxBounds` con viscosidad total y zoom mínimo igual al encuadre inicial (no se puede alejar ni desplazar fuera).
 
