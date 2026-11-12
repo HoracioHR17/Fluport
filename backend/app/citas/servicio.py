@@ -87,8 +87,10 @@ def sugerir(sim: Simulador, req: SugerenciaRequest) -> list[Sugerencia]:
         for a in accesos:
             espera = espera_estimada(sim, a, inicio)
             cambio = 5.0 if req.acceso_id and a != req.acceso_id else 0.0  # preferencia leve por el acceso pedido
-            # desempate: la franja que empieza más cerca del centro de la ventana (la hora que mencionó el transportista)
-            distancia = abs((inicio - centro).total_seconds()) / 3600
+            # desempate: la franja más cercana a la hora que mencionó el transportista (centro de la ventana)
+            # o, si no dio hora, la más próxima
+            ref = desde if req.preferencia == "temprano" else centro
+            distancia = abs((inicio - ref).total_seconds()) / 3600
             candidatos.append((espera + cambio, distancia, a, inicio, espera))
     if not candidatos:
         raise ErrorCita(422, "ventana demasiado corta")

@@ -40,6 +40,14 @@ def test_sugerencias_empatadas_prefieren_el_centro_de_la_ventana(sim):
     assert s[0].inicio.hour == 9 and s[0].espera_min_est < 5
 
 
+def test_sin_hora_las_empatadas_prefieren_la_mas_proxima(sim):
+    """Si el transportista no dio hora, entre esperas similares gana la franja más próxima."""
+    req = SugerenciaRequest(acceso_id="A1", desde=INICIO.replace(hour=7, minute=30),
+                            hasta=INICIO.replace(hour=10, minute=30), tipo_carga="granel", preferencia="temprano")
+    s = citas.sugerir(sim, req)
+    assert s[0].inicio.hour == 7 and s[0].inicio.minute == 30 and s[0].espera_min_est < 5
+
+
 def test_sugerencias_evitan_acceso_cerrado(sim):
     sim.aplicar_evento(EventoCreate(tipo=TipoEventoSim.cierre_acceso, acceso_id="A2"))
     req = SugerenciaRequest(acceso_id="A2", desde=INICIO.replace(hour=6), hasta=INICIO.replace(hour=9),

@@ -50,6 +50,7 @@ HERRAMIENTAS: list[dict[str, Any]] = [
             "hasta": {"type": "string", "description": "Fin de la ventana, AAAA-MM-DDTHH:MM (hora de Veracruz)"},
             "tipo_carga": {"type": "string", "enum": CARGAS},
             "acceso_id": {"type": "string", "description": "Caseta preferida (opcional)"},
+            "sin_hora": {"type": "boolean", "description": "true si el transportista no indicó hora"},
         }, "required": ["desde", "hasta", "tipo_carga"]},
     },
     {
@@ -101,6 +102,8 @@ def instrucciones(sim: Simulador) -> str:
         "1. Para agendar: si el usuario da una hora aproximada, busca con sugerir_horario una ventana de 3 horas "
         "CENTRADA en esa hora (p. ej. 9:00 → 07:30 a 10:30) y ofrece las 3 opciones numeradas con caseta, hora y "
         "espera estimada. "
+        "Si NO da hora, busca con sugerir_horario desde la hora actual hasta 12 horas después (lo que cubre el "
+        "pronóstico), con sin_hora=true, y ofrece las 3 opciones con menor espera; no le preguntes la hora. "
         "Agenda con crear_cita SOLO cuando el usuario elija una opción o confirme.\n"
         "2. Si falta el tipo de carga, pregúntalo antes de buscar.\n"
         "3. Usa siempre fechas completas AAAA-MM-DDTHH:MM; \"mañana\" es el día siguiente a la fecha actual.\n"
@@ -156,9 +159,10 @@ class Herramientas:
             })
         return {"casetas": res}
 
-    def h_sugerir_horario(self, desde: str, hasta: str, tipo_carga: str, acceso_id: str | None = None) -> dict:
+    def h_sugerir_horario(self, desde: str, hasta: str, tipo_carga: str, acceso_id: str | None = None,
+                          sin_hora: bool = False) -> dict:
         req = SugerenciaRequest(desde=self._fecha(desde), hasta=self._fecha(hasta), tipo_carga=tipo_carga,
-                                acceso_id=acceso_id or None)
+                                acceso_id=acceso_id or None, preferencia="temprano" if sin_hora else "centro")
         try:
             sug = citas.sugerir(self.sim, req)
         except KeyError:
