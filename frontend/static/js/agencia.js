@@ -385,7 +385,18 @@
     var activas = estado.citas.filter(pasa.activas);
     $("resumen-citas").textContent = plural(activas.length, "cita activa", "citas activas") + " · " + F.num(activas.filter(function (c) { return c.confirmada_en; }).length) + " confirmadas";
     renderLineaTiempo();
-    F.reemplazar($("tabla-citas"), lista.length ? lista.map(function (c) {
+    // mientras la agencia edita una cita no se redibuja la tabla (perdería lo que está escribiendo)
+    if (estado.edicion && $("edicion-cita") && estado.citas.some(function (c) { return c.id === estado.edicion.id && c.estado === "agendada"; })) return;
+    if (estado.edicion && !estado.citas.some(function (c) { return c.id === estado.edicion.id && c.estado === "agendada"; })) estado.edicion = null;
+    var filas = [];
+    lista.forEach(function (c) {
+      filas.push(filaCita(c, t));
+      if (estado.edicion && estado.edicion.id === c.id) filas.push(filaEdicion(c));
+    });
+    F.reemplazar($("tabla-citas"), filas.length ? filas : [el("tr", {}, el("td", { colspan: "7", class: "vacio" }, "No hay citas con este filtro."))]);
+  }
+
+  function filaCita(c, t) {
       var e = estadoCita(c), tr = t[c.transportista_id] || {};
       return el("tr", { class: (c.id === estado.citaResaltada ? "elegida " : "") + (sinConfirmar(c) ? "resaltada" : ""), "data-cita": c.id, tabindex: "-1" }, [
         el("td", { class: "cifra" }, F.hora(c.ventana_inicio)),
@@ -394,10 +405,64 @@
         el("td", {}, nombreCaseta(c.acceso_id)),
         el("td", {}, c.espera_estimada_min === null ? "—" : "~" + F.num(c.espera_estimada_min) + " min"),
         el("td", {}, chip(e.tono, e.texto)),
-        el("td", { style: { textAlign: "right" } }, c.estado === "agendada"
-          ? el("button", { type: "button", class: "btn btn--sec btn--chico", onclick: function () { cancelar(c); } }, "Cancelar") : null)
+        el("td", { style: { textAlign: "right", whiteSpace: "nowrap" } }, c.estado === "agendada" ? [
+          el("button", { type: "button", class: "btn btn--suave btn--chico", "aria-expanded": String(!!(estado.edicion && estado.edicion.id === c.id)),
+            onclick: function () { abrirEdicion(c); } }, "Cambiar"), " ",
+          el("button", { type: "button", class: "btn btn--sec btn--chico", onclick: function () { cancelar(c); } }, "Cancelar")
+        ] : null)
       ]);
-    }) : [el("tr", {}, el("td", { colspan: "7", class: "vacio" }, "No hay citas con este filtro."))]);
+  }
+
+  // ───────────── Cambiar una cita (entrada y hora); el transportista recibe el aviso por Telegram ─────────────
+  function abrirEdicion(c) {
+    estado.edicion = estado.edicion && estado.edicion.id === c.id ? null
+      : { id: c.id, acceso: c.acceso_id, hora: F.hora(c.ventana_inicio), msg: "" };
+    renderCitasForzado();
+  }
+
+  function renderCitasForzado() {
+    var e = estado.edicion; estado.edicion = null; renderCitas(); estado.edicion = e;
+    if (e) { renderCitas(); var s = $("edicion-acceso"); if (s) s.focus(); }
+  }
+
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+
+  /** fecha AAAA-MM-DD + hora HH:MM + minutos → ISO con la zona horaria dada (cruza la medianoche si hace falta). */
+  function isoMas(fecha, hm, zona, minutos) {
+    var p = hm.split(":").map(Number), t = p[0] * 60 + p[1] + (minutos || 0), dias = Math.floor(t / 1440);
+    t = ((t % 1440) + 1440) % 1440;
+    return sumarDias(fecha, dias) + "T" + pad2(Math.floor(t / 60)) + ":" + pad2(t % 60) + ":00" + zona;
+  }
+
+  function filaEdicion(c) {
+    var ed = estado.edicion;
+    var opciones = Object.keys(estado.accesos).sort().map(function (id) {
+      return el("option", { value: id, selected: id === ed.acceso ? "selected" : null }, nombreCaseta(id));
+    });
+    return el("tr", { class: "edicion-cita" }, el("td", { colspan: "7" },
+      el("form", { class: "form form--fila", id: "edicion-cita", onsubmit: function (ev) { ev.preventDefault(); guardarEdicion(c); } }, [
+        el("label", { class: "campo" }, ["Entrada", el("select", { id: "edicion-acceso", onchange: function () { ed.acceso = this.value; } }, opciones)]),
+        el("label", { class: "campo" }, ["Hora", el("input", { id: "edicion-hora", type: "time", required: "required", value: ed.hora,
+          oninput: function () { ed.hora = this.value; } })]),
+        el("button", { type: "submit", class: "btn btn--chico" }, "Guardar y avisar al chofer"),
+        el("button", { type: "button", class: "btn btn--sec btn--chico", onclick: function () { estado.edicion = null; renderCitasForzado(); } }, "Cerrar"),
+        el("p", { class: "estado-msg", role: "status" }, ed.msg)
+      ])));
+  }
+
+  async function guardarEdicion(c) {
+    var ed = estado.edicion;
+    if (!ed || !ed.hora) return;
+    var zona = F.zonaHoraria(c.ventana_inicio), fecha = F.fecha(c.ventana_inicio);
+    var duracion = Math.round((new Date(c.ventana_fin) - new Date(c.ventana_inicio)) / 60000) || 30;
+    if (ed.acceso === c.acceso_id && ed.hora === F.hora(c.ventana_inicio)) { ed.msg = "No hay cambios que guardar."; renderCitasForzado(); return; }
+    try {
+      var nueva = await F.api("/api/citas/" + c.id, { method: "PATCH", json: {
+        acceso_id: ed.acceso, ventana_inicio: isoMas(fecha, ed.hora, zona, 0), ventana_fin: isoMas(fecha, ed.hora, zona, duracion) } });
+      estado.edicion = null; estado.citaResaltada = nueva.id;
+      $("estado-cita").textContent = "Cita cambiada: ahora es la #" + nueva.id + ". Se le avisó al transportista para que la confirme.";
+      await cargarCitas();
+    } catch (e) { ed.msg = "No se pudo cambiar: " + e.message; renderCitasForzado(); }
   }
 
   /** Línea de tiempo: una fila por caseta, de 1 h antes a 11 h después de la hora simulada. */

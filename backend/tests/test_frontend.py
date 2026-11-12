@@ -62,3 +62,21 @@ def test_mapas_limitados_al_puerto():
     for f in ("publico.js", "agencia.js", "demo.js"):
         codigo = (js / f).read_text(encoding="utf-8")
         assert "F.mapaPuerto(" in codigo and "L.map(" not in codigo, f
+
+
+def test_paginas_piden_estaticos_con_version(cliente):
+    """Las páginas agregan ?v=<huella> a sus CSS y JS para que la caché nunca sirva una versión vieja."""
+    import re
+
+    r = cliente.get("/publico/")
+    assert r.headers["cache-control"] == "no-cache"
+    assert re.search(r'src="/static/js/publico\.js\?v=[0-9a-f]{10}"', r.text)
+    assert re.search(r'href="/static/css/ui\.css\?v=[0-9a-f]{10}"', r.text)
+    assert cliente.get("/static/js/publico.js?v=x").status_code == 200
+
+
+def test_versionar_no_toca_otros_recursos():
+    from app.main import versionar
+
+    html = '<link href="/static/favicon.svg"><script src="/static/js/a.js"></script>'
+    assert versionar(html, "abc") == '<link href="/static/favicon.svg"><script src="/static/js/a.js?v=abc"></script>'

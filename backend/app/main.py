@@ -4,13 +4,16 @@ Una sola app FastAPI sirve la API, el WebSocket y el frontend estático (monolit
 decide qué implementa cada puerto: la operación del puerto es el simulador; los ganchos de la simulación llaman a
 citas, mensajería y pronóstico.
 """
+import hashlib
 import logging
+import re
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from starlette.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
@@ -35,7 +38,8 @@ from app.nucleo.db.base import engine
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 # ───────────── Puertos → adaptadores ─────────────
-dependencias.configurar(operacion=servicio.requerir, publicar=servicio.publicar)
+dependencias.configurar(operacion=servicio.requerir, publicar=servicio.publicar,
+                        suscribir=servicio.suscribir, desuscribir=servicio.desuscribir)
 servicio.ganchos = Ganchos(
     citas_por_reinyectar=reinyectar_desde_bd,
     sincronizar_citas=sincronizar_desde_operacion,
@@ -96,7 +100,39 @@ def operador() -> RedirectResponse:
     return RedirectResponse("/agencia/")
 
 
-app.mount("/agencia", StaticFiles(directory=FRONTEND / "agencia", html=True, check_dir=False), name="agencia")
-app.mount("/demo", StaticFiles(directory=FRONTEND / "demo", html=True, check_dir=False), name="demo")
-app.mount("/publico", StaticFiles(directory=FRONTEND / "publico", html=True, check_dir=False), name="publico")
+# ───────────── Páginas con versión en sus recursos ─────────────
+# Las páginas piden /static/...js?v=<huella>: la huella cambia al modificar cualquier archivo estático, así que
+# Cloudflare y el navegador descargan la versión nueva sin purgar la caché. Las páginas no se guardan en caché.
+RECURSO_ESTATICO = re.compile(r'((?:src|href)="/static/[^"?#]+\.(?:js|css))"')
+
+
+def huella_estaticos() -> str:
+    """Huella corta de los archivos de frontend/static (ruta + fecha de modificación)."""
+    h = hashlib.sha1()
+    for p in sorted((FRONTEND / "static").rglob("*")):
+        if p.is_file():
+            h.update(f"{p.relative_to(FRONTEND)}:{p.stat().st_mtime_ns}".encode())
+    return h.hexdigest()[:10]
+
+
+def versionar(html: str, huella: str) -> str:
+    return RECURSO_ESTATICO.sub(lambda m: f'{m.group(1)}?v={huella}"', html)
+
+
+class PaginasVersionadas(StaticFiles):
+    async def get_response(self, path: str, scope) -> Response:
+        resp = await super().get_response(path, scope)
+        if isinstance(resp, FileResponse) and resp.media_type == "text/html":
+            with open(resp.path, encoding="utf-8") as f:
+                html = versionar(f.read(), huella_estaticos())
+            return HTMLResponse(html, headers={"Cache-Control": "no-cache"})
+        return resp
+
+    def is_not_modified(self, response_headers, request_headers) -> bool:  # noqa: ARG002
+        return False  # la página cambia si cambia la huella aunque el HTML no cambie
+
+
+app.mount("/agencia", PaginasVersionadas(directory=FRONTEND / "agencia", html=True, check_dir=False), name="agencia")
+app.mount("/demo", PaginasVersionadas(directory=FRONTEND / "demo", html=True, check_dir=False), name="demo")
+app.mount("/publico", PaginasVersionadas(directory=FRONTEND / "publico", html=True, check_dir=False), name="publico")
 app.mount("/static", StaticFiles(directory=FRONTEND / "static", check_dir=False), name="static")

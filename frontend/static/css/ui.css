@@ -348,3 +348,8 @@ a:hover { color: #13324F; }
 .cerca__lista { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
 .cerca__lista li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 16px; }
 .cerca__nota { margin: 0; font-size: 13px; }
+
+/* Panel de agencia · cambiar una cita */
+.form--fila { grid-template-columns: repeat(auto-fit, minmax(150px, max-content)); }
+.form--fila .estado-msg { grid-column: 1 / -1; }
+.edicion-cita > td { background: var(--bruma); }

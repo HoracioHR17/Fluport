@@ -52,3 +52,27 @@ def test_api_publica_sin_datos_de_operacion():
         texto = r.text.lower()
         for prohibido in ("telefono", "transportista", "cita", "comparacion", "mundo"):
             assert prohibido not in texto
+
+
+def test_snapshot_publico_solo_trae_las_entradas(sim):
+    from app.modulos.publico.servicio import snapshot_publico
+
+    sim.avanzar(6 * 60)
+    s = snapshot_publico(sim)
+    assert s["tipo"] == "snapshot" and set(s["data"]) == {"ts_sim", "clima", "mundos"}
+    assert set(s["data"]["mundos"]) == {"B"} and set(s["data"]["mundos"]["B"]) == {"accesos"}
+    assert len(s["data"]["mundos"]["B"]["accesos"]) == 6
+
+
+def test_websocket_publico_sin_camiones_ni_avisos():
+    import json
+
+    from app.main import app
+
+    with TestClient(app) as c, c.websocket_connect("/ws/publico") as ws:
+        m = json.loads(ws.receive_text())
+        assert m["tipo"] == "snapshot" and set(m["data"]["mundos"]["B"]) == {"accesos"}
+        texto = json.dumps(m).lower()
+        for prohibido in ("camiones", "agencia", "cita", "comparacion", "telefono"):
+            assert prohibido not in texto
+        assert c.get("/api/publico/snapshot").json()["tipo"] == "snapshot"

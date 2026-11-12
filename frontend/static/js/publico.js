@@ -302,7 +302,7 @@
   if ($("btn-ubicacion")) $("btn-ubicacion").addEventListener("click", activarUbicacion);
   cargar().then(cargarMapa).then(function () {
     F.conectarSimulacion(function (m) { if (m.tipo === "snapshot") aplicarSnapshot(m.data); },
-      function (e) { estado.conexion = e; });
+      function (e) { estado.conexion = e; }, { ws: "/ws/publico", sondeo: "/api/publico/snapshot" });
   });
   cargarBot();
   setInterval(cargar, 60000); // pronóstico, mejor hora y nombres: cambian más lento que la fila

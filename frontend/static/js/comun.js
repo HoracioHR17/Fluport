@@ -67,17 +67,18 @@
    * Conecta al WebSocket del simulador; si falla, consulta /api/sim/snapshot cada segundo
    * y reintenta el WebSocket cada 5 s. `alMensaje` recibe {tipo, data}.
    */
-  function conectarSimulacion(alMensaje, alEstado) {
-    var ws = null, sondeo = null;
+  /** Stream en vivo. `rutas` (opcional): { ws: "/ws/publico", sondeo: "/api/publico/snapshot" } para la vista pública. */
+  function conectarSimulacion(alMensaje, alEstado, rutas) {
+    var ws = null, sondeo = null, r = rutas || { ws: "/ws/sim", sondeo: "/api/sim/snapshot" };
     function iniciarSondeo() {
       if (sondeo) return;
       alEstado && alEstado("sondeo");
       sondeo = setInterval(function () {
-        api("/api/sim/snapshot").then(function (s) { alMensaje({ tipo: "snapshot", data: s }); }).catch(function () {});
+        api(r.sondeo).then(function (s) { alMensaje(s && s.tipo ? s : { tipo: "snapshot", data: s }); }).catch(function () {});
       }, 1000);
     }
     function abrir() {
-      var url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ws/sim";
+      var url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + r.ws;
       try { ws = new WebSocket(url); } catch (e) { iniciarSondeo(); setTimeout(abrir, 5000); return; }
       ws.onopen = function () {
         if (sondeo) { clearInterval(sondeo); sondeo = null; }

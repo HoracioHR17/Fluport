@@ -36,6 +36,16 @@ def horas_pico(p: PronosticoOut) -> list[HoraPico]:
     return picos
 
 
+def snapshot_publico(sim: Operacion) -> dict:
+    """Estado instantáneo de las entradas para la vista pública, con la misma forma que el snapshot del simulador
+    (`{"tipo": "snapshot", "data": {"ts_sim", "clima", "mundos": {"B": {"accesos": [...]}}}}`) pero sin camiones,
+    agencias, citas, avisos ni la comparación A/B."""
+    return {"tipo": "snapshot", "data": {
+        "ts_sim": sim.ts().isoformat(), "clima": sim.clima.value,
+        "mundos": {"B": {"accesos": [e.model_dump(mode="json") for e in sim.estado_accesos(Mundo.B)]}},
+    }}
+
+
 def zonas(sim: Operacion) -> list[ZonaPublica]:
     estados = {e.acceso_id: e for e in sim.estado_accesos(Mundo.B)}
     pron = {p.acceso_id: p for p in pronosticador.obtener(sim, Mundo.B)}
