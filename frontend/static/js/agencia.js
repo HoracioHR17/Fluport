@@ -59,7 +59,6 @@
 
   function reloj(s) {
     $("reloj").textContent = F.fecha(s.ts_sim) + " · " + F.hora(s.ts_sim) + " (hora simulada)" + (s.clima === "norte" ? " · norte activo" : "");
-    $("etiqueta").textContent = s.etiqueta || "SIMULACIÓN";
   }
 
   // ───────────── Resumen ─────────────

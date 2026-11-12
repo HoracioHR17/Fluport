@@ -78,16 +78,8 @@
     }));
   }
 
-  // ───────────── Recomendación y ranking ─────────────
-  function renderMejor(zonas) {
-    var abiertas = zonas.filter(function (z) { return z.abierto; }).sort(function (a, b) { return a.espera_min - b.espera_min; });
-    if (!abiertas.length) { F.reemplazar($("mejor"), [el("h2", {}, "TODAS LAS ENTRADAS CERRADAS"), el("p", {}, "Espera el aviso de reapertura.")]); return; }
-    var m = abiertas[0], peor = abiertas[abiertas.length - 1], ahorro = peor.espera_min - m.espera_min;
-    F.reemplazar($("mejor"), [
-      el("h2", {}, "MEJOR ENTRADA AHORA"),
-      el("div", { class: "mejor__nombre" }, [F.simbolo(est(m), 28), el("span", {}, corto(m.nombre))]),
-      el("p", {}, F.num(m.espera_min) + " min de espera." + (ahorro >= 10 ? " Ahorras cerca de " + F.num(ahorro) + " min frente a " + corto(peor.nombre) + "." : ""))
-    ]);
+  // ───────────── Ranking de espera por entrada ─────────────
+  function renderRanking(zonas) {
     F.reemplazar($("ranking"), zonas.slice().sort(function (a, b) { return (b.abierto - a.abierto) || a.espera_min - b.espera_min; }).map(function (z) {
       var e = est(z), pct = z.abierto ? Math.min(100, z.espera_min / ESCALA * 100) : 100;
       return el("div", { class: "ranking__fila" }, [
@@ -182,7 +174,6 @@
       estado.pron = {};
       res[1].forEach(function (p) { estado.pron[p.acceso_id] = p; });
       estado.zonas = zonas;
-      if (zonas[0]) $("etiqueta").textContent = zonas[0].etiqueta || "SIMULACIÓN";
       dibujar();
       renderPildoras(estado.zonas); renderPronostico();
     } catch (e) {
@@ -258,7 +249,7 @@
       var vivo = estado.conexion === "en-vivo" ? "En vivo" : estado.conexion === "sondeo" ? "Actualizando cada segundo" : "Actualizado";
       $("actualizado").textContent = vivo + " · " + F.hora(zonas[0].actualizado_en) + " (hora simulada)";
     }
-    renderAlerta(zonas); renderResumen(zonas); renderZonas(zonas); renderMejor(zonas); actualizarMapa(zonas);
+    renderAlerta(zonas); renderResumen(zonas); renderZonas(zonas); renderRanking(zonas); actualizarMapa(zonas);
     renderCerca();
   }
 

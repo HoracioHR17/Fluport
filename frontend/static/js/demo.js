@@ -141,7 +141,6 @@
     estado.snap = s;
     $("reloj").textContent = F.hora(s.ts_sim);
     $("reloj-dia").textContent = "Reloj simulado · " + F.fecha(s.ts_sim) + (s.clima === "norte" ? " · norte" : "");
-    $("etiqueta").textContent = s.etiqueta || "SIMULACIÓN";
     renderCasetas(s.mundos.B.accesos);
     var pausada = s.estado !== "corriendo";
     $("btn-pausa").setAttribute("aria-label", pausada ? "Reanudar simulación" : "Pausar simulación");

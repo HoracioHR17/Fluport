@@ -110,7 +110,6 @@ def instrucciones(sim: Operacion) -> str:
         "Respondes por Telegram: en español, breve (máximo 6 líneas), cordial y claro, sin tecnicismos. "
         "Formato de Telegram: negritas con UN asterisco (*07:30*), nunca Markdown doble (**, #, tablas).\n"
         f"Fecha y hora actual (hora de Veracruz): {DIAS[ahora.weekday()]} {ahora:%Y-%m-%d %H:%M}. "
-        "Es una SIMULACIÓN con datos sintéticos.\n"
         f"Entradas al puerto (puntos de acceso; el usuario puede llamarlas casetas): {casetas}.\n"
         f"Entradas por corredor: {por_entrada}.\n"
         f"Tipos de carga válidos: {', '.join(CARGAS)} (\"contenedor de 40\" = contenedor_40).\n"
@@ -424,7 +423,7 @@ class Asistente:
 
     def _sin_llm(self, sim: Operacion) -> AsistenteResponse:
         """Respaldo sin LLM: estado de las casetas en texto."""
-        lineas = [f"FLUPORT · estado a las {sim.ts():%H:%M} (simulación)"]
+        lineas = [f"FLUPORT · estado a las {sim.ts():%H:%M}"]
         estado = {"verde": "🟢 Fluye", "amarillo": "🟡 Lento", "rojo": "🔴 Saturado"}
         for e in sim.estado_accesos(Mundo.B):
             nombre = sim.esc.acceso(e.acceso_id).nombre

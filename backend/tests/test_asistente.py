@@ -46,7 +46,7 @@ def test_declaraciones_de_herramientas():
 
 def test_instrucciones_incluyen_hora_y_casetas(sim):
     t = instrucciones(sim)
-    assert "2026-11-12 04:00" in t and "Entronque Santa Fe" in t and "SIMULACIÓN" in t
+    assert "2026-11-12 04:00" in t and "Entronque Santa Fe" in t
 
 
 def test_respaldo_sin_llm(sim):

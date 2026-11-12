@@ -42,7 +42,7 @@ from app.nucleo.puertos import Operacion
 
 log = logging.getLogger("fluport.telegram")
 
-BIENVENIDA = ("¡Hola! Soy el asistente de *FLUPORT* para las entradas al puerto de Veracruz (simulación).\n"
+BIENVENIDA = ("¡Hola! Soy el asistente de *FLUPORT* para las entradas al puerto de Veracruz.\n"
               "Para ver y agendar tus citas, comparte tu número con el botón de abajo.\n"
               "¿Solo quieres saber qué entrada te conviene? Toca *📍 Entradas cerca de mí*.")
 REGISTRADO = ("Listo ✅ Ya te identifiqué con el número terminado en {fin}.\n"
@@ -136,7 +136,7 @@ def texto_cercanas(sim: Operacion, lat: float, lon: float, en_vivo: bool) -> tup
     """Mensaje con las entradas más cercanas, su estado y la recomendada."""
     lista = ubicacion.cercanas(sim, lat, lon)
     mejor = ubicacion.recomendada(lista)
-    lineas = [f"📍 *Entradas más cercanas a ti* ({sim.ts():%H:%M}, simulación):"]
+    lineas = [f"📍 *Entradas más cercanas a ti* ({sim.ts():%H:%M}):"]
     for i, x in enumerate(lista[:MAX_CERCANAS], 1):
         espera = f"espera ~{x.espera_min:.0f} min" if x.abierta else "sin paso"
         lineas.append(f"{i}. {ICONO[x.estado]} *{x.nombre}* · {x.distancia_km:.1f} km · {ESTADO_TXT[x.estado]}, {espera}")

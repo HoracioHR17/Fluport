@@ -22,7 +22,7 @@ def cliente():
 ])
 def test_paginas(cliente, ruta, texto):
     r = cliente.get(ruta)
-    assert r.status_code == 200 and texto in r.text and "SIMULACIÓN" in r.text
+    assert r.status_code == 200 and texto in r.text and 'id="etiqueta"' not in r.text  # sin etiqueta SIMULACIÓN
 
 
 @pytest.mark.parametrize("ruta", [
