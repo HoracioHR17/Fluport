@@ -270,7 +270,8 @@
     Object.keys(estado.accesos).forEach(function (id) {
       var a = estado.accesos[id];
       L.polyline([[a.lat, a.lon], [F.PUERTO.lat, F.PUERTO.lon]], { color: "#0A2238", weight: 2, opacity: 0.45, dashArray: "4 6", interactive: false }).addTo(mapa);
-      casetas[id] = L.marker([a.lat, a.lon], { icon: F.iconoCaseta("verde", nombreCaseta(id)), keyboard: false, zIndexOffset: 500 }).addTo(mapa);
+      casetas[id] = L.marker([a.lat, a.lon], { icon: F.iconoCaseta("verde", nombreCaseta(id)), keyboard: false, zIndexOffset: 500 })
+        .bindTooltip(nombreCaseta(id), { direction: "top", offset: [0, -14] }).addTo(mapa);
     });
     estado.mapa = { mapa: mapa, camiones: {}, casetas: casetas, rutas: rutas };
   }
@@ -343,7 +344,7 @@
       Object.keys(m.camiones).forEach(function (id) { if (!vistos[id]) { m.mapa.removeLayer(m.camiones[id]); delete m.camiones[id]; } });
       mb.accesos.forEach(function (a) {
         var e = F.estadoDe(a.semaforo, a.estado !== "cerrado");
-        if (m.casetas[a.acceso_id]) m.casetas[a.acceso_id].setIcon(F.iconoCaseta(e, nombreCaseta(a.acceso_id) + " · " + (e === "cerrado" ? "cerrada" : F.num(a.espera_min) + " min")));
+        if (m.casetas[a.acceso_id]) m.casetas[a.acceso_id].setIcon(F.iconoCaseta(e, F.etiquetaCaseta(m.mapa, nombreCaseta(a.acceso_id), e === "cerrado" ? "cerrada" : F.num(a.espera_min) + " min")));
         Object.keys(m.rutas).forEach(function (id) { if (estado.rutas[id].acceso === a.acceso_id) m.rutas[id].setStyle(F.estiloRuta(e)); });
       });
     }

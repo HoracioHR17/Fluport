@@ -173,7 +173,7 @@
     var movil = MOVIL.matches;
     zonas.forEach(function (z) {
       var e = est(z), espera = z.abierto ? F.num(z.espera_min) + " min" : "cerrada";
-      var texto = movil ? espera : corto(z.nombre) + " · " + espera;
+      var texto = movil ? espera : F.etiquetaCaseta(m.mapa, corto(z.nombre), espera);
       var clave = e + "|" + texto + "|" + movil;
       if (m.claves[z.acceso_id] === clave) return; // sin cambios: no se redibuja (evita parpadeo al tocar)
       m.claves[z.acceso_id] = clave;

@@ -1,7 +1,7 @@
 # Fluport
 **Menos fila, más puerto.**
 
-Fluport predice la congestión en los accesos al puerto de Veracruz y redistribuye la llegada de camiones mediante citas en el horario de menor espera, avisando a cada actor por el canal que ya usa.
+Fluport predice la congestión en las seis entradas terrestres al puerto de Veracruz y redistribuye la llegada de camiones mediante citas en el horario de menor espera, avisando a cada actor por el canal que ya usa.
 
 > ⚠️ **SIMULACIÓN.** Todos los datos de Fluport son sintéticos, generados por un simulador. No se usan datos reales de la terminal, la aduana ni de personas. Los teléfonos usados en la demo son números de prueba con consentimiento de sus titulares.
 
@@ -11,13 +11,12 @@ Cientos de camiones llegan al puerto todos los días a las mismas horas. Se form
 **Para quién:** agencias transportistas y sus choferes, agentes aduanales y terminales, y vecinos de las zonas cercanas al puerto.
 
 ## Cómo funciona
-1. **Simulador en vivo:** recrea el flujo de camiones hacia los accesos. Corre dos mundos a la vez, uno *sin Fluport* y otro *con Fluport*, para medir la diferencia.
-2. **Pronóstico:** estima la espera de cada acceso durante las próximas 12 horas.
-3. **Citas:** sugiere los tres mejores horarios para llegar y permite agendar, cambiar o cancelar.
-4. **Vista pública:** estado de contingencia de cada entrada (normal, lenta, saturada o cerrada), espera estimada en tiempo real, horas pico y un acceso directo (botón y QR) al bot de Telegram.
-5. **Bot de Telegram:** el transportista que su agencia dio de alta (o que pidió unirse desde el bot y su agencia aprobó) se conecta con su número, recibe y confirma las citas que le asignan, pide o cambia citas en lenguaje natural y recibe avisos si su caseta se satura o se cierra.
-6. **Vista de agencia:** cada agencia da de alta a sus transportistas, les asigna citas con el pronóstico de espera y supervisa su flota en el mapa, el estado de cada cita (sin confirmar, confirmada, pedida por el chofer, en ruta, cumplida), los avisos y lo que requiere su atención.
-7. **Panel de demostración:** controla la simulación (velocidad y eventos como cierres, buques o norte) y compara el mundo *sin Fluport* con el *con Fluport*: ahorro en horas, diésel, costo y CO₂.
+1. **Simulador en vivo:** recrea el flujo de camiones hacia las seis entradas (Av. Rafael Cuervo, Distribuidor MEX-140, Bulevar portuario km 13.5, Entronque San Julián, Entronque Santa Fe y Av. Miguel Alemán). Corre dos mundos a la vez, uno *sin Fluport* y otro *con Fluport*, para medir la diferencia; si una entrada se cierra, sin Fluport los camiones se forman ante ella y con Fluport se desvían a tiempo.
+2. **Pronóstico:** estima la espera de cada entrada durante las próximas 12 horas.
+3. **Citas:** sugiere los tres mejores horarios para llegar y permite agendar, cambiar o cancelar. Las citas que asigna la agencia son obligatorias para el transportista.
+4. **Vista pública:** estado de cada entrada en tiempo real (normal, lenta, saturada o cerrada), espera estimada, pronóstico y mejor hora para pasar, las entradas más cercanas a tu ubicación y un acceso directo (botón y QR) al bot de Telegram. Se adapta a celular.
+5. **Bot de Telegram:** el transportista se conecta con su número, recibe las citas que le asigna su agencia y los cambios o cancelaciones, pide o cambia citas en lenguaje natural (incluso "ya no entro por el norte, voy por el sur") y, si comparte su ubicación en tiempo real, recibe aviso de cuellos de botella con una entrada alternativa y su hora estimada de llegada.
+6. **Vista de agencia (Tiburones Ecover Logistics):** da de alta a sus transportistas o aprueba sus solicitudes, les asigna, cambia o cancela citas con el pronóstico de espera, supervisa su flota en el mapa y los avisos, y controla la simulación (velocidad, cierres y reaperturas de entradas, buques y norte) desde su pantalla principal, con el ahorro en horas, diésel, costo y CO₂ frente a la llegada sin citas.
 
 ## Arquitectura
 Monolito modular hexagonal: un solo proceso FastAPI dividido en módulos (`simulacion`, `pronostico`, `citas`, `agencias`, `mensajeria`, `publico`) que se comunican por sus servicios y dependen de **puertos** (interfaces) en lugar de tecnologías concretas; el simulador, PostgreSQL, Telegram y Gemini son **adaptadores** que `app/main.py` conecta. Detalle, diagrama y reglas de dependencia en [`docs/arquitectura.md`](docs/arquitectura.md); las reglas se verifican con pruebas.
@@ -34,7 +33,7 @@ cp .env.example .env          # ajustar la conexión a PostgreSQL
 alembic upgrade head
 uvicorn app.main:app --reload
 ```
-Abrir `http://localhost:8000/publico/` (vista pública, también en `/`) · `/agencia/` (panel de agencia: resumen, flota, citas, transportistas y avisos) · `/demo/` (panel de demostración) · `/docs` (API).
+Abrir `http://localhost:8000/publico/` (vista pública, también en `/`) · `/agencia/` (panel de agencia: resumen con los controles de la simulación, flota, citas, transportistas y avisos) · `/docs` (API).
 
 **Publicarlo en internet:** con Cloudflare Tunnel y un dominio propio, sin abrir puertos; ver [`docs/despliegue.md`](docs/despliegue.md).
 
@@ -641,7 +640,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo eligió la arquitectura y sus reglas; se apoyó en Claude (Opus 5.5) como asistente para mover los archivos, reescribir las importaciones, escribir los puertos, la prueba de arquitectura y la documentación, que el equipo revisó y aprobó.
 
-### 2026-11-12 01:40 · `pendiente` · Solicitud de alta desde el bot con elección de agencia
+### 2026-11-12 01:25 · `cac9152` · Solicitud de alta desde el bot con elección de agencia
 
 - **Justificación del cambio:** hasta ahora, si un transportista sin alta abría el bot, solo recibía "pide a tu agencia que te registre" y el trámite se quedaba fuera del sistema. El equipo decidió que el bot le pregunte a qué agencia pertenece y le envíe la solicitud, para que la agencia solo apruebe o rechace con un clic desde su panel, sin capturar teléfonos a mano. La agencia conserva el control: nadie queda vinculado sin su aprobación.
 
@@ -665,7 +664,7 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo definió el flujo de solicitud y aprobación; se apoyó en Claude (Opus 5.5) como asistente para escribir el servicio, los cambios del bot, la pantalla y las pruebas, que el equipo revisó y aprobó.
 
-### 2026-11-12 02:30 · `pendiente` · Rediseño con gráficas y simbología, mapa acotado al puerto y fin de WhatsApp
+### 2026-11-12 01:52 · `026e7bb` · Rediseño con gráficas y simbología, mapa acotado al puerto y fin de WhatsApp
 
 - **Justificación del cambio:** el equipo validó en el lienzo de diseño un rediseño de las vistas pública y de agencia con gráficas y una simbología que no depende solo del color, y lo llevó a las pantallas reales. Además retiró WhatsApp: el proyecto solo usa Telegram, y mantener el adaptador de Twilio, su webhook y su configuración era código sin uso y superficie de ataque. Por último, el mapa permitía alejarse hasta perder el puerto de vista; ahora se queda en la zona de Veracruz.
 
@@ -694,3 +693,215 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 
 - **Herramientas de IA:** el equipo aprobó el rediseño en el lienzo, decidió retirar WhatsApp y acotar el mapa; se apoyó en Claude (Opus 5.5) como asistente para escribir los componentes, las pantallas, la migración y las pruebas, que el equipo revisó y aprobó.
 
+
+### 2026-11-12 02:32 · `23023af` · Avisos de cancelación y cambio de citas, y cambio de entrada desde el bot
+
+- **Justificación del cambio:** el transportista no se enteraba cuando su agencia cancelaba o movía una cita, y si cambiaba de ruta en el camino (por ejemplo, del norte al sur) no podía ajustar su cita sin empezar de cero. El equipo decidió que el bot avise ambos casos y que entienda el cambio de entrada conservando la hora; la agencia, a su vez, ve lo que el transportista cambia o cancela.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `backend/app/modulos/mensajeria/servicio.py` | `mensaje_cancelacion`, `mensaje_reasignacion`, `notificar_cancelacion`, `notificar_reasignacion`, `_notificar`. | Arman el aviso, lo guardan en el tablero y en el historial del asistente y lo envían por Telegram. `_notificar` reúne el flujo que antes repetía `notificar_asignacion`. |
+  | `backend/app/modulos/citas/api.py` | `DELETE /api/citas/{id}` y `PATCH /api/citas/{id}`. | Al cancelar o cambiar desde el panel, el transportista recibe el aviso en segundo plano. |
+  | `backend/app/modulos/mensajeria/asistente/agente.py` | `reprogramar_cita` sin hora obligatoria; `entradas`; reglas 8 y 9; `_avisar_agencia`. | Si el transportista solo cambia de entrada se conserva su ventana; la cita nueva queda confirmada y la agencia recibe el aviso `cambio_chofer` o `cancelacion_chofer`. |
+  | `frontend/static/js/agencia.js` | Etiquetas, tonos y filtros de los avisos nuevos. | "Cambio del chofer", "Cancelación del chofer" (con botón Reasignar), "Cancelación avisada" y "Cambio avisado". |
+  | `backend/tests/test_cambios_citas.py` (nuevo) | Pruebas de los cuatro flujos. | Cancelación y cambio por la agencia; cambio de entrada y cancelación por el transportista. |
+
+- **Funcionalidad:** la agencia cancela o mueve una cita y el transportista lo sabe al instante; el transportista escribe "ya no entro por el norte, voy por el sur" y su cita pasa a una entrada de ese corredor a la misma hora, con aviso a la agencia.
+
+- **Tecnologías usadas:** tareas en segundo plano de `asyncio` (`create_task`) para no retrasar la respuesta de la API mientras se envía el mensaje; *function calling* de Gemini con un parámetro opcional (`inicio`) para que el modelo pueda cambiar solo la entrada.
+
+- **Herramientas de IA:** el equipo definió qué avisos necesitaba cada actor; se apoyó en Claude (Opus 5.5) como asistente para escribir los servicios, las reglas del asistente y las pruebas, que el equipo revisó y aprobó.
+
+### 2026-11-12 02:35 · `9e4f4d4` · Vista pública en tiempo real
+
+- **Justificación del cambio:** la vista pública se recalculaba cada 10 s; el equipo quería que la espera y el estado de cada entrada cambiaran al mismo ritmo que la simulación.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `frontend/static/js/publico.js` | `aplicarSnapshot`, `dibujar`. | Con cada actualización en vivo se copian espera, semáforo, fila y contingencia a cada entrada y se redibuja como máximo una vez por segundo; pronóstico y mejor hora se recargan aparte. El encabezado indica "En vivo" o "Actualizando cada segundo". |
+
+- **Funcionalidad:** quien abre la vista pública ve la fila moverse en vivo sin recargar la página.
+
+- **Tecnologías usadas:** WebSocket del navegador (con respaldo por sondeo) ya usado por el panel de agencia; `setTimeout` para limitar los redibujos.
+
+- **Herramientas de IA:** el equipo pidió la actualización en vivo; se apoyó en Claude (Opus 5.5) como asistente para escribir el código, que el equipo revisó y aprobó.
+
+### 2026-11-12 02:55 · `f0902a1` · Seis entradas del inventario de acceso terrestre y entradas cercanas por ubicación
+
+- **Justificación del cambio:** el equipo elaboró un inventario de puntos críticos de acceso terrestre (convergencia vial, interferencia urbana y conectividad portuaria, con base en el Programa Municipal de Desarrollo Urbano, el programa de infraestructura de la zona conurbada y comunicados de la SICT) y decidió que esos seis puntos reemplacen a las tres casetas. También quiso que el bot y la vista pública indiquen qué entradas tiene cerca el usuario y cómo están.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `backend/data/escenario.json` | Seis entradas A1–A6 con corredor (`norte`, `sur`, `urbana`), coordenadas y rutas. | Carriles, tiempo de servicio y participación derivados de los datos ya integrados: se conservan los 11 carriles y la demanda total; la participación es proporcional a la capacidad con un ligero sesgo a Rafael Cuervo. Coordenadas aproximadas. |
+  | `backend/app/modulos/simulacion/dominio/escenario.py` | Campo `entrada` en `AccesoParam`. | Corredor por el que llegan los camiones. |
+  | `backend/app/modulos/pronostico/pronosticador.py` | Validación del modelo. | Si el modelo se entrenó con otras entradas se descarta y se reentrena; mientras tanto se usa el balance de flujo. |
+  | `backend/app/modulos/mensajeria/dominio/ubicacion.py` (nuevo) | `distancia_km`, `cercanas`, `recomendada`, `empeoro`. | Distancia en línea recta, tiempo de manejo estimado y la entrada abierta con menor manejo + fila. |
+  | `backend/app/modulos/mensajeria/bot_telegram.py`, `adaptadores/telegram.py` | Botón «📍 Entradas cerca de mí», `atender_ubicacion`, `revisar_seguimiento`, `revisar_en_vivo`. | Con o sin alta. Con ubicación en tiempo real avisa si su mejor entrada cambia o empeora. La ubicación solo vive en memoria. |
+  | `backend/app/modulos/mensajeria/servicio.py` | `ciclo_avisos` revisa a quienes comparten ubicación en vivo. | Aunque no se muevan, la fila cambia. |
+  | `frontend/publico/index.html`, `static/js/publico.js`, `static/css/ui.css`, `static/js/graficas.js` | Botón "Ver entradas cerca de mí", tarjeta con las 3 más cercanas y punto en el mapa; encuadre del mapa ajustado. | La distancia se calcula en el navegador: la ubicación no se envía al servidor. |
+  | `backend/tests/test_ubicacion.py` (nuevo) y pruebas ajustadas a seis entradas | — | — |
+
+- **Funcionalidad:** el transportista toca un botón y sabe qué entrada le conviene desde donde está; si comparte su ubicación en vivo, el bot le avisa en el camino.
+
+- **Tecnologías usadas:** fórmula del haversine (biblioteca estándar `math`) para la distancia; ubicación puntual (`request_location`) y en tiempo real (actualizaciones `edited_message`) de la Bot API de Telegram; Geolocation API del navegador (`watchPosition`), que solo funciona con HTTPS, como el que da el túnel.
+
+- **Herramientas de IA:** el equipo elaboró el inventario y decidió las entradas y el reparto; se apoyó en Claude (Opus 5.5) como asistente para escribir el escenario, el módulo de ubicación, los cambios del bot y la página, y las pruebas, que el equipo revisó y aprobó.
+
+### 2026-11-12 03:06 · `55ac128` · Más demanda simulada, sin etiqueta de simulación y sin "mejor entrada" en la vista pública
+
+- **Justificación del cambio:** el equipo quería ver más camiones en las horas pico y una vista pública más limpia.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `backend/data/escenario.json` | `camiones_dia` de 2,000 a 2,800 con el mismo perfil horario. | Con las olas de buques el día queda en ~88 % de la capacidad de las seis entradas. |
+  | `backend/app/nucleo/config.py` | `sim_max_camiones_visibles` de 300 a 600. | Más camiones dibujados en el mapa. |
+  | `frontend/*/index.html`, `static/js/agencia.js`, `publico.js`, `bot_telegram.py`, `asistente/agente.py` | Sin la etiqueta "SIMULACIÓN" en pantallas y mensajes. | El aviso de datos sintéticos se mantiene en este README. |
+  | `frontend/publico/index.html`, `static/js/publico.js` | Sin el recuadro "Mejor entrada ahora". | Se conserva el ranking de espera. |
+
+- **Funcionalidad:** la saturación de las horas pico es visible sin Fluport y se reparte con Fluport.
+
+- **Tecnologías usadas:** sin tecnologías nuevas.
+
+- **Herramientas de IA:** el equipo decidió los cambios; se apoyó en Claude (Opus 5.5) como asistente para aplicarlos, y el equipo los revisó y aprobó.
+
+### 2026-11-12 03:18 · `1ee2b03` · Cambiar citas desde el panel, versión en los archivos y canal en vivo solo público
+
+- **Justificación del cambio:** la agencia solo podía cancelar citas, no moverlas; la caché de Cloudflare servía archivos viejos y rompía páginas; y la vista pública recibía el estado completo de la simulación (incluidos camiones y agencias) aunque no lo mostrara.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `frontend/static/js/agencia.js`, `static/css/ui.css` | Botón "Cambiar" por cita, `filaEdicion`, `guardarEdicion`, `isoMas`. | Elige entrada y hora; al guardar se avisa al transportista. Mientras se edita, la tabla no se redibuja. |
+  | `backend/app/main.py` | `PaginasVersionadas`, `huella_estaticos`, `versionar`. | Las páginas piden sus CSS y JS con `?v=<huella>` y se sirven con `Cache-Control: no-cache`. |
+  | `backend/app/modulos/publico/api.py`, `servicio.py` | `/ws/publico`, `/api/publico/snapshot`, `snapshot_publico`. | Solo hora, clima y estado de cada entrada. |
+  | `backend/app/nucleo/dependencias.py` | `suscribir`, `desuscribir`. | Acceso al canal en vivo sin que el módulo público dependa del simulador. |
+  | `frontend/static/js/comun.js`, `publico.js` | `conectarSimulacion` acepta otras rutas. | La vista pública usa el canal público. |
+  | `backend/tests/test_frontend.py`, `test_publico.py` | Pruebas de la versión de archivos y del canal público. | — |
+
+- **Funcionalidad:** la agencia reprograma una cita en dos clics; cada cambio en el frontend llega a los navegadores sin purgar la caché; la vista pública ya no expone datos de operación.
+
+- **Tecnologías usadas:** `hashlib` (biblioteca estándar) para la huella de los archivos; subclase de `StaticFiles` de Starlette para reescribir las páginas; encabezado HTTP `Cache-Control`.
+
+- **Herramientas de IA:** el equipo identificó los tres problemas; se apoyó en Claude (Opus 5.5) como asistente para escribir las soluciones y las pruebas, que el equipo revisó y aprobó.
+
+### 2026-11-12 03:23 · `97ad505` · Mejor hora sin franjas pasadas y tarjetas de entradas fijas
+
+- **Justificación del cambio:** la vista pública a veces mostraba como mejor hora una que ya había pasado, y las tarjetas de las entradas se reordenaban y parpadeaban con cada actualización.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `frontend/static/js/publico.js` | `franjasVigentes`, `mejorHora`, `crearTarjeta`, `actualizarTarjeta`. | Se descartan las franjas pasadas según la hora simulada; las tarjetas se crean una vez, en orden fijo, y solo cambia su contenido. El pronóstico se recarga cada 15 s. |
+  | `backend/app/modulos/publico/servicio.py`, `asistente/agente.py` | Solo franjas desde ahora. | El pronóstico en caché puede tener franjas que ya pasaron. |
+  | `backend/tests/test_publico.py` | `test_mejor_hora_nunca_es_pasada`. | — |
+
+- **Funcionalidad:** la mejor hora siempre es futura y las tarjetas se quedan quietas.
+
+- **Tecnologías usadas:** sin tecnologías nuevas.
+
+- **Herramientas de IA:** el equipo reportó los dos problemas; se apoyó en Claude (Opus 5.5) como asistente para corregirlos, y el equipo revisó y aprobó.
+
+### 2026-11-12 03:48 · `17dbcce` · El bot cancela las citas cuando se le pide
+
+- **Justificación del cambio:** al pedir "cancela mi cita", el asistente consultaba primero la lista de citas y la respuesta terminaba ahí, sin cancelar.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `backend/app/modulos/mensajeria/asistente/agente.py` | `quiere_modificar`, `_unica_activa`; `cancelar_cita` y `reprogramar_cita` sin número obligatorio. | Si el mensaje pide cancelar o cambiar, la lista no corta la conversación; con una sola cita activa no se pide el número. |
+  | `backend/tests/test_cambios_citas.py` | Pruebas del flujo. | — |
+
+- **Funcionalidad:** "cancela mi cita" cancela la cita.
+
+- **Tecnologías usadas:** expresiones regulares (`re`) y `unicodedata` (biblioteca estándar) para reconocer la intención sin importar acentos.
+
+- **Herramientas de IA:** el equipo reportó el fallo; se apoyó en Claude (Opus 5.5) como asistente para diagnosticarlo y corregirlo, y el equipo revisó y aprobó.
+
+### 2026-11-12 03:48 · `17dbcce` · Citas asignadas por la agencia obligatorias
+
+- **Justificación del cambio:** el equipo decidió que una cita asignada por la agencia se cumple: el transportista no la confirma ni la rechaza.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `backend/app/modulos/citas/servicio.py` | La cita de la agencia queda en firme al crearse. | — |
+  | `backend/app/modulos/mensajeria/servicio.py`, `bot_telegram.py` | Avisos sin "Responde SÍ o NO"; se retira la confirmación por SÍ/NO. | — |
+  | `backend/app/modulos/mensajeria/asistente/agente.py` | Si el transportista pide cancelar una cita de la agencia, se envía la petición a la agencia (aviso `solicitud_cancelacion`) en lugar de cancelarla. | Las citas que pidió el propio transportista sí las puede cancelar. |
+  | `frontend/static/js/agencia.js`, `agencia/index.html`, `agencia/citas/index.html`, `publico/index.html` | Sin "sin confirmar": las citas de la agencia aparecen como "Asignada"; aviso "Pide cancelar" con botón Reasignar. | — |
+  | `backend/tests/test_agencias.py`, `test_cambios_citas.py` | Pruebas ajustadas y nuevas. | — |
+
+- **Funcionalidad:** la agencia asigna y el transportista solo recibe el aviso; si no puede asistir, la agencia decide.
+
+- **Tecnologías usadas:** sin tecnologías nuevas.
+
+- **Herramientas de IA:** el equipo definió la regla; se apoyó en Claude (Opus 5.5) como asistente para aplicarla, y el equipo revisó y aprobó.
+
+### 2026-11-12 04:10 · `486f9fc` · Una sola agencia: Tiburones Ecover Logistics
+
+- **Justificación del cambio:** el equipo decidió presentar Fluport con una sola agencia.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `backend/data/escenario.json`, `simulacion/dominio/escenario.py` | Solo AG01, Tiburones Ecover Logistics, con el 22 % de los camiones simulados. | El resto son camiones de otros transportistas, sin agencia en Fluport. |
+  | `backend/app/modulos/simulacion/adaptadores/persistencia_pg.py` | Al arrancar, los transportistas y solicitudes de agencias retiradas pasan a la vigente y esas agencias se borran. | — |
+  | `backend/app/modulos/agencias/servicio.py`, `mensajeria/bot_telegram.py` | `agencia_unica`. | Con una sola agencia, la solicitud de alta va directo a ella sin preguntar. |
+  | `frontend/static/js/agencia.js`, `publico/index.html`, `static/css/ui.css` | Nombre de la agencia en lugar del selector; textos de acceso. | — |
+  | `backend/tests/test_agencias.py` | Pruebas reescritas para una agencia. | — |
+
+- **Funcionalidad:** el panel y el bot trabajan con Tiburones Ecover Logistics.
+
+- **Tecnologías usadas:** `update` y `delete` de SQLAlchemy con `not_in` para mover y retirar registros al sembrar el escenario.
+
+- **Herramientas de IA:** el equipo decidió la agencia; se apoyó en Claude (Opus 5.5) como asistente para aplicar el cambio, y el equipo revisó y aprobó.
+
+### 2026-11-12 04:32 · `6ef857f` · El cierre de una entrada genera cuello de botella; con Fluport se desvía al momento
+
+- **Justificación del cambio:** al cerrar una entrada, en el mundo con Fluport los camiones seguían manejando hacia ella y aparecían de golpe en otra fila, sin tiempo de rodeo; tampoco regresaban al reabrir.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `backend/app/modulos/simulacion/dominio/mundo.py` | `_desviar`, `_rebalancear`; `_camion` reescrito; `cerrar` y `reabrir`. | Con Fluport, al cerrar, quienes van hacia la entrada o están en su fila se desvían a la abierta con menos espera con 15 min de rodeo (supuesto), y quienes salen después ya no van hacia ella; al reabrir, los últimos de las filas largas se cambian a la reabierta mientras les convenga. Sin Fluport, los camiones se forman ante la barrera hasta que reabre. |
+  | `backend/tests/test_motor.py` | `test_cierre_crea_cuello_de_botella_y_fluport_desvia`. | — |
+  | `backend/tests/test_citas.py`, `test_agencias.py`, `asistente/agente.py` | Dos pruebas actualizadas a la nueva demanda y a una agencia; "Cámbiala" con acento se reconoce como cambio. | — |
+
+- **Funcionalidad:** al cerrar A2 a las 10:00, sin Fluport su fila llega a 95 camiones en 2 h; con Fluport la entrada queda vacía y la carga se reparte en las demás, que se saturan. Pruebas sin PostgreSQL: 145 aprobadas.
+
+- **Tecnologías usadas:** `Process.interrupt` de SimPy para sacar de la fila a un camión cuando Fluport le avisa del cierre (la petición del carril se cancela al salir del bloque `with`).
+
+- **Herramientas de IA:** el equipo detectó el problema en la demo; se apoyó en Claude (Opus 5.5) como asistente para reproducirlo, corregirlo y probarlo, y el equipo revisó y aprobó.
+
+### 2026-11-12 04:32 · `6ef857f` · Simulación desde el panel de agencia, vista pública para celular y cuello de botella en ruta con ETA
+
+- **Justificación del cambio:** el equipo decidió presentar todo desde las pantallas reales (agencia y pública) y retirar el panel `/demo`; en celular el mapa público se veía saturado; y el bot debía avisar al transportista en camino si su entrada se congestiona, con otra entrada y su hora de llegada.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `frontend/agencia/index.html`, `static/js/agencia.js` | Panel "Simulación": pausar o reanudar, velocidad, cerrar y reabrir entradas, buque y norte; `iniciarPanelSimulacion`. | Muestra si corre y qué entradas están cerradas. |
+  | `backend/app/main.py`, `docs/despliegue.md` | `/demo` redirige a `/agencia/`. | Se retiran `frontend/demo/`, `static/js/demo.js` y `static/css/app.css`. |
+  | `frontend/static/js/publico.js`, `static/css/ui.css` | Mapa en celular con etiquetas de solo la espera (nombre al tocar), rutas más delgadas y sin líneas al puerto; tarjetas en dos columnas, menú deslizable y márgenes compactos. | Las etiquetas solo se redibujan si cambian. |
+  | `backend/app/modulos/mensajeria/bot_telegram.py` | `cita_en_curso`, `texto_cuello_de_botella`, `_avisar_cuello`, `_llegada`. | Con cita y ubicación en vivo: si su entrada está cerrada o tendrá 45 min o más de fila al llegar y otra le ahorra al menos 15 min, le sugiere la otra con hora de llegada, espera y hora en que pasa; con "SÍ" el asistente cambia su cita. Los mensajes de entradas cercanas incluyen la hora de llegada. |
+  | `backend/tests/test_frontend.py`, `test_ubicacion.py`, `test_cambios_citas.py` | Pruebas del panel, la redirección y el aviso de cuello de botella. | — |
+
+- **Funcionalidad:** la demostración se hace desde el panel de agencia y la vista pública; en el celular el mapa se lee con claridad; el transportista en camino recibe a tiempo una entrada mejor y sabe a qué hora llega. Pruebas sin PostgreSQL: 146 aprobadas.
+
+- **Tecnologías usadas:** `window.matchMedia` para simplificar el mapa en pantallas angostas; *tooltips* de Leaflet (`bindTooltip`) para mostrar el nombre al tocar; pronóstico de espera a la hora de llegada (`espera_estimada`) para calcular la ETA.
+
+- **Herramientas de IA:** el equipo decidió retirar la demo, priorizar el celular y el aviso en ruta; se apoyó en Claude (Opus 5.5) como asistente para escribir el panel, los estilos, la lógica del bot y las pruebas, que el equipo revisó y aprobó.

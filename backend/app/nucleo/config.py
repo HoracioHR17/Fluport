@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     # Simulación
     sim_autostart: bool = True  # arrancar la simulación al iniciar la app
     sim_semilla: int = 42
-    sim_velocidad: float = 60.0  # segundos simulados por segundo real (60 => 1 s real = 1 min simulado)
+    sim_velocidad: float = 15.0  # segundos simulados por segundo real (15 => 4 s reales = 1 min simulado)
     sim_tick_seg: float = 1.0  # cada cuánto se emite un snapshot (segundos reales)
     sim_max_camiones_visibles: int = 600
 

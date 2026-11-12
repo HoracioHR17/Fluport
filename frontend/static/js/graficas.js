@@ -116,6 +116,12 @@
   }
 
   /** Icono de caseta: forma del estado + nombre y espera. */
+  // Las entradas están cerca entre sí: en el encuadre inicial la etiqueta solo muestra la espera (el nombre aparece al
+  // pasar el cursor o tocarla); al acercarse un nivel o más sobre el encuadre se agrega el nombre.
+  function etiquetaCaseta(mapa, nombre, detalle) {
+    return mapa && mapa.getZoom() >= mapa.getMinZoom() + 1 ? nombre + " · " + detalle : detalle;
+  }
+
   function iconoCaseta(estado, texto) {
     var t = String(texto).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
     return L.divIcon({ className: "", iconSize: null, iconAnchor: [15, 15],
@@ -147,6 +153,6 @@
 
   Object.assign(F, { svg: svg, COLOR: COLOR, ETIQUETA: ETIQUETA, FONDO: FONDO, estadoDe: estadoDe, formaSvg: formaSvg,
     simbolo: simbolo, pastilla: pastilla, sparkline: sparkline, velocimetro: velocimetro, dona: dona,
-    PUERTO: PUERTO, LIMITES: LIMITES, mapaPuerto: mapaPuerto, iconoCaseta: iconoCaseta, estiloRuta: estiloRuta,
+    PUERTO: PUERTO, LIMITES: LIMITES, mapaPuerto: mapaPuerto, iconoCaseta: iconoCaseta, etiquetaCaseta: etiquetaCaseta, estiloRuta: estiloRuta,
     iconoCamion: iconoCamion, rumbo: rumbo });
 })();
