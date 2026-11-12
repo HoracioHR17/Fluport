@@ -17,6 +17,7 @@ os.environ["FLUPORT_ASISTENTE_WEB_ACTIVO"] = "true"  # las pruebas del asistente
 # Aísla las pruebas de tu .env: sin llaves reales nunca se llama a Gemini, a Telegram ni al gateway SMS.
 for _var in ("LLM_API_KEY", "TELEGRAM_TOKEN", "TELEGRAM_WEBHOOK_SECRET", "SMS_URL", "SMS_USUARIO", "SMS_CLAVE"):
     os.environ[f"FLUPORT_{_var}"] = ""
+os.environ["FLUPORT_SMS_PROVEEDOR"] = "off"  # nunca enviar SMS reales (gateway, ADB o proveedor) desde las pruebas
 
 import pytest  # noqa: E402
 

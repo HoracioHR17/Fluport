@@ -16,7 +16,7 @@ TEL = "+52 229 000 0001"
 # ───────────── Sin BD ─────────────
 def test_normalizar_telefono():
     assert normalizar_telefono("+52 229 123 4567") == "+522291234567"
-    assert normalizar_telefono("229-123-4567") == "+2291234567"
+    assert normalizar_telefono("229-123-4567") == "+522291234567"  # 10 dígitos: se asume México (E.164)
     assert normalizar_telefono("+5212291234567") == "+522291234567"  # celular MX con el "1" extra
     with pytest.raises(ErrorCita):
         normalizar_telefono("123")

@@ -34,7 +34,7 @@ def test_accesos_y_rutas(cliente):
 
 
 def test_estado_por_mundo(cliente):
-    for mundo in ("A", "B"):
+    for mundo in ("B",):  # un solo mundo: la operación con Fluport
         estado = cliente.get("/api/accesos/estado", params={"mundo": mundo}).json()
         assert len(estado) == 6 and all(e["semaforo"] in ("verde", "amarillo", "rojo") for e in estado)
 
