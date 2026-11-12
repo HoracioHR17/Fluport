@@ -17,6 +17,7 @@ TEL = "whatsapp:+52 229 000 0001"
 def test_normalizar_telefono():
     assert normalizar_telefono("whatsapp:+52 229 123 4567") == "+522291234567"
     assert normalizar_telefono("229-123-4567") == "+2291234567"
+    assert normalizar_telefono("whatsapp:+5212291234567") == "+522291234567"  # celular MX con el "1" extra
     with pytest.raises(ErrorCita):
         normalizar_telefono("123")
 
@@ -26,9 +27,17 @@ def test_sugerencias_ordenadas_y_dentro_de_la_ventana(sim):
     req = SugerenciaRequest(desde=INICIO.replace(hour=9), hasta=INICIO.replace(hour=15), tipo_carga="contenedor_40")
     s = citas.sugerir(sim, req)
     assert len(s) == 3
-    assert [x.espera_min_est for x in s] == sorted(x.espera_min_est for x in s)
+    assert [round(x.espera_min_est / 5) for x in s] == sorted(round(x.espera_min_est / 5) for x in s)
     assert all(req.desde - timedelta(minutes=30) < x.inicio < req.hasta for x in s)
     assert all(x.ahorro_vs_pico_min >= 0 for x in s)
+
+
+def test_sugerencias_empatadas_prefieren_el_centro_de_la_ventana(sim):
+    """Sin congestión (espera 0 en todas), primero la franja que contiene la hora pedida (centro de la ventana)."""
+    req = SugerenciaRequest(acceso_id="A1", desde=INICIO.replace(hour=7, minute=30),
+                            hasta=INICIO.replace(hour=10, minute=30), tipo_carga="granel")
+    s = citas.sugerir(sim, req)
+    assert s[0].inicio.hour == 9 and s[0].espera_min_est < 5
 
 
 def test_sugerencias_evitan_acceso_cerrado(sim):

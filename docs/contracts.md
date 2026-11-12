@@ -50,8 +50,9 @@ Enums: `tipo_carga` (contenedor_20, contenedor_40, refrigerado, peligroso, grane
 | GET | `/api/sim/kpis` | — | `KpisResponse` | M1 |
 | GET | `/api/sim/snapshot` | — | `SimSnapshot` (respaldo por polling) | M1 |
 | POST | `/api/asistente/mensaje` | `AsistenteRequest` | `AsistenteResponse` | M4 |
-| GET/POST | `/webhook/whatsapp` | WhatsApp Cloud API | verificación / 200 | M5 |
-| POST | `/webhook/telegram` | Telegram Bot API | 200 | M5 |
+| POST | `/webhook/whatsapp` | Formulario de Twilio (`From`, `Body`, …) + `X-Twilio-Signature` | TwiML vacío (la respuesta se envía aparte por la API REST) · 403 si la firma es inválida | M5 |
+| GET | `/api/avisos?limite=10` | — | `AvisoOut[]` (últimos avisos proactivos) | M5 |
+| GET | `/api/whatsapp/enlace` | — | `{numero, enlace, configurado}` (wa.me de respaldo) | M5 |
 | GET | `/api/publico/zonas` | — | `ZonaPublica[]` (por caseta: semáforo actual, horas pico de 12 h, mejor hora) | M7 |
 
 Payload de `EventoCreate.payload` por tipo:
@@ -67,6 +68,10 @@ Notas de citas:
 - Errores: 404 acceso/cita/transportista inexistente · 409 acceso cerrado, cita no activa o camión ya en camino · 422 ventana inválida o teléfono inválido.
 - Ciclo de estados: `agendada → en_ruta → cumplida` (lo actualiza el simulador) · `reprogramada` / `cancelada` (por la API) · `no_show` si la ventana terminó hace más de 60 min sin salir.
 - Sugerencias: franjas de 30 min dentro de `[desde, hasta]` en accesos abiertos, ordenadas por espera prevista (pronóstico a 12 h; más allá, carga agendada vs. capacidad); `ahorro_vs_pico_min` = espera de la peor franja de la ventana − espera de la sugerida.
+
+Notas de WhatsApp (M5):
+- Avisos proactivos, uno por cita y tipo: `turno_30min` (faltan ≤ 30 min) y `saturacion` (caseta cerrada o espera prevista ≥ 45 min en las próximas 3 h, con la mejor alternativa si ahorra ≥ 15 min). Se guardan en `aviso`, se publican en el WebSocket como `{"tipo": "aviso"}` y se agregan al historial del asistente para que un "SÍ" tenga contexto.
+- La firma se valida contra `FLUPORT_TWILIO_WEBHOOK_URL` (la URL pública exacta configurada en Twilio).
 
 Notas de la vista pública:
 - Usa el Mundo B (operación con Fluport). Nunca incluye citas, transportistas, teléfonos ni la comparación A/B.
@@ -91,7 +96,10 @@ Servidor → cliente, JSON. Al conectar se envía un snapshot inmediato; luego u
 `MundoEstado`: `camiones[]` (tope `sim_max_camiones_visibles`; el resto en `camiones_ocultos`), `accesos[]`, `kpis`.
 `CamionEstado.progreso` es 0..1 sobre la polilínea `ruta_id` del GeoJSON; el front interpola la posición.
 
-## 5. Herramientas del asistente (M4)
+## 5. Asistente (M4)
+`POST /api/asistente/mensaje` `{canal, remitente, texto}` → `{respuesta, acciones[]}`. El remitente es el teléfono (acepta `whatsapp:+52…`); el asistente solo ve y modifica las citas de ese teléfono. Sin `FLUPORT_LLM_API_KEY` responde con el estado de las casetas.
+
+Herramientas:
 `consultar_espera(acceso_id?)` → `GET /api/accesos/estado` + `GET /api/pronostico`
 `sugerir_horario(desde, hasta, tipo_carga, acceso_id?)` → `POST /api/citas/sugerencias`
 `crear_cita(...)` → `POST /api/citas` · `reprogramar_cita(id, ...)` → `PATCH` · `cancelar_cita(id)` → `DELETE`

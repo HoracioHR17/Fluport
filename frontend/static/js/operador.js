@@ -10,7 +10,7 @@
   var EVENTOS = { cierre_acceso: "Caseta cerrada", reapertura: "Caseta reabierta", buque_atraca: "Atracó un buque",
     norte: "Norte", carga_urgente: "Carga urgente", personalizado: "Evento especial" };
 
-  var estado = { accesos: {}, rutas: {}, mundo: "B", pronCaseta: null, snap: null, mapas: {} };
+  var estado = { accesos: {}, rutas: {}, mundo: "B", pronCaseta: null, snap: null, mapas: {}, avisos: [] };
 
   // ───────────── Mapas (Leaflet) ─────────────
   function prepararRuta(coords) {
@@ -183,6 +183,22 @@
     var vis = s.mundos[estado.mundo === "A" ? "A" : "B"];
     $("resumen-mapa").textContent = F.num(vis.camiones.length) + " camiones en el mapa" +
       (vis.camiones_ocultos ? " · " + F.num(vis.camiones_ocultos) + " más no se dibujan" : "");
+  }
+
+  // ───────────── Avisos por WhatsApp ─────────────
+  var TIPOS_AVISO = { turno_30min: "Recordatorio de turno", saturacion: "Caseta saturada o cerrada" };
+
+  function renderAvisos(lista) {
+    F.reemplazar($("lista-avisos"), lista.length ? lista.slice(0, 6).map(function (a) {
+      return el("li", { style: { flexDirection: "column", gap: "4px" } }, [
+        el("span", {}, [el("b", {}, (TIPOS_AVISO[a.tipo] || a.tipo) + " · cita #" + a.cita_id), " · " + F.hora(a.creado_en)]),
+        el("span", { class: "tenue", style: { whiteSpace: "pre-line" } }, a.mensaje.replace(/\*/g, ""))
+      ]);
+    }) : [el("li", { class: "tenue" }, "Sin avisos todavía.")]);
+  }
+
+  async function cargarAvisos() {
+    try { estado.avisos = await F.api("/api/avisos?limite=6"); renderAvisos(estado.avisos); } catch (e) { /* sin BD */ }
   }
 
   // ───────────── Pronóstico ─────────────
@@ -373,8 +389,9 @@
     F.conectarSimulacion(function (m) {
       if (m.tipo === "snapshot") render(m.data);
       else if (m.tipo === "evento") cargarPronostico();
+      else if (m.tipo === "aviso") { estado.avisos.unshift(m.data); renderAvisos(estado.avisos); }
     });
-    cargarModelo(); cargarPronostico(); cargarCitas();
+    cargarModelo(); cargarPronostico(); cargarCitas(); cargarAvisos();
     setInterval(cargarPronostico, 15000);
     setInterval(cargarCitas, 10000);
     setInterval(cargarModelo, 60000);

@@ -28,11 +28,18 @@ class Settings(BaseSettings):
 
     # Asistente IA / mensajería
     llm_api_key: str = ""
-    llm_modelo: str = "claude-sonnet-5-5"
-    whatsapp_token: str = ""
-    whatsapp_phone_id: str = ""
-    whatsapp_verify_token: str = "fluport-verify"
-    telegram_token: str = ""
+    llm_modelo: str = "gemini-3.6-flash"  # Gemini API (generateContent)
+    llm_pensamiento: str = "low"  # thinkingLevel de Gemini 3: minimal | low | medium | high ("" = el del modelo)
+    llm_historial_min: float = 30.0  # minutos de conversación previa que recuerda el asistente
+    llm_timeout_s: float = 12.0  # tiempo máximo de espera por modelo (principal y respaldo)
+    llm_modelo_respaldo: str = "gemini-3.5-flash-lite"  # se usa si el principal está saturado o tarda ("" = sin respaldo)
+    # WhatsApp con Twilio (Sandbox)
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    twilio_whatsapp_from: str = ""  # número del Sandbox, p. ej. "whatsapp:+14155238886"
+    twilio_webhook_url: str = ""  # URL pública EXACTA configurada en Twilio (para validar la firma)
+    twilio_validar_firma: bool = True
+    avisos_activos: bool = True  # avisos proactivos por WhatsApp
 
     # General
     zona_horaria: str = "America/Mexico_City"

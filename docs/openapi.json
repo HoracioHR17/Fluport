@@ -706,6 +706,7 @@
      "asistente"
     ],
     "summary": "Mensaje",
+    "description": "Conversación con el asistente de citas (la usan los canales de mensajería, el tablero y las pruebas).",
     "operationId": "mensaje_api_asistente_mensaje_post",
     "requestBody": {
      "content": {
@@ -742,39 +743,66 @@
    }
   },
   "/webhook/whatsapp": {
+   "post": {
+    "tags": [
+     "asistente"
+    ],
+    "summary": "Recibir Whatsapp",
+    "description": "Webhook de Twilio para mensajes de WhatsApp entrantes.\n\nResponde de inmediato (Twilio espera una respuesta rápida) y contesta al transportista en segundo plano\npor la API REST de Twilio.",
+    "operationId": "recibir_whatsapp_webhook_whatsapp_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/whatsapp/enlace": {
    "get": {
     "tags": [
      "asistente"
     ],
-    "summary": "Verificar Whatsapp",
-    "description": "Verificación del webhook de WhatsApp Cloud API.",
-    "operationId": "verificar_whatsapp_webhook_whatsapp_get",
+    "summary": "Enlace Whatsapp",
+    "description": "Enlace wa.me para abrir el chat con el número de Fluport (respaldo para la demo).",
+    "operationId": "enlace_whatsapp_api_whatsapp_enlace_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Enlace Whatsapp Api Whatsapp Enlace Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/avisos": {
+   "get": {
+    "tags": [
+     "asistente"
+    ],
+    "summary": "Avisos",
+    "description": "Últimos avisos proactivos generados (para el tablero).",
+    "operationId": "avisos_api_avisos_get",
     "parameters": [
      {
-      "name": "hub.mode",
+      "name": "limite",
       "in": "query",
-      "required": true,
+      "required": false,
       "schema": {
-       "type": "string",
-       "title": "Hub.Mode"
-      }
-     },
-     {
-      "name": "hub.verify_token",
-      "in": "query",
-      "required": true,
-      "schema": {
-       "type": "string",
-       "title": "Hub.Verify Token"
-      }
-     },
-     {
-      "name": "hub.challenge",
-      "in": "query",
-      "required": true,
-      "schema": {
-       "type": "string",
-       "title": "Hub.Challenge"
+       "type": "integer",
+       "default": 10,
+       "title": "Limite"
       }
      }
     ],
@@ -782,9 +810,13 @@
      "200": {
       "description": "Successful Response",
       "content": {
-       "text/plain": {
+       "application/json": {
         "schema": {
-         "type": "string"
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/AvisoOut"
+         },
+         "title": "Response Avisos Api Avisos Get"
         }
        }
       }
@@ -795,50 +827,6 @@
        "application/json": {
         "schema": {
          "$ref": "#/components/schemas/HTTPValidationError"
-        }
-       }
-      }
-     }
-    }
-   },
-   "post": {
-    "tags": [
-     "asistente"
-    ],
-    "summary": "Recibir Whatsapp",
-    "operationId": "recibir_whatsapp_webhook_whatsapp_post",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "type": "object",
-         "additionalProperties": true,
-         "title": "Response Recibir Whatsapp Webhook Whatsapp Post"
-        }
-       }
-      }
-     }
-    }
-   }
-  },
-  "/webhook/telegram": {
-   "post": {
-    "tags": [
-     "asistente"
-    ],
-    "summary": "Recibir Telegram",
-    "operationId": "recibir_telegram_webhook_telegram_post",
-    "responses": {
-     "200": {
-      "description": "Successful Response",
-      "content": {
-       "application/json": {
-        "schema": {
-         "additionalProperties": true,
-         "type": "object",
-         "title": "Response Recibir Telegram Webhook Telegram Post"
         }
        }
       }
@@ -1051,6 +1039,56 @@
      "respuesta"
     ],
     "title": "AsistenteResponse"
+   },
+   "AvisoOut": {
+    "properties": {
+     "id": {
+      "type": "integer",
+      "title": "Id"
+     },
+     "transportista_id": {
+      "type": "integer",
+      "title": "Transportista Id"
+     },
+     "cita_id": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Cita Id"
+     },
+     "canal": {
+      "$ref": "#/components/schemas/Canal"
+     },
+     "tipo": {
+      "type": "string",
+      "title": "Tipo"
+     },
+     "mensaje": {
+      "type": "string",
+      "title": "Mensaje"
+     },
+     "creado_en": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Creado En"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "transportista_id",
+     "cita_id",
+     "canal",
+     "tipo",
+     "mensaje",
+     "creado_en"
+    ],
+    "title": "AvisoOut"
    },
    "CamionEstado": {
     "properties": {

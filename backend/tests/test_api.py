@@ -85,12 +85,3 @@ def test_websocket_snapshot_inicial_y_eventos(cliente):
 def test_reset_cambia_semilla(cliente):
     r = cliente.post("/api/sim/control", json={"accion": "reset", "semilla": 9}).json()
     assert r["semilla"] == 9 and r["estado"] == "corriendo"
-
-
-def test_webhook_whatsapp_verificacion(cliente):
-    ok = cliente.get("/webhook/whatsapp", params={"hub.mode": "subscribe", "hub.verify_token": "fluport-verify",
-                                                  "hub.challenge": "42"})
-    assert ok.text == "42"
-    mal = cliente.get("/webhook/whatsapp", params={"hub.mode": "subscribe", "hub.verify_token": "x",
-                                                   "hub.challenge": "42"})
-    assert mal.status_code == 403

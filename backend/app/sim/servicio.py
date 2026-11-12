@@ -83,6 +83,17 @@ class ServicioSim:
 
         self._entrenando = asyncio.create_task(_tarea(), name="fluport-entrenamiento")
 
+    async def _avisos(self, sim: Simulador) -> None:
+        """Avisos proactivos por WhatsApp (requiere BD)."""
+        if not (self.cfg.avisos_activos and self.persistencia.activa and sim.corrida_id):
+            return
+        from app.messaging.servicio import ciclo_avisos
+
+        try:
+            await ciclo_avisos(sim, self.publicar)
+        except Exception:  # noqa: BLE001  (los avisos nunca detienen la simulación)
+            log.exception("Error en el ciclo de avisos")
+
     async def _guardar_pronostico(self, sim: Simulador) -> None:
         from app.prediction.pronosticador import pronosticador
 
@@ -117,6 +128,7 @@ class ServicioSim:
                 sim.publicar_snapshot()
                 if sim.tick % TICKS_POR_ESCRITURA == 0:
                     await self._escribir()
+                    await self._avisos(sim)
                 await self._guardar_pronostico(sim)
             except Exception:  # noqa: BLE001
                 log.exception("Error en el tick %s", sim.tick)

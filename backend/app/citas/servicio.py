@@ -18,6 +18,7 @@ from app.prediction.pronosticador import pronosticador
 from app.sim.motor import Simulador
 
 ACTIVAS = (EstadoCita.agendada, EstadoCita.en_ruta)
+TRAMO_EMPATE_MIN = 5.0  # al ordenar sugerencias, esperas dentro del mismo tramo de 5 min empatan
 
 
 class ErrorCita(Exception):
@@ -29,11 +30,17 @@ class ErrorCita(Exception):
 
 
 def normalizar_telefono(tel: str) -> str:
-    """'whatsapp:+52 229 123 4567' → '+522291234567' (formato de Twilio y de la BD)."""
+    """'whatsapp:+52 229 123 4567' → '+522291234567' (formato de Twilio y de la BD).
+
+    Los celulares de México pueden llegar como +521 + 10 dígitos (formato móvil anterior que aún usa WhatsApp)
+    o +52 + 10 dígitos: ambos se guardan como +52 + 10 dígitos para que sean el mismo transportista.
+    """
     tel = tel.strip().removeprefix("whatsapp:")
     digitos = re.sub(r"\D", "", tel)
     if len(digitos) < 10:
         raise ErrorCita(422, "teléfono inválido")
+    if len(digitos) == 13 and digitos.startswith("521"):
+        digitos = "52" + digitos[3:]
     return "+" + digitos
 
 
@@ -70,6 +77,7 @@ def sugerir(sim: Simulador, req: SugerenciaRequest) -> list[Sugerencia]:
 
     f_ini = int(sim.a_minuto(desde) // FRANJA_MIN)
     f_fin = int(sim.a_minuto(req.hasta) // FRANJA_MIN)
+    centro = req.desde + (req.hasta - req.desde) / 2
     # (puntaje, distancia a lo pedido, acceso, inicio, espera)
     candidatos: list[tuple[float, float, str, datetime, float]] = []
     for f in range(f_ini, f_fin + 1):
@@ -79,12 +87,14 @@ def sugerir(sim: Simulador, req: SugerenciaRequest) -> list[Sugerencia]:
         for a in accesos:
             espera = espera_estimada(sim, a, inicio)
             cambio = 5.0 if req.acceso_id and a != req.acceso_id else 0.0  # preferencia leve por el acceso pedido
-            distancia = abs((inicio - req.desde).total_seconds()) / 3600  # desempate: lo más cercano a lo pedido
+            # desempate: la franja que empieza más cerca del centro de la ventana (la hora que mencionó el transportista)
+            distancia = abs((inicio - centro).total_seconds()) / 3600
             candidatos.append((espera + cambio, distancia, a, inicio, espera))
     if not candidatos:
         raise ErrorCita(422, "ventana demasiado corta")
     pico = max(c[4] for c in candidatos)
-    candidatos.sort(key=lambda c: (c[0], c[1]))
+    # esperas que difieren menos de 5 min se consideran iguales: decide la cercanía a la hora pedida
+    candidatos.sort(key=lambda c: (round(c[0] / TRAMO_EMPATE_MIN), c[1], c[0]))
     cfg = sim.cfg
     return [
         Sugerencia(

@@ -289,7 +289,7 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
 
 - **Herramientas de IA:** Claude (Opus 5.5) diseñó e implementó la vista pública, amplió el contrato con los campos que necesita la pantalla y escribió 5 pruebas, incluida una de privacidad de la respuesta.
 
-### 2026-11-11 19:05 · `#009` · M6 y M7 Frontend: tablero del operador y vista pública
+### 2026-11-11 18:50 · `#009` · M6 y M7 Frontend: tablero del operador y vista pública
 
 - **Qué se agregó:**
 
@@ -319,3 +319,132 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - PostgreSQL `timezone` por conexión (`options=-c timezone=…`): **Por qué:** que la base devuelva las fechas en la misma zona que el simulador.
 
 - **Herramientas de IA:** Claude (Opus 5.5) diseñó las pantallas (lienzo de diseño aprobado), las implementó en HTML, CSS y JavaScript conectadas a la API, las probó en Chrome automatizado en escritorio y celular, corrigió tres defectos encontrados (logotipo duplicado, horas en UTC, porcentaje engañoso al arrancar) y escribió 11 pruebas.
+
+### 2026-11-11 18:55 · `#010` · M4 Asistente de citas con Gemini
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/app/assistant/llm.py` | Cliente de Gemini. | `ClienteGemini.generar()` llama a la API REST `generateContent` de Gemini con la clave en el encabezado `x-goog-api-key`, las instrucciones del sistema y las herramientas declaradas, y devuelve el turno del modelo tal cual (incluida su firma de pensamiento, que la API pide reenviar en el siguiente paso); `ClienteLLM` (interfaz) permite cambiar de proveedor o usar uno simulado en pruebas; `ErrorLLM`. |
+  | `backend/app/assistant/agente.py` | El asistente. | `HERRAMIENTAS`: 6 funciones que el modelo puede pedir (`consultar_espera`, `sugerir_horario`, `crear_cita`, `reprogramar_cita`, `cancelar_cita`, `mis_citas`) con sus parámetros; `instrucciones()`: fecha y hora del reloj simulado, casetas, tipos de carga y reglas (respuestas breves, ofrecer 3 opciones y agendar solo cuando el usuario confirme, no inventar datos, la terminal conserva el control); `Herramientas` ejecuta cada función sobre el servicio de citas y el pronóstico, interpreta fechas en hora de Veracruz y **solo permite tocar las citas del teléfono que escribe**; `Asistente.responder()`: carga el historial del remitente, llama al modelo, ejecuta herramientas hasta 5 rondas y guarda la conversación; respaldo sin LLM o si Gemini falla (estado de las casetas en texto); `cargar_historial()` / `guardar_turnos()` en la tabla `mensaje_asistente`. |
+  | `backend/app/api/asistente.py` (modificado) | Ruta del asistente. | `POST /api/asistente/mensaje` implementado (422 si el teléfono es inválido). |
+  | `backend/app/citas/servicio.py` (modificado) | Teléfonos. | `normalizar_telefono()` unifica los celulares de México que llegan como `+521…` (con el "1" extra) y `+52…`, para que sean el mismo transportista. |
+  | `backend/app/config.py`, `backend/.env.example` (modificados) | Configuración. | Modelo por defecto `gemini-3.6-flash`; variable `FLUPORT_LLM_API_KEY`. |
+  | `backend/requirements.txt` (modificado) | Dependencias. | Se retira `anthropic`: el asistente usa Gemini mediante `httpx`, que ya estaba instalado. |
+  | `backend/tests/test_asistente.py` (14) | Pruebas con un LLM simulado que sigue un guion. | Declaraciones de herramientas, instrucciones con la hora simulada, respaldo sin clave, consulta de espera, herramienta desconocida y datos inválidos, fechas sin zona; con BD: flujo completo "llego mañana a las 9 con un contenedor de 40" → 3 opciones → "la primera" → cita creada con origen WhatsApp y con el historial del primer mensaje, no puede cancelar citas ajenas, mis citas y cancelar, falla de Gemini, límite de 5 rondas, teléfono inválido, y formato exacto de la petición REST a Gemini. |
+  | `backend/tests/test_citas.py` (modificado) | — | Caso del celular `+521…`. |
+  | `docs/contracts.md`, `docs/openapi.json` (actualizados) | Contratos. | Ruta y reglas del asistente. |
+
+- **Funcionalidad:** un transportista puede escribir en lenguaje natural ("llego mañana a las 9 con un contenedor de 40"); el asistente busca los 3 horarios con menor espera, los ofrece con caseta y minutos estimados, y al confirmar agenda la cita, que aparece en el tablero y en la simulación. También responde cómo está la fila, lista sus citas, las cambia o cancela. Recuerda la conversación de cada teléfono. Si no hay clave de Gemini o el servicio falla, responde con el estado de las casetas. Pruebas: 119 con PostgreSQL de prueba, 104 sin él. Pendiente: probar con la clave real de Gemini.
+
+- **Tecnologías usadas:**
+  - **Gemini API** (`generateContent`, modelo `gemini-3.6-flash`): modelo de lenguaje de Google con **llamadas a herramientas** (*function calling*). **Por qué:** el modelo no inventa horarios ni citas; decide qué función llamar y con qué datos, y Fluport ejecuta la acción con sus propias reglas y validaciones. Modelo estable de la familia Flash: rápido y económico para mensajes cortos.
+  - `httpx.AsyncClient`: cliente HTTP asíncrono. **Por qué:** la llamada a Gemini no bloquea el simulador ni las demás peticiones mientras espera la respuesta, y evita agregar el SDK de Google como dependencia.
+  - Esquemas **OpenAPI/JSON Schema** para declarar herramientas: **Por qué:** es el formato que Gemini entiende para saber qué parámetros pedir (por ejemplo, el tipo de carga con sus valores válidos).
+  - `zoneinfo`: ver `d1a97ad`. Aquí interpreta las horas que da el modelo en hora de Veracruz cuando no traen zona.
+  - `httpx.MockTransport` (pruebas): responde peticiones HTTP sin red. **Por qué:** verifica que la petición a Gemini tiene el formato correcto sin gastar llamadas reales.
+  - Tabla `mensaje_asistente` con `JSONB`: ver `aae10d9`. Guarda cada turno de la conversación tal cual lo espera Gemini.
+
+- **Herramientas de IA:** Claude (Opus 5.5) consultó la documentación vigente de Gemini (formato REST, firmas de pensamiento, modelos estables), diseñó el asistente y sus herramientas, lo probó con un LLM simulado (14 pruebas) y corrigió con ellas la duplicación de teléfonos `+521`/`+52`.
+
+### 2026-11-11 19:05 · `#011` · Ajustes del asistente tras la primera prueba con Gemini real
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/app/assistant/agente.py` (modificado) | Instrucciones del asistente. | Formato de WhatsApp: negritas con un solo asterisco y sin Markdown (Gemini respondía con `**07:30**`, que WhatsApp no interpreta); la ventana de búsqueda se centra en la hora que menciona el transportista. |
+  | `backend/app/citas/servicio.py` (modificado) | Orden de las sugerencias. | Las esperas que difieren menos de 5 min se consideran iguales (`TRAMO_EMPATE_MIN`) y se desempata por la franja que empieza más cerca de la hora pedida: con el puerto tranquilo, "llego a las 9" ahora sugiere primero las 9:00 y no las 7:30. |
+  | `backend/tests/test_citas.py` (modificado) | Pruebas. | Nueva prueba de desempate por cercanía a la hora pedida; la prueba de orden compara por tramos de 5 min. |
+
+- **Funcionalidad:** en la primera prueba con Gemini real el asistente entendió "llego mañana a las 9 con un contenedor de 40", consultó los horarios y ofreció 3 opciones; con estos ajustes las opciones quedan alrededor de la hora pedida y el texto se ve bien en WhatsApp. Pruebas: 120 con PostgreSQL de prueba, 105 sin él.
+
+- **Tecnologías usadas:** sin tecnologías nuevas (ver `#010`).
+
+- **Herramientas de IA:** Claude (Opus 5.5) analizó la respuesta real de Gemini, ajustó instrucciones y orden de sugerencias, y agregó la prueba correspondiente.
+
+### 2026-11-11 19:10 · `#012` · Asistente más rápido y robusto
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/app/assistant/llm.py` (modificado) | Cliente de Gemini. | Envía `generationConfig.thinkingConfig.thinkingLevel` (por defecto `low`): Gemini 3 razona en nivel alto si no se indica, y en la prueba real la primera respuesta superó los 30 s del límite; reintenta una vez si Gemini responde 429/5xx o se agota el tiempo; el error registrado ahora incluye el tipo de excepción (antes un tiempo agotado aparecía vacío). |
+  | `backend/app/assistant/agente.py` (modificado) | Asistente. | `formato_whatsapp()` convierte en código `**x**` → `*x*`, `__x__` → `_x_` y quita encabezados `#` (el modelo seguía usando Markdown pese a las instrucciones); el historial enviado se limita a los últimos 30 minutos reales para que respuestas como "la primera" no se refieran a opciones de una conversación anterior. |
+  | `backend/app/config.py`, `backend/.env.example` (modificados) | Configuración. | `FLUPORT_LLM_PENSAMIENTO` (minimal \| low \| medium \| high) y `llm_historial_min`. |
+  | `backend/tests/test_asistente.py` (modificado) | Pruebas. | La petición incluye el nivel de razonamiento, reintento tras un 503, conversión de formato a WhatsApp. |
+
+- **Funcionalidad:** el asistente responde más rápido y con el formato correcto de WhatsApp; si Gemini se satura o tarda, reintenta antes de usar la respuesta de respaldo. Pruebas: 122 con PostgreSQL de prueba, 107 sin él.
+
+- **Tecnologías usadas:**
+  - `thinkingLevel` de Gemini 3: controla cuánto razona el modelo antes de responder. **Por qué:** en un chat de citas las decisiones las toman las herramientas de Fluport; un nivel bajo reduce la latencia y el costo sin perder calidad.
+  - `re` (expresiones regulares): ver `#007`. Aquí normaliza el formato del texto para WhatsApp.
+
+- **Herramientas de IA:** Claude (Opus 5.5) diagnosticó el tiempo agotado a partir del log del servidor, consultó la documentación de Gemini sobre niveles de razonamiento e implementó y probó los ajustes.
+
+### 2026-11-11 19:20 · `#013` · Asistente: una sola llamada a Gemini por mensaje
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/app/assistant/agente.py` (modificado) | Respuestas con plantilla. | `redactar()` arma el mensaje de WhatsApp a partir del resultado de cada herramienta (opciones numeradas, confirmación de cita, cambio, cancelación, lista de citas, estado de casetas); si todas las herramientas de la ronda terminaron sin error, se responde con la plantilla y **no se vuelve a llamar a Gemini**; si alguna falló, Gemini redacta la explicación. El turno de plantilla se guarda en el historial como respuesta del modelo para que el siguiente mensaje ("la 1") tenga contexto. |
+  | `backend/app/assistant/llm.py` (modificado) | Cliente de Gemini. | Un tiempo agotado ya no se reintenta (duplicaba la espera a ~60 s); el límite por llamada baja a 25 s y es configurable. |
+  | `backend/app/config.py` (modificado) | Configuración. | `llm_timeout_s`. |
+  | `backend/tests/test_asistente.py` (modificado) | Pruebas. | El flujo completo hace una sola llamada al LLM por mensaje; plantillas; con error, el LLM redacta; tiempo agotado sin reintento. |
+
+- **Funcionalidad:** cada mensaje del transportista requiere ahora una sola respuesta de Gemini (decidir qué hacer); la redacción la hace Fluport al instante, así que el tiempo de respuesta baja aproximadamente a la mitad y las respuestas tienen siempre el mismo formato claro. En la prueba real previa, las llamadas a Gemini tardaron entre 2 y más de 30 s según la carga del servicio. Pruebas: 124 con PostgreSQL de prueba, 109 sin él.
+
+- **Tecnologías usadas:** sin tecnologías nuevas (ver `#010` y `#012`).
+
+- **Herramientas de IA:** Claude (Opus 5.5) midió el problema con los tiempos reportados en la prueba real, rediseñó el flujo del asistente para reducir llamadas al LLM y actualizó las pruebas.
+
+### 2026-11-11 19:25 · `#014` · Asistente: modelo de respaldo cuando Gemini está saturado
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/app/assistant/llm.py` (modificado) | Cliente de Gemini con respaldo. | `ClienteGemini.generar()` intenta el modelo principal y, si responde 429/5xx, falla la conexión o tarda más del límite, repite la petición con el modelo de respaldo; un error 400 (petición inválida) no se reintenta; `_sin_firmas()` quita las firmas de pensamiento al cambiar de modelo, porque pertenecen al modelo que las generó (el historial original no se modifica); `ultimo_modelo` indica cuál respondió; `_Temporal` distingue fallas pasajeras. |
+  | `backend/app/config.py`, `backend/.env.example` (modificados) | Configuración. | `FLUPORT_LLM_MODELO_RESPALDO` (por defecto `gemini-3.5-flash-lite`) y `FLUPORT_LLM_TIMEOUT_S` (12 s por modelo). |
+  | `backend/app/assistant/agente.py` (modificado) | — | Pasa el modelo de respaldo y el límite al cliente. |
+  | `backend/tests/test_asistente.py` (modificado) | Pruebas. | 503 del principal → responde el respaldo sin firmas; tiempo agotado en ambos → error tras 2 intentos; 400 → no usa respaldo. |
+
+- **Funcionalidad:** medición directa con la petición completa del asistente: `gemini-3.6-flash` respondió en 3.5 s, y en el siguiente intento devolvió 503 por alta demanda; la lentitud venía de la saturación del modelo, no de Fluport. Ahora, si el modelo principal está saturado o tarda más de 12 s, el asistente usa automáticamente `gemini-3.5-flash-lite`, de modo que la respuesta tarda como máximo unos 25 s y casi siempre mucho menos. Pruebas: 125 con PostgreSQL de prueba, 110 sin él.
+
+- **Tecnologías usadas:**
+  - **Gemini 3.5 Flash-Lite** como modelo de respaldo: modelo más ligero y rápido de la familia. **Por qué:** en el asistente el modelo solo decide qué herramienta usar con qué datos; un modelo ligero basta y tiene menos demanda que el principal.
+  - Patrón de **respaldo (*fallback*)** ante fallas pasajeras: **Por qué:** en una demo en vivo una saturación momentánea del proveedor no debe dejar al transportista sin respuesta.
+
+- **Herramientas de IA:** Claude (Opus 5.5) diseñó la prueba de diagnóstico que aisló el problema (petición directa a Gemini fuera del servidor), implementó el respaldo y sus pruebas.
+
+### 2026-11-11 19:35 · `#015` · M5 WhatsApp con Twilio y avisos proactivos
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/app/messaging/twilio.py` | Integración con Twilio. | `firma()` / `firma_valida()`: verifican que cada webhook viene de Twilio (HMAC-SHA1 con el Auth Token sobre la URL más los parámetros ordenados, comparación en tiempo constante); `parsear_formulario()` lee el formulario de Twilio sin dependencias extra; `enviar()` manda un WhatsApp por la API REST de Twilio; `a_whatsapp()` y `recordar_direccion()` responden con la misma dirección con la que escribió el transportista (`+521…` o `+52…`). |
+  | `backend/app/messaging/avisos.py` | Reglas de los avisos proactivos. | `revisar()` revisa las citas activas y genera, una sola vez por cita: `turno_30min` ("En 20 min es tu turno…") y `saturacion` cuando la caseta está cerrada o tendrá ≥ 45 min de espera en las próximas 3 h, proponiendo la mejor alternativa (otra hora o caseta que ahorre ≥ 15 min) con "Responde *SÍ* para cambiarla". |
+  | `backend/app/messaging/servicio.py` | Orquestación. | `atender_mensaje()`: mensaje entrante → asistente → respuesta por WhatsApp; `ciclo_avisos()`: lee citas en un hilo, calcula avisos con el simulador, los guarda en la tabla `aviso`, los publica en el tablero (WebSocket), los envía y marca enviado/fallido; cada aviso se agrega al historial del asistente; `en_segundo_plano()` guarda referencias a las tareas. |
+  | `backend/app/api/asistente.py` (modificado) | Rutas. | `POST /webhook/whatsapp` (firma validada, 403 si no coincide; responde de inmediato con TwiML vacío y contesta en segundo plano); `GET /api/avisos`; `GET /api/whatsapp/enlace` (enlace wa.me de respaldo). Se retiran las rutas de WhatsApp Cloud API (Meta) y Telegram. |
+  | `backend/app/assistant/agente.py` (modificado) | Asistente. | El historial conserva un aviso automático como contexto aunque sea el primer turno; nueva regla: un "SÍ" a un aviso reprograma la cita a la opción propuesta. |
+  | `backend/app/sim/servicio.py` (modificado) | Servicio en vivo. | Ejecuta el ciclo de avisos cada 5 ticks (requiere BD). |
+  | `backend/app/config.py`, `backend/.env.example` (modificados) | Configuración. | `FLUPORT_TWILIO_ACCOUNT_SID`, `…_AUTH_TOKEN`, `…_WHATSAPP_FROM`, `…_WEBHOOK_URL`, `twilio_validar_firma`, `FLUPORT_AVISOS_ACTIVOS`. |
+  | `frontend/operador/index.html`, `frontend/static/js/operador.js` (modificados) | Tablero. | Nueva tarjeta "Avisos por WhatsApp": carga los últimos al abrir y agrega en vivo los que llegan por WebSocket. |
+  | `backend/tests/test_whatsapp.py` (14) | Pruebas con Twilio y Gemini simulados. | Firma (ida y vuelta, alteraciones, vector calculado de forma independiente), formulario y direcciones, envío sin configuración, petición exacta a la API de Twilio, aviso de turno sin repetición, aviso por cierre con alternativa en otra caseta, sin aviso si ya va en camino o si fluye; con BD: webhook con firma inválida (403), webhook que responde por WhatsApp, ciclo de avisos (guarda, publica, envía, no repite, queda en el historial), flujo aviso → "SÍ" → cita reprogramada, enlace wa.me. |
+  | `backend/tests/test_api.py` (modificado) | — | Se retira la prueba de verificación de Meta. |
+  | `docs/contracts.md`, `docs/openapi.json` (actualizados) | Contratos. | Webhook de Twilio, avisos y enlace. |
+
+- **Funcionalidad:** el transportista escribe al número de WhatsApp de Fluport y el asistente le contesta ahí mismo: consulta la fila, agenda, cambia o cancela citas. Fluport además le escribe por iniciativa propia: 30 minutos antes de su turno y cuando su caseta se cierra o se satura, proponiéndole otra hora o caseta; si responde "SÍ", la cita se cambia sola. Cada aviso aparece en vivo en el tablero del operador. Verificado en el navegador: el aviso llegó al tablero. Pruebas: 137 con PostgreSQL de prueba, 117 sin él. Pendiente: probar con el Sandbox real de Twilio.
+
+- **Tecnologías usadas:**
+  - **Twilio WhatsApp Sandbox**: número de WhatsApp de prueba de Twilio. **Por qué:** permite enviar y recibir WhatsApp reales en minutos, sin aprobación de Meta; ideal para una demo con teléfonos del equipo.
+  - **Webhooks con firma HMAC-SHA1** (`hmac`, `hashlib`, `base64` de la biblioteca estándar): **Por qué:** garantizan que solo Twilio puede mandar mensajes al webhook; `hmac.compare_digest` evita ataques por tiempo de comparación.
+  - **API REST de Twilio** con `httpx` (autenticación básica con Account SID y Auth Token): **Por qué:** responder fuera del webhook evita el límite de tiempo de Twilio cuando Gemini tarda, y permite los avisos proactivos; no requiere el SDK de Twilio.
+  - **TwiML**: XML de respuesta de Twilio; se devuelve vacío para confirmar la recepción de inmediato.
+  - `urllib.parse.parse_qsl`: lee formularios `application/x-www-form-urlencoded` sin agregar `python-multipart`.
+  - `asyncio.create_task`: procesa cada mensaje en segundo plano.
+
+- **Herramientas de IA:** Claude (Opus 5.5) verificó en la documentación de Twilio el algoritmo de firma y la recomendación de responder rápido, implementó el canal y los avisos, escribió 14 pruebas con Twilio y Gemini simulados (incluido el flujo aviso → "SÍ" → reprogramación) y comprobó el aviso en el tablero con Chrome automatizado.
