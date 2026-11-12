@@ -49,6 +49,8 @@ def normalizar_telefono(tel: str) -> str:
         raise ErrorCita(422, "teléfono inválido")
     if len(digitos) == 13 and digitos.startswith("521"):
         digitos = "52" + digitos[3:]
+    elif len(digitos) == 10:  # número nacional sin lada de país: se asume México (E.164 +52)
+        digitos = "52" + digitos
     return "+" + digitos
 
 

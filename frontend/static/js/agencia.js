@@ -29,6 +29,9 @@
   function porId(lista) { var m = {}; lista.forEach(function (x) { m[x.id] = x; }); return m; }
   function q(sep) { return sep + "agencia_id=" + encodeURIComponent(estado.agencia); }
   function chip(tono, texto) { return el("span", { class: "chip chip--" + tono }, texto); }
+  /** Transportista con avisos por Telegram que aún no abre la invitación al bot (los de SMS no la necesitan). */
+  function pendienteBot(t) { return t.canal_aviso !== "sms" && !t.telegram; }
+  function viaAviso(t) { return t.canal_aviso === "sms" ? "por SMS" : "por Telegram"; }
   function plural(n, uno, varios) { return F.num(n) + " " + (n === 1 ? uno : varios); }
 
   function estadoCita(c) {
@@ -49,7 +52,7 @@
   // ───────────── Menú, contadores y reloj (todas las pantallas) ─────────────
   function contadores() {
     var rech = estado.avisos.filter(function (a) { return REASIGNAR.indexOf(a.tipo) >= 0; }).length;
-    var sinBot = estado.transportistas.filter(function (t) { return !t.telegram; }).length;
+    var sinBot = estado.transportistas.filter(pendienteBot).length;
     [["avisos", rech], ["transportistas", sinBot + estado.solicitudes.length]].forEach(function (p) {
       var n = document.querySelector('[data-contador="' + p[0] + '"]');
       if (n) { n.textContent = p[1]; n.classList.toggle("oculto", !p[1]); }
@@ -57,7 +60,7 @@
   }
 
   function reloj(s) {
-    $("reloj").textContent = F.fecha(s.ts_sim) + " · " + F.hora(s.ts_sim) + " (hora simulada)" + (s.clima === "norte" ? " · norte activo" : "");
+    $("reloj").textContent = F.fecha(s.ts_sim) + " · " + F.hora(s.ts_sim) + (s.clima === "norte" ? " · norte activo" : "");
     if ($("sim-pausa")) { // panel de simulación (pantalla principal)
       var pausada = s.estado !== "corriendo";
       $("sim-pausa").textContent = pausada ? "Reanudar" : "Pausar";
@@ -118,12 +121,11 @@
     var s = estado.snap, f = s ? ((s.mundos.B.flota || {})[estado.agencia] || {}) : {};
     var activas = estado.citas.filter(function (c) { return ACTIVAS[c.estado]; });
     var asignadas = activas.filter(function (c) { return c.origen === "web"; }).length;
-    var espA = s ? s.mundos.A.kpis.espera_prom_min : 0;
     var kpis = [
       ["Camiones en ruta", F.num(f.en_ruta), "", "hacia las casetas", "en_ruta", f.en_ruta || 0, "/agencia/flota/"],
       ["En fila en casetas", F.num(f.en_fila), "", "esperando turno", "en_fila", f.en_fila || 0, "/agencia/flota/"],
       ["Citas activas", F.num(activas.length), "", F.num(asignadas) + " asignadas · " + F.num(activas.length - asignadas) + " pedidas por choferes", "activas", activas.length, "/agencia/citas/"],
-      ["Espera promedio de mi flota", F.num(f.espera_prom_min), "min", espA >= 5 ? F.num(Math.max(0, espA - (f.espera_prom_min || 0))) + " min menos que sin Fluport" : "acumulada del día", "espera", f.espera_prom_min || 0, "/agencia/flota/"]
+      ["Espera promedio de mi flota", F.num(f.espera_prom_min), "min", "acumulada del día", "espera", f.espera_prom_min || 0, "/agencia/flota/"]
     ];
     F.reemplazar($("kpis"), kpis.map(function (k) {
       return el("a", { class: "kpi kpi--grafica", href: k[6] }, [
@@ -135,7 +137,7 @@
     }));
     renderCitasHora(activas);
     renderDona(f);
-    renderAhorro(s, f);
+    renderOperacion(s, f);
     if (s) renderCasetas(s.mundos.B);
     renderAtencion();
   }
@@ -191,25 +193,26 @@
     ]);
   }
 
-  function renderAhorro(s, f) {
-    if (!$("ahorro")) return;
-    if (!s) { F.reemplazar($("ahorro"), [el("p", { class: "vacio" }, "Esperando datos de la simulación…")]); return; }
-    var a = s.mundos.A.kpis.espera_prom_min, b = f.espera_prom_min || 0, c = s.comparacion, max = Math.max(a, b, 1);
+  /** Indicadores del puerto en la operación con Fluport (simulación de hoy) frente a la espera de mi flota. */
+  function renderOperacion(s, f) {
+    if (!$("operacion")) return;
+    if (!s) { F.reemplazar($("operacion"), [el("p", { class: "vacio" }, "Esperando datos de la simulación…")]); return; }
+    var k = s.mundos.B.kpis, b = f.espera_prom_min || 0, max = Math.max(k.espera_prom_min, b, 1);
     function barra(texto, v, color) {
       return el("div", { class: "ahorro__fila" }, [
         el("div", { class: "ranking__txt" }, [el("span", {}, texto), el("b", { class: "cifra" }, F.num(v) + " min")]),
         el("div", { class: "ranking__pista" }, el("div", { class: "ranking__barra", style: { width: (v / max * 100).toFixed(0) + "%", background: color } }))
       ]);
     }
-    F.reemplazar($("ahorro"), [
-      el("div", { role: "img", "aria-label": "Espera promedio: tu flota " + F.num(b) + " min, sin Fluport " + F.num(a) + " min", class: "ahorro__barras" }, [
-        barra("Mi flota con Fluport", b, "#0A2238"), barra("Sin Fluport (llegada libre)", a, "#A9C3DA")]),
+    F.reemplazar($("operacion"), [
+      el("div", { role: "img", "aria-label": "Espera promedio: tu flota " + F.num(b) + " min, todo el puerto " + F.num(k.espera_prom_min) + " min", class: "ahorro__barras" }, [
+        barra("Mi flota", b, "#0A2238"), barra("Todo el puerto", k.espera_prom_min, "#A9C3DA")]),
       el("dl", { class: "ahorro__datos" }, [
-        el("div", {}, [el("dt", {}, "Horas de espera"), el("dd", { class: "cifra" }, F.num(c.horas_ahorradas) + " h")]),
-        el("div", {}, [el("dt", {}, "Diésel"), el("dd", { class: "cifra" }, F.num(c.diesel_l_evitado) + " L")]),
-        el("div", {}, [el("dt", {}, "CO₂"), el("dd", { class: "cifra" }, F.num(c.co2_kg_evitado) + " kg")])
+        el("div", {}, [el("dt", {}, "Atendidos"), el("dd", { class: "cifra" }, F.num(k.camiones_atendidos))]),
+        el("div", {}, [el("dt", {}, "Espera máx."), el("dd", { class: "cifra" }, F.num(k.espera_max_min) + " min")]),
+        el("div", {}, [el("dt", {}, "Pico de fila"), el("dd", { class: "cifra" }, F.num(k.pico_fila))])
       ]),
-      el("p", { class: "tenue", style: { margin: 0, fontSize: "12px" } }, "Ahorro de todo el puerto en la simulación de hoy, comparado con la llegada sin citas.")
+      el("p", { class: "tenue", style: { margin: 0, fontSize: "12px" } }, "Operación de todo el puerto con Fluport en la simulación de hoy.")
     ]);
   }
 
@@ -242,7 +245,7 @@
     if (sol) items.push(["+", "#E6F4EA", plural(sol, "solicitud de alta", "solicitudes de alta"), "Transportistas que pidieron unirse a tu agencia desde Telegram.", "Revisar", "/agencia/transportistas/"]);
     var ped = estado.citas.filter(function (c) { return c.estado === "agendada" && c.origen !== "web"; }).length;
     if (ped) items.push(["●", "#E3EEF6", plural(ped, "cita pedida por un chofer", "citas pedidas por choferes"), "Agendadas desde el bot.", "Ver cuáles", "/agencia/citas/"]);
-    var sinBot = estado.transportistas.filter(function (t) { return !t.telegram; }).length;
+    var sinBot = estado.transportistas.filter(pendienteBot).length;
     if (sinBot) items.push(["●", "#E3EEF6", plural(sinBot, "transportista sin Telegram", "transportistas sin Telegram"), "No recibirán sus citas hasta abrir la invitación.", "Ver invitación", "/agencia/transportistas/"]);
     $("total-atencion").textContent = items.length ? plural(items.length, "pendiente", "pendientes") : "";
     F.reemplazar($("atencion"), items.length ? items.map(function (it) {
@@ -491,7 +494,7 @@
       var nueva = await F.api("/api/citas/" + c.id, { method: "PATCH", json: {
         acceso_id: ed.acceso, ventana_inicio: isoMas(fecha, ed.hora, zona, 0), ventana_fin: isoMas(fecha, ed.hora, zona, duracion) } });
       estado.edicion = null; estado.citaResaltada = nueva.id;
-      $("estado-cita").textContent = "Cita cambiada: ahora es la #" + nueva.id + ". Se le avisó al transportista por Telegram.";
+      $("estado-cita").textContent = "Cita cambiada: ahora es la #" + nueva.id + ". Se le avisó al transportista por su canal (Telegram o SMS).";
       await cargarCitas();
     } catch (e) { ed.msg = "No se pudo cambiar: " + e.message; renderCitasForzado(); }
   }
@@ -567,7 +570,7 @@
     if (!sel) return;
     var previo = sel.value, lista = estado.transportistas;
     F.reemplazar(sel, lista.length ? lista.map(function (t) {
-      return el("option", { value: String(t.id) }, t.alias + (t.placas ? " · " + t.placas : "") + (t.telegram ? "" : " (sin Telegram)"));
+      return el("option", { value: String(t.id) }, t.alias + (t.placas ? " · " + t.placas : "") + (t.canal_aviso === "sms" ? " (SMS)" : t.telegram ? "" : " (sin Telegram)"));
     }) : [el("option", { value: "" }, "Sin transportistas registrados")]);
     if (previo && lista.some(function (t) { return String(t.id) === previo; })) sel.value = previo;
   }
@@ -607,7 +610,7 @@
       var c = await F.api("/api/citas", { method: "POST", json: { transportista_id: tid, acceso_id: s.acceso_id,
         ventana_inicio: s.inicio, ventana_fin: s.fin, tipo_carga: $("cita-carga").value, origen: "web" } });
       $("estado-cita").textContent = "Cita asignada a " + (t.alias || "el transportista") + " a las " + F.hora(c.ventana_inicio) + " en " + nombreCaseta(c.acceso_id) +
-        (t.telegram ? ". Se le avisó por Telegram." : ". Aún no está conectado a Telegram: compártele la invitación.");
+        (pendienteBot(t) ? ". Aún no está conectado a Telegram: compártele la invitación." : ". Se le avisó " + viaAviso(t) + ".");
       F.reemplazar($("sugerencias"), []);
       await cargarTransportistas(); await cargarCitas(); cargarAvisos();
     } catch (e) { $("estado-cita").textContent = "No se pudo asignar: " + e.message; }
@@ -616,7 +619,7 @@
   // ───────────── Transportistas ─────────────
   function renderTransportistas() {
     if (!$("tabla-trans")) return;
-    var lista = estado.transportistas, sinBot = lista.filter(function (t) { return !t.telegram; });
+    var lista = estado.transportistas, sinBot = lista.filter(pendienteBot);
     var botones = $("filtro-trans").children;
     if (botones.length) { botones[0].textContent = "Todos · " + F.num(lista.length); botones[1].textContent = "Sin Telegram · " + F.num(sinBot.length); }
     var vista = estado.filtroTrans === "sin_bot" ? sinBot : lista;
@@ -624,11 +627,31 @@
       return el("tr", {}, [
         el("td", { style: { fontWeight: "700" } }, t.alias), el("td", { class: "cifra" }, t.placas || "—"),
         el("td", {}, t.telefono_fin ? "…" + t.telefono_fin : "—"),
-        el("td", {}, t.telegram ? chip("verde", "Conectado") : chip("amarillo", "Invitación pendiente")),
+        el("td", {}, selectorCanal(t)),
+        el("td", {}, t.canal_aviso === "sms" ? chip("azul", "Recibe SMS") : t.telegram ? chip("verde", "Conectado") : chip("amarillo", "Invitación pendiente")),
         el("td", {}, F.num(t.citas_activas)), el("td", {}, t.proxima_cita ? F.hora(t.proxima_cita) : "—"),
         el("td", { style: { textAlign: "right" } }, el("a", { class: "btn btn--sec btn--chico", href: "/agencia/citas/#asignar" }, "Asignar cita"))
       ]);
-    }) : [el("tr", {}, el("td", { colspan: "7", class: "vacio" }, lista.length ? "Todos están conectados a Telegram." : "Aún no hay transportistas. Da de alta al primero."))]);
+    }) : [el("tr", {}, el("td", { colspan: "8", class: "vacio" }, lista.length ? "Todos reciben sus avisos (Telegram conectado o SMS)." : "Aún no hay transportistas. Da de alta al primero."))]);
+  }
+
+  /** Selector del canal de avisos de un transportista; al cambiarlo se guarda (PATCH). */
+  function selectorCanal(t) {
+    var sel = el("select", { "aria-label": "Canal de avisos de " + t.alias, style: { maxWidth: "140px" }, onchange: function () { cambiarCanal(t, sel.value, sel); } }, [
+      el("option", { value: "telegram" }, "Telegram"), el("option", { value: "sms" }, "SMS")
+    ]);
+    sel.value = t.canal_aviso || "telegram";
+    return sel;
+  }
+
+  async function cambiarCanal(t, canal, sel) {
+    sel.disabled = true;
+    try {
+      await F.api("/api/agencias/" + encodeURIComponent(estado.agencia) + "/transportistas/" + t.id, { method: "PATCH", json: { canal_aviso: canal } });
+      $("estado-alta").textContent = t.alias + " recibirá sus avisos " + (canal === "sms" ? "por SMS." : "por Telegram.");
+      await cargarTransportistas();
+    } catch (e) { $("estado-alta").textContent = "No se pudo cambiar el canal: " + e.message; sel.value = t.canal_aviso; }
+    sel.disabled = false;
   }
 
   function renderSolicitudes() {
@@ -664,8 +687,11 @@
     ev.preventDefault();
     try {
       var t = await F.api("/api/agencias/" + encodeURIComponent(estado.agencia) + "/transportistas", { method: "POST",
-        json: { alias: $("alta-nombre").value.trim(), telefono: $("alta-tel").value, placas: $("alta-placas").value || null } });
-      $("estado-alta").textContent = t.alias + " quedó dado de alta. Compártele la invitación para que se conecte a Telegram.";
+        json: { alias: $("alta-nombre").value.trim(), telefono: $("alta-tel").value, placas: $("alta-placas").value || null,
+          canal_aviso: $("alta-canal") ? $("alta-canal").value : "telegram" } });
+      $("estado-alta").textContent = t.alias + (t.canal_aviso === "sms"
+        ? " quedó dado de alta. Recibirá sus citas y avisos por SMS; no necesita smartphone."
+        : " quedó dado de alta. Compártele la invitación para que se conecte a Telegram.");
       $("form-alta").reset();
       await cargarTransportistas();
     } catch (e) { $("estado-alta").textContent = "No se pudo dar de alta: " + e.message; }
@@ -694,6 +720,13 @@
   // ───────────── Avisos ─────────────
   var FILTROS_AVISOS = [["todos", "Todos"], ["cita_rechazada", "Respuestas de choferes"], ["saturacion", "Contingencias"], ["cita_asignada", "Citas enviadas"], ["turno_30min", "Recordatorios"]];
 
+  /** Chip del resultado del envío; si falló, el motivo queda como texto emergente. */
+  function estadoAviso(a) {
+    if (a.estado === "enviado") return chip("verde", "Enviado");
+    if (a.estado === "fallido") { var c = chip("rojo", "Error"); if (a.detalle) c.title = a.detalle; return c; }
+    return chip("amarillo", "Enviando…");
+  }
+
   function renderAvisos() {
     if (!$("lista-avisos")) return;
     var t = porId(estado.transportistas);
@@ -705,7 +738,8 @@
       return el("li", {}, [
         el("span", { class: "avisos__hora" }, F.hora(a.creado_en)),
         el("div", { class: "avisos__texto" }, [
-          el("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" } }, [el("strong", {}, quien), chip(TONO_AVISO[a.tipo] || "azul", TIPOS_AVISO[a.tipo] || a.tipo)]),
+          el("div", { style: { display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" } }, [el("strong", {}, quien), chip(TONO_AVISO[a.tipo] || "azul", TIPOS_AVISO[a.tipo] || a.tipo),
+            chip("oscuro", a.canal === "sms" ? "SMS" : "Telegram"), estadoAviso(a)]),
           el("span", { style: { fontSize: "14px", whiteSpace: "pre-line", lineHeight: "1.45" } }, a.mensaje.replace(/\*/g, ""))
         ]),
         el("div", { class: "avisos__accion" }, [

@@ -85,12 +85,21 @@ async def quitar_webhook() -> None:
     await llamar("deleteWebhook", {"drop_pending_updates": False})
 
 
-class CanalTelegram:
-    """Adaptador del puerto CanalMensajeria para Telegram (Bot API)."""
+class TelegramAdapter:
+    """Adaptador del puerto NotificadorPort para Telegram (Bot API)."""
 
     def configurado(self) -> bool:
         return configurado()
 
     async def enviar(self, destino, texto: str) -> tuple[bool, str]:
-        return await enviar(destino, texto)
+        if destino is None:
+            return False, "el transportista no está conectado al bot de Telegram"
+        try:
+            return await enviar(destino, texto)
+        except Exception as e:  # noqa: BLE001 - un fallo del canal nunca debe detener la simulación
+            log.exception("Telegram: error inesperado")
+            return False, f"error inesperado ({type(e).__name__})"
+
+
+CanalTelegram = TelegramAdapter  # nombre anterior del adaptador
 

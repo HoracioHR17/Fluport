@@ -43,6 +43,18 @@ class Settings(BaseSettings):
     asistente_web_activo: bool = False
     telegram_solo_registrados: bool = True  # el bot solo vincula números que una agencia dio de alta
     telegram_webhook_secret: str = ""  # valor de X-Telegram-Bot-Api-Secret-Token en modo webhook
+    # SMS (transportistas sin smartphone): gateway Android (app SMS Gateway, API /message), Twilio o Vonage
+    sms_proveedor: str = "android"  # android | adb | twilio | vonage | off
+    sms_url: str = ""  # android: http://<ip-del-celular>:8080/message (o la URL de la nube de la app)
+    sms_usuario: str = ""  # android: usuario de la app · twilio: Account SID · vonage: API Key
+    sms_clave: str = ""  # android: contraseña de la app · twilio: Auth Token · vonage: API Secret
+    sms_remitente: str = ""  # twilio: número que envía (+1…) · vonage: número o nombre (por defecto "Fluport")
+    sms_timeout_s: float = 10.0
+    # adb: Android por USB que envía con su app de Mensajes
+    sms_adb_ruta: str = ""  # vacío = adb del PATH o ~/Android/Sdk/platform-tools/adb
+    sms_adb_serial: str = ""  # solo si hay más de un dispositivo en `adb devices`
+    sms_adb_tap: str = ""  # "x,y" del botón Enviar si no se detecta solo
+    sms_adb_espera_s: float = 2.0  # segundos para que abra Mensajes antes de tocar Enviar
 
     # General
     zona_horaria: str = "America/Mexico_City"

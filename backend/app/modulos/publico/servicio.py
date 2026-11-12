@@ -1,6 +1,6 @@
 """Vista pública para vecinos (M7): semáforo actual y horas pico previstas por caseta.
 
-Solo expone información agregada de tráfico; nunca citas, transportistas ni la comparación A/B.
+Solo expone información agregada de tráfico; nunca citas ni transportistas.
 `contingencia` resume el estado de cada entrada (normal, lenta, saturada o cerrada) y `norte` el clima.
 Se usa el Mundo B (operación con Fluport).
 """
@@ -39,7 +39,7 @@ def horas_pico(p: PronosticoOut) -> list[HoraPico]:
 def snapshot_publico(sim: Operacion) -> dict:
     """Estado instantáneo de las entradas para la vista pública, con la misma forma que el snapshot del simulador
     (`{"tipo": "snapshot", "data": {"ts_sim", "clima", "mundos": {"B": {"accesos": [...]}}}}`) pero sin camiones,
-    agencias, citas, avisos ni la comparación A/B."""
+    agencias, citas ni avisos."""
     return {"tipo": "snapshot", "data": {
         "ts_sim": sim.ts().isoformat(), "clima": sim.clima.value,
         "mundos": {"B": {"accesos": [e.model_dump(mode="json") for e in sim.estado_accesos(Mundo.B)]}},

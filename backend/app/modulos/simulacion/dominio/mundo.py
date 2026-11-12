@@ -1,8 +1,6 @@
-"""Un mundo de simulación (SimPy): accesos con carriles, filas y camiones.
+"""Operación simulada con Fluport (SimPy): accesos con carriles, filas y camiones.
 
-Mundo A (sin Fluport): cada camión llega a su hora deseada, fila FIFO, sin aviso de cierres: si su entrada se
-cierra, llega y se queda formado detrás de la barrera hasta que reabre (cuello de botella).
-Mundo B (con Fluport): llegada según la franja asignada por el planificador (si el camión cumple),
+Llegada según la franja asignada por el planificador (si el camión cumple),
 prioridad para carga refrigerada/peligrosa y aviso de cierres: en cuanto una entrada se cierra, los camiones que van
 hacia ella o están en su fila se desvían a la entrada abierta con menos espera (con el tiempo extra del rodeo), lo que
 carga las demás entradas.
@@ -62,9 +60,9 @@ class MundoSim:
             a.id: AccesoVivo(a.id, a.carriles, a.tiempo_servicio_min, simpy.PriorityResource(self.env, a.carriles))
             for a in esc.accesos
         }
-        self.planificador = Planificador(esc) if mundo == Mundo.B else None
+        self.planificador = Planificador(esc)
         self.camiones: dict[str, CamionVivo] = {}
-        # notificación de cambios de estado de camiones con cita (solo se usa en el Mundo B)
+        # notificación de cambios de estado de camiones con cita
         self.al_cambiar_cita: Callable[[int, str], None] | None = None
         # Métricas acumuladas
         self.esperas_total = 0.0
@@ -79,23 +77,18 @@ class MundoSim:
     # ───────────── Altas de camiones ─────────────
     def agregar(self, planes: list[CamionPlan]) -> None:
         for p in planes:
-            if self.mundo == Mundo.B:
-                if p.cita_id is not None:  # cita real del asistente/API: ya trae su horario
-                    acceso, t = p.acceso_id, p.llegada_deseada
-                    self.planificador.registrar(acceso, t)
-                elif p.con_cita and p.cumple:
-                    acceso, base = self.planificador.asignar(p.llegada_deseada, p.acceso_id, p.prioritario)
-                    # dentro de la franja: desfase pseudoaleatorio (fijo por camión) + impuntualidad
-                    t = base if p.prioritario else base + (p.llegada_deseada % 30) + p.retraso_min
-                else:
-                    acceso, t = p.acceso_id, p.llegada_deseada
-                    self.planificador.registrar(acceso, t)
-                if p.no_show:
-                    continue  # reservó franja pero no se presenta
-            else:
-                if p.no_show:
-                    continue
+            if p.cita_id is not None:  # cita real del asistente/API: ya trae su horario
                 acceso, t = p.acceso_id, p.llegada_deseada
+                self.planificador.registrar(acceso, t)
+            elif p.con_cita and p.cumple:
+                acceso, base = self.planificador.asignar(p.llegada_deseada, p.acceso_id, p.prioritario)
+                # dentro de la franja: desfase pseudoaleatorio (fijo por camión) + impuntualidad
+                t = base if p.prioritario else base + (p.llegada_deseada % 30) + p.retraso_min
+            else:
+                acceso, t = p.acceso_id, p.llegada_deseada
+                self.planificador.registrar(acceso, t)
+            if p.no_show:
+                continue  # reservó franja pero no se presenta
             ruta = p.ruta_id if acceso == p.acceso_id else self.esc.acceso(acceso).rutas[0].id
             self.env.process(self._camion(p, acceso, ruta, max(t, self.env.now)))
 
@@ -105,7 +98,7 @@ class MundoSim:
         yield self.env.timeout(salida - self.env.now)
         if p.cancelado:
             return
-        if self.mundo == Mundo.B and self.accesos[acceso_id].estado == EstadoAcceso.cerrado:
+        if self.accesos[acceso_id].estado == EstadoAcceso.cerrado:
             destino = self._mejor_acceso_abierto()  # sale ya avisado del cierre: va directo a otra entrada
             if destino is not None:
                 acceso_id, ruta_id = destino.id, self.esc.acceso(destino.id).rutas[0].id
@@ -113,13 +106,13 @@ class MundoSim:
                        proceso=self.env.active_process)
         self.camiones[p.id] = c
         self._notificar_cita(p, "en_ruta")
-        prioridad = 0 if (self.mundo == Mundo.B and p.prioritario) else 1
+        prioridad = 0 if p.prioritario else 1
         while True:
             # en camino (si Fluport lo desvía mientras maneja, su llegada se recorre)
             while c.t_llegada > self.env.now:
                 yield self.env.timeout(c.t_llegada - self.env.now)
             acc = self.accesos[c.acceso_id]
-            if self.mundo == Mundo.B and acc.estado == EstadoAcceso.cerrado and self._desviar(c):
+            if acc.estado == EstadoAcceso.cerrado and self._desviar(c):
                 continue  # Fluport avisó del cierre: maneja a otra entrada
             c.estado, c.t_fila, c.t_estado = EstadoCamion.en_fila, self.env.now, self.env.now
             acc.en_fila.append(c)
@@ -185,7 +178,7 @@ class MundoSim:
         acc.bloqueos = [acc.recurso.request(priority=PRIORIDAD_CIERRE) for _ in range(acc.carriles)]
         if self.planificador:
             self.planificador.cerrados.add(acceso_id)
-        if self.mundo == Mundo.B and any(a.estado == EstadoAcceso.abierto for a in self.accesos.values()):
+        if any(a.estado == EstadoAcceso.abierto for a in self.accesos.values()):
             # Fluport avisa del cierre: quienes iban hacia esa entrada o estaban en su fila se desvían ya
             for c in list(self.camiones.values()):
                 if c.acceso_id != acceso_id:
@@ -208,8 +201,7 @@ class MundoSim:
         acc.estado = EstadoAcceso.abierto
         if self.planificador:
             self.planificador.cerrados.discard(acceso_id)
-        if self.mundo == Mundo.B:
-            self._rebalancear(acc)
+        self._rebalancear(acc)
 
     def _rebalancear(self, destino: AccesoVivo) -> None:
         """Al reabrir una entrada, Fluport sugiere cambiarse a los últimos de las filas largas mientras les convenga

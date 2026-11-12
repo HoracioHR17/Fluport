@@ -61,7 +61,7 @@ def test_eventos(cliente):
 
 def test_kpis(cliente):
     k = cliente.get("/api/sim/kpis").json()
-    assert set(k) == {"ts_sim", "A", "B", "comparacion"}
+    assert set(k) == {"ts_sim", "B"}
 
 
 def test_pronostico(cliente):

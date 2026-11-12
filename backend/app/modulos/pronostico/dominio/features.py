@@ -64,7 +64,7 @@ def dataset_entrenamiento(lecturas: pd.DataFrame, accesos: dict[str, tuple[int, 
                 j = idx_franjas[k]
                 t_obj = ts[j]
                 filas.append([
-                    ids.index(acc), 0 if str(mundo) in ("A", "Mundo.A") else 1, h,
+                    ids.index(acc), 1, h,  # mundo_idx: siempre 1 (operación con Fluport)
                     t_obj.hour + t_obj.minute / 60, t_obj.dayofweek,
                     fila[i], espera[i], lleg[i], aten[i], norte[i], citas[j], buques[j],
                     espera_de_fila(q[k], carriles, servicio, factor), carriles, servicio,

@@ -15,6 +15,7 @@ from app.nucleo.contracts.schemas import (
     SolicitudAltaOut,
     TransportistaCreate,
     TransportistaOut,
+    TransportistaUpdate,
 )
 from app.nucleo.db.base import get_db
 from app.nucleo.db.models import Agencia, Cita, SolicitudAlta, Transportista
@@ -48,7 +49,8 @@ async def transportistas(agencia_id: str, db: Session = Depends(get_db)) -> list
 def _out(t: Transportista, activas: list[datetime] | None = None) -> TransportistaOut:
     activas = activas or []
     return TransportistaOut(id=t.id, alias=t.alias, telefono_fin=(t.telefono or "")[-4:] or None,
-                            telegram=t.telegram_chat_id is not None, placas=t.placas, citas_activas=len(activas),
+                            telegram=t.telegram_chat_id is not None, canal_aviso=t.canal_aviso, placas=t.placas,
+                            citas_activas=len(activas),
                             proxima_cita=min(activas) if activas else None)
 
 
@@ -68,8 +70,29 @@ async def alta_transportista(agencia_id: str, body: TransportistaCreate, db: Ses
         t = Transportista(telefono=tel, es_demo=True, alias=body.alias)
         db.add(t)
     t.alias, t.placas, t.agencia_id = body.alias, (body.placas or "").strip().upper() or None, agencia_id
+    t.canal_aviso = body.canal_aviso
     db.commit()
     return _out(t)
+
+
+@router.patch("/{agencia_id}/transportistas/{transportista_id}", response_model=TransportistaOut)
+async def editar_transportista(agencia_id: str, transportista_id: int, body: TransportistaUpdate,
+                               db: Session = Depends(get_db)) -> TransportistaOut:
+    """La agencia cambia nombre, placas o canal de avisos (Telegram o SMS) de uno de sus transportistas."""
+    _agencia(db, agencia_id)
+    t = db.get(Transportista, transportista_id)
+    if t is None or t.agencia_id != agencia_id:
+        raise HTTPException(404, f"transportista {transportista_id} no existe en {agencia_id}")
+    if body.alias is not None:
+        t.alias = body.alias.strip()
+    if body.placas is not None:
+        t.placas = body.placas.strip().upper() or None
+    if body.canal_aviso is not None:
+        t.canal_aviso = body.canal_aviso
+    db.commit()
+    activas = list(db.scalars(select(Cita.ventana_inicio).where(Cita.transportista_id == t.id,
+                                                                Cita.estado.in_(ACTIVAS))))
+    return _out(t, activas)
 
 
 def _agencia(db: Session, agencia_id: str) -> Agencia:

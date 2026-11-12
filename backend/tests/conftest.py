@@ -14,8 +14,8 @@ os.environ["FLUPORT_DATABASE_URL"] = TEST_DB or "postgresql+psycopg://nadie:nada
 os.environ["FLUPORT_PRONOSTICO_AUTOENTRENAR"] = "false"
 os.environ["FLUPORT_SIM_VELOCIDAD"] = "60"
 os.environ["FLUPORT_ASISTENTE_WEB_ACTIVO"] = "true"  # las pruebas del asistente usan el canal HTTP
-# Aísla las pruebas de tu .env: sin llaves reales nunca se llama a Gemini ni a Telegram.
-for _var in ("LLM_API_KEY", "TELEGRAM_TOKEN", "TELEGRAM_WEBHOOK_SECRET"):
+# Aísla las pruebas de tu .env: sin llaves reales nunca se llama a Gemini, a Telegram ni al gateway SMS.
+for _var in ("LLM_API_KEY", "TELEGRAM_TOKEN", "TELEGRAM_WEBHOOK_SECRET", "SMS_URL", "SMS_USUARIO", "SMS_CLAVE"):
     os.environ[f"FLUPORT_{_var}"] = ""
 
 import pytest  # noqa: E402

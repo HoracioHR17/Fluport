@@ -53,9 +53,9 @@ def test_cierre_sube_el_pronostico_inmediato(sim):
     p = Pronosticador()
     p.paquete = None
     sim.avanzar(8 * 60)
-    antes = next(r for r in p.calcular(sim, Mundo.A) if r.acceso_id == "A1").franjas[1].espera_min
+    antes = next(r for r in p.calcular(sim, Mundo.B) if r.acceso_id == "A1").franjas[1].espera_min
     sim.aplicar_evento(EventoCreate(tipo=TipoEventoSim.cierre_acceso, acceso_id="A1"))
-    despues = next(r for r in p.calcular(sim, Mundo.A) if r.acceso_id == "A1").franjas[1].espera_min
+    despues = next(r for r in p.calcular(sim, Mundo.B) if r.acceso_id == "A1").franjas[1].espera_min
     assert despues > antes
 
 

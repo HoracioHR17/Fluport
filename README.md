@@ -905,3 +905,100 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 - **Tecnologías usadas:** `window.matchMedia` para simplificar el mapa en pantallas angostas; *tooltips* de Leaflet (`bindTooltip`) para mostrar el nombre al tocar; pronóstico de espera a la hora de llegada (`espera_estimada`) para calcular la ETA.
 
 - **Herramientas de IA:** el equipo decidió retirar la demo, priorizar el celular y el aviso en ruta; se apoyó en Claude (Opus 5.5) como asistente para escribir el panel, los estilos, la lógica del bot y las pruebas, que el equipo revisó y aprobó.
+
+### 2026-11-12 07:25 · `#001` · Giro del reto: avisos por SMS para transportistas sin smartphone
+
+- **Justificación del cambio:** el giro del reto pide que un transportista sin smartphone moderno reciba sus avisos por SMS o voz. El equipo eligió SMS: llega a cualquier celular sin app ni datos móviles, y Fluport ya tenía los avisos separados del canal.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `backend/app/modulos/mensajeria/puertos.py` | Puerto `NotificadorPort` (antes `CanalMensajeria`, que queda como alias). | Contrato de todo canal de avisos: `configurado()` y `enviar(destino, texto) -> (enviado, detalle)`; nunca lanza excepciones. |
+  | `backend/app/modulos/mensajeria/adaptadores/telegram.py` | `TelegramAdapter` (antes `CanalTelegram`, alias conservado). | Si el transportista no tiene chat o hay un error inesperado, devuelve `(False, motivo)` en lugar de fallar. |
+  | `backend/app/modulos/mensajeria/adaptadores/sms.py` | `SmsAdapter` y `enviar`. | Envía el SMS por un celular Android con la app SMS Gateway (`POST {"message", "phoneNumbers"}` con usuario y contraseña) o por Twilio (`Messages.json`), según `FLUPORT_SMS_PROVEEDOR`. Valida el formato E.164 y convierte cualquier error de red en `(False, motivo)`. |
+  | `backend/app/modulos/mensajeria/dominio/sms.py` | `normalizar_sms` y `sms`. | Convierten el texto a GSM-7: quitan acentos, convierten la ñ en n, descartan emojis, lo dejan en una línea y lo recortan a 160 caracteres terminando en una palabra completa. `sms` antepone "FLUPORT: ". |
+  | `backend/app/modulos/mensajeria/dominio/avisos.py` | `CitaActiva.canal`, `AvisoNuevo.canal`, `mensaje_sms`, `texto`, `destino`. | Los avisos de turno en 30 min y de contingencia llevan su versión corta para SMS; en SMS no se pide responder (solo salida). |
+  | `backend/app/modulos/mensajeria/servicio.py` | `CANALES` con los dos adaptadores, `canal_de`, `_avisable`, `_aviso`, `_despachar`, `marcar_aviso` con detalle. | Cada aviso (cita asignada, cambiada o cancelada, turno en 30 min, contingencia) sale por el `canal_aviso` del transportista. Se registra con destino y estado; si falla queda `fallido` con el motivo, sin detener la simulación. El tablero se actualiza al registrar y al conocer el resultado. |
+  | `backend/app/nucleo/contracts/enums.py`, `schemas.py`, `db/models.py` | `Canal.sms`, `CanalAviso`, `Transportista.canal_aviso`, `Aviso.destino` y `Aviso.detalle`, `TransportistaUpdate`; `AvisoOut` y `TransportistaOut` exponen estado y canal. | El teléfono completo no se expone en la API. |
+  | `backend/alembic/versions/0007_avisos_sms.py` | Migración PostgreSQL. | Agrega `sms` al enum `canal`, crea el enum `canal_aviso` y las columnas nuevas; los transportistas existentes quedan en Telegram. |
+  | `backend/app/modulos/agencias/api.py` | Alta con `canal_aviso` y `PATCH /api/agencias/{id}/transportistas/{id}`. | La agencia elige o cambia el canal, el nombre y las placas. |
+  | `backend/app/modulos/citas/servicio.py` | `normalizar_telefono`. | Un número de 10 dígitos sin lada de país se guarda como `+52…` (E.164), necesario para enviar el SMS. |
+  | `backend/app/nucleo/config.py`, `backend/.env.example` | `FLUPORT_SMS_PROVEEDOR`, `_URL`, `_USUARIO`, `_CLAVE`, `_REMITENTE`, `_TIMEOUT_S`. | Credenciales fuera del código. |
+  | `frontend/agencia/transportistas/index.html`, `static/js/agencia.js` | Selector "Avisos por" en el alta y en cada fila; columna de estado; `pendienteBot`, `selectorCanal`, `cambiarCanal`, `estadoAviso`. | Los transportistas con SMS no cuentan como "invitación pendiente". En Avisos se ven el canal y el resultado (Enviado o Error, con el motivo al pasar el cursor). |
+  | `backend/tests/test_sms.py`, `tests/conftest.py` | Pruebas de normalización GSM-7, adaptador con transporte simulado, error de red y teléfono E.164. | Las pruebas no usan las credenciales SMS del `.env`. |
+
+- **Funcionalidad:** en `/agencia/transportistas` la agencia da de alta a un transportista con "Avisos por: SMS", o cambia el canal de uno existente. Desde ese momento recibe por mensaje de texto su cita asignada, los cambios y cancelaciones, el recordatorio 30 min antes y las contingencias de su entrada. No necesita smartphone, app ni datos. En `/agencia/avisos` se ve cada SMS con su estado.
+
+- **Tecnologías usadas:**
+  - `httpx` (ver entradas anteriores): ahora también llama a la API del gateway SMS; `httpx.MockTransport` simula al proveedor en las pruebas sin red.
+  - App SMS Gateway para Android: convierte un celular del equipo en un servidor que envía SMS con su propia SIM. Se eligió porque es gratis, usa un número mexicano y no tiene las restricciones de una cuenta de prueba de Twilio.
+  - Twilio Messages API: proveedor alterno configurable si no hay celular disponible.
+  - `unicodedata.normalize("NFD")`: separa letras y acentos para quitarlos y mantener el SMS en GSM-7. Con un solo carácter fuera de GSM-7, el límite baja de 160 a 70 caracteres.
+  - `ALTER TYPE … ADD VALUE` de PostgreSQL: agrega `sms` al enum `canal` sin recrearlo.
+
+- **Herramientas de IA:** el equipo definió cómo atender el giro (solo SMS, canal por transportista elegido por la agencia); se apoyó en Claude (Opus 5.5) como asistente para escribir el puerto, el adaptador, la migración, la interfaz y las pruebas, que el equipo revisó y aprobó.
+
+### 2026-11-12 09:15 · `#002` · Proveedor SMS Vonage
+
+- **Justificación del cambio:** el celular OPPO que se usó como gateway rechaza los SMS que envían otras apps (`RESULT_ERROR_GENERIC_FAILURE`) y la cuenta de prueba de Twilio ya no permite textos propios. El equipo eligió Vonage porque su cuenta de prueba sí envía texto personalizado a números verificados.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `backend/app/modulos/mensajeria/adaptadores/sms.py` | `_vonage` y tabla `PROVEEDORES`. | `POST https://rest.nexmo.com/sms/json` con `api_key`, `api_secret`, `from`, `to` (sin "+") y `text`. Vonage responde HTTP 200 aun cuando rechaza el SMS, así que el resultado se lee de `messages[0].status` ("0" = aceptado) y el motivo de `error-text`. El remitente por defecto es "Fluport". |
+  | `backend/app/nucleo/config.py`, `backend/.env.example` | `FLUPORT_SMS_PROVEEDOR=vonage`. | `FLUPORT_SMS_USUARIO` = API Key, `FLUPORT_SMS_CLAVE` = API Secret, `FLUPORT_SMS_REMITENTE` opcional. |
+  | `backend/tests/test_sms.py` | `test_adaptador_sms_vonage`. | Envío aceptado y rechazo por número no verificado (estado 29), con transporte simulado. |
+
+- **Funcionalidad:** con `FLUPORT_SMS_PROVEEDOR=vonage`, los avisos SMS de Fluport salen por Vonage sin cambiar nada más. Si Vonage rechaza un mensaje, el aviso queda con Error y el motivo en `/agencia/avisos`.
+
+- **Tecnologías usadas:**
+  - SMS API de Vonage: envía SMS a cualquier operador con una sola petición HTTP. Se eligió porque su cuenta de prueba (2 € de crédito) permite texto propio hacia números verificados; en prueba agrega "[FREE SMS DEMO, TEST MESSAGE]" al mensaje.
+  - `httpx` (ver #001): la petición se envía como formulario (`data=`), que es el formato que espera esa API.
+
+- **Herramientas de IA:** el equipo diagnosticó la falla del gateway y eligió Vonage; se apoyó en Claude (Opus 5.5) como asistente para escribir el adaptador y la prueba, que el equipo revisó y aprobó.
+
+### 2026-11-12 09:30 · `#003` · Proveedor SMS por ADB con la app de Mensajes del celular
+
+- **Justificación del cambio:** el sistema del OPPO bloquea los SMS que envían otras apps, pero su app de Mensajes sí envía. Los trials de Twilio y Vonage no permitieron probar a tiempo. El equipo decidió enviar el SMS con la app de Mensajes del propio celular, controlada desde la laptop por USB.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `backend/app/modulos/mensajeria/adaptadores/sms.py` | `_ruta_adb`, `_adb`, `boton_enviar`, `_enviar_adb`, candado `_candado_adb`. | Despierta la pantalla y abre Mensajes con el intent `SENDTO` (`sms:<número>`, texto en `sms_body`). Vuelca la pantalla con `uiautomator dump`, localiza el botón Enviar (por id, descripción o texto; ignora campos de texto) y lo toca con `input tap`; al terminar vuelve al inicio. Envía un SMS a la vez porque cada envío usa la pantalla del celular. Cualquier falla se devuelve como `(False, motivo)`. |
+  | `backend/app/nucleo/config.py`, `backend/.env.example` | `FLUPORT_SMS_PROVEEDOR=adb`, `FLUPORT_SMS_ADB_RUTA`, `_SERIAL`, `_TAP`, `_ESPERA_S`. | Si no se configura la ruta, usa el `adb` del PATH o el del SDK de Android Studio. `_TAP` ("x,y") fija el punto de Enviar si no se detecta solo. |
+  | `backend/tests/test_sms.py` | `test_boton_enviar_en_volcado_de_pantalla`. | Detección del botón en un volcado de ejemplo. |
+
+- **Funcionalidad:** con el celular conectado por USB, la depuración activada y la pantalla desbloqueada, cada aviso SMS de Fluport se envía desde la app de Mensajes del celular. El panel de avisos muestra el resultado.
+
+- **Tecnologías usadas:**
+  - ADB (Android Debug Bridge): herramienta oficial de Android para controlar un dispositivo desde la computadora. Se eligió porque permite usar la app de Mensajes que ya envía SMS, sin depender del permiso que el sistema bloquea a otras apps.
+  - Intent `android.intent.action.SENDTO` con esquema `sms:`: forma estándar de Android de abrir la app de mensajería con destinatario y texto listos.
+  - `uiautomator dump` e `input tap`: leen la pantalla y simulan el toque en Enviar sin depender de coordenadas fijas.
+  - `asyncio.create_subprocess_exec` y `asyncio.Lock`: ejecutan `adb` sin bloquear la simulación y evitan que dos envíos usen la pantalla al mismo tiempo.
+
+- **Herramientas de IA:** el equipo eligió esta vía después de diagnosticar el bloqueo del OPPO; se apoyó en Claude (Opus 5.5) como asistente para escribir el adaptador y la prueba, que el equipo revisó y aprobó.
+
+### 2026-11-12 09:55 · `#004` · Simulación con un solo mundo: la operación con Fluport
+
+- **Justificación del cambio:** el equipo decidió simular únicamente la operación con Fluport y retirar el mundo de comparación sin Fluport (llegada libre). Esto incluye los indicadores de ahorro calculados contra ese mundo.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `backend/app/nucleo/contracts/enums.py`, `schemas.py` | `Mundo` solo con `B`; se elimina `KpisComparacion`; `SimSnapshot` ya no trae `comparacion` y `KpisResponse` solo trae `B`. | La clave `mundos.B` se conserva para no romper el contrato del WebSocket ni las pantallas. |
+  | `backend/app/modulos/simulacion/dominio/motor.py` | `Simulador.mundos = {B}`; se elimina `comparacion`; `kpis_response` y `snapshot` con un solo mundo. | La mitad de los camiones simulados por tick: menos carga de CPU. |
+  | `backend/app/modulos/simulacion/dominio/mundo.py` | `MundoSim` siempre aplica la política de Fluport. | Planificador de franjas, prioridad de carga refrigerada o peligrosa, desvío al cerrar una entrada y rebalanceo al reabrir. |
+  | `backend/app/modulos/pronostico/dominio/features.py`, `pronosticador.py`, `api.py` | `mundo_idx` fijo en 1. | El modelo entrenado sigue siendo compatible, sin reentrenar. |
+  | `frontend/agencia/index.html`, `static/js/agencia.js` | La tarjeta "Lo que ahorra Fluport" pasa a "Operación del puerto hoy" (`renderOperacion`). | Compara la espera de mi flota con la de todo el puerto y muestra atendidos, espera máxima y pico de fila. El KPI de espera ya no dice "menos que sin Fluport". |
+  | `backend/tests/test_motor.py`, `test_mundo.py`, `test_prediccion.py`, `test_api.py` | Pruebas ajustadas a un solo mundo. | Se eliminan las que comparaban mundos; la del cierre con barrera cierra todas las entradas para que no haya a dónde desviar. |
+  | `docs/contracts.md`, `docs/ejemplo-snapshot.json` y comentarios | Contrato con un solo mundo. | — |
+
+- **Funcionalidad:** el tablero, la vista pública, el pronóstico, las citas y los avisos funcionan igual, sobre la operación con Fluport. Ya no se muestran ni se calculan horas, diésel, costo o CO₂ evitados contra la llegada libre.
+
+- **Tecnologías usadas:** sin tecnologías nuevas. SimPy, FastAPI y Pydantic se usan como en entradas anteriores.
+
+- **Herramientas de IA:** el equipo decidió el alcance (quitar el mundo sin Fluport del código); se apoyó en Claude (Opus 5.5) como asistente para aplicar el cambio en motor, contratos, pronóstico, panel y pruebas, que el equipo revisó y aprobó.

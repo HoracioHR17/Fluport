@@ -1,4 +1,6 @@
-"""Motor de simulación: avanza los mundos A y B en paralelo, aplica eventos y produce snapshots/KPIs."""
+"""Motor de simulación: avanza la operación con Fluport, aplica eventos y produce snapshots/KPIs.
+
+`mundos` conserva la forma {Mundo.B: MundoSim} del contrato (snapshot `mundos.B`), con un solo mundo."""
 import logging
 import random
 from collections import Counter, defaultdict, deque
@@ -35,7 +37,6 @@ from app.nucleo.contracts.schemas import (
     EventoOut,
     FlotaAgencia,
     Kpis,
-    KpisComparacion,
     KpisResponse,
     MundoEstado,
     SimEstadoOut,
@@ -63,7 +64,7 @@ class Simulador:
         self.esc, self.semilla, self.inicio, self.velocidad = esc, semilla, inicio, velocidad
         self.corrida_id = corrida_id
         self.eventos_auto, self.intervalo_lectura = eventos_auto, intervalo_lectura_min
-        self.mundos = {Mundo.A: MundoSim(Mundo.A, esc), Mundo.B: MundoSim(Mundo.B, esc)}
+        self.mundos = {Mundo.B: MundoSim(Mundo.B, esc)}
         self.t = 0.0
         self.tick = 0
         self.estado = EstadoSim.corriendo
@@ -180,7 +181,7 @@ class Simulador:
     def aplicar_evento(self, ev: EventoCreate, generar_ola: bool = True) -> EventoOut:
         p = dict(ev.payload)
         if ev.tipo in (TipoEventoSim.cierre_acceso, TipoEventoSim.reapertura):
-            if ev.acceso_id not in self.mundos[Mundo.A].accesos:
+            if ev.acceso_id not in self.mundos[Mundo.B].accesos:
                 raise ValueError(f"acceso_id inválido: {ev.acceso_id}")
             for mundo in self.mundos.values():
                 (mundo.cerrar if ev.tipo == TipoEventoSim.cierre_acceso else mundo.reabrir)(ev.acceso_id)
@@ -226,7 +227,7 @@ class Simulador:
         self, cita_id: int, acceso_id: str, inicio: datetime, tipo_carga: TipoCarga, es_demo: bool = False,
         agencia_id: str | None = None,
     ) -> str:
-        """Agrega a ambos mundos el camión de una cita real (en B llega en su ventana)."""
+        """Agrega a la operación el camión de una cita real (llega en su ventana)."""
         rng = random.Random(cita_id)
         plan = crear_camion(self.esc, rng, f"C{cita_id:05d}", max(self.t, self.a_minuto(inicio)),
                             acceso_id=acceso_id, tipo_carga=tipo_carga, origen="cita")
@@ -280,27 +281,8 @@ class Simulador:
             pico_fila=ms.pico_fila,
         )
 
-    def comparacion(self, ka: Kpis | None = None, kb: Kpis | None = None) -> KpisComparacion:
-        ka, kb = ka or self.kpis(Mundo.A), kb or self.kpis(Mundo.B)
-        horas = max(0.0, ka.horas_camion_espera - kb.horas_camion_espera)
-        imp = self.esc.impacto
-        diesel = horas * imp.diesel_ralenti_l_h
-
-        def pct(a: float, b: float) -> float:
-            return round(100 * (a - b) / a, 1) if a > 0 else 0.0
-
-        return KpisComparacion(
-            horas_ahorradas=round(horas, 1),
-            diesel_l_evitado=round(diesel, 1),
-            costo_mxn_evitado=round(horas * imp.costo_hora_camion_mxn, 0),  # costo integral de la hora parada
-            co2_kg_evitado=round(diesel * imp.co2_kg_por_l, 1),
-            reduccion_espera_pct=pct(ka.espera_prom_min, kb.espera_prom_min),
-            reduccion_pico_fila_pct=pct(ka.pico_fila, kb.pico_fila),
-        )
-
     def kpis_response(self) -> KpisResponse:
-        ka, kb = self.kpis(Mundo.A), self.kpis(Mundo.B)
-        return KpisResponse(ts_sim=self.ts(), A=ka, B=kb, comparacion=self.comparacion(ka, kb))
+        return KpisResponse(ts_sim=self.ts(), B=self.kpis(Mundo.B))
 
     # ───────────── Snapshots ─────────────
     def estado_accesos(self, mundo: Mundo) -> list[AccesoEstado]:
@@ -354,11 +336,10 @@ class Simulador:
         return res
 
     def snapshot(self) -> SimSnapshot:
-        ma, mb = self._mundo_estado(Mundo.A), self._mundo_estado(Mundo.B)
         return SimSnapshot(
             corrida_id=self.corrida_id, tick=self.tick, ts_sim=self.ts(), velocidad=self.velocidad,
-            estado=self.estado, clima=self.clima, mundos={Mundo.A: ma, Mundo.B: mb},
-            comparacion=self.comparacion(ma.kpis, mb.kpis), eventos_recientes=list(self.eventos_recientes),
+            estado=self.estado, clima=self.clima, mundos={Mundo.B: self._mundo_estado(Mundo.B)},
+            eventos_recientes=list(self.eventos_recientes),
             etiqueta=self.cfg.etiqueta_simulacion,
         )
 

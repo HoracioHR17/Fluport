@@ -74,7 +74,7 @@ class Pronosticador:
         res: list[PronosticoOut] = []
         for acc in sim.esc.accesos:
             av = ms.accesos[acc.id]
-            # llegadas conocidas por franja: en B las agendadas por el planificador; en A la demanda deseada
+            # llegadas conocidas por franja: las agendadas por el planificador de Fluport
             fuente = ms.planificador.ocupacion if ms.planificador else sim.demanda_conocida
             llegadas = [fuente[(acc.id, franja0 + k)] for k in range(1, len(HORIZONTES) + 1)]
             cap = capacidad_franja(acc.carriles, acc.tiempo_servicio_min, factor)
@@ -90,7 +90,7 @@ class Pronosticador:
                     t_obj = sim.ts(sim.t + h)
                     franja = franja0 + k + 1
                     filas.append([
-                        ids.index(acc.id), 0 if mundo == Mundo.A else 1, h, t_obj.hour + t_obj.minute / 60,
+                        ids.index(acc.id), 1, h, t_obj.hour + t_obj.minute / 60,
                         t_obj.weekday(), len(av.en_fila), ms.espera_estimada(acc.id), ms.llegadas_hora(acc.id),
                         ms.atendidos_hora(acc.id), float(norte), sim.demanda_conocida[(acc.id, franja)],
                         sum(1 for a, b in sim.olas if a <= sim.t + h <= b), fluida[k], acc.carriles,

@@ -49,10 +49,14 @@
             <label class="campo">Nombre<input id="alta-nombre" autocomplete="off" required minlength="2"></label>
             <label class="campo">Teléfono<input id="alta-tel" type="tel" inputmode="tel" autocomplete="off" placeholder="+52 229 000 0000" required></label>
             <label class="campo">Placas<input id="alta-placas" autocomplete="off" placeholder="XKL-45-21"></label>
+            <label class="campo">Avisos por<select id="alta-canal">
+              <option value="telegram">Telegram (smartphone)</option>
+              <option value="sms">SMS (cualquier celular)</option>
+            </select></label>
             <button type="submit" class="btn">Dar de alta</button>
           </form>
           <p class="estado-msg" id="estado-alta" role="status"></p>
-          <p class="tenue" style="margin:0;font-size:13px">Solo los números dados de alta pueden conectarse al bot.</p>
+          <p class="tenue" style="margin:0;font-size:13px">Solo los números dados de alta pueden conectarse al bot. Si el transportista no tiene smartphone, elige SMS: recibirá sus citas y avisos por mensaje de texto.</p>
         </section>
         <aside class="tarjeta angosto" aria-labelledby="t-inv">
           <h2 id="t-inv">Invitación al bot</h2>
@@ -81,7 +85,7 @@
         <div class="tabla-caja">
           <table class="tabla">
             <caption class="sr">Transportistas de la agencia</caption>
-            <thead><tr><th scope="col">Nombre</th><th scope="col">Placas</th><th scope="col">Teléfono</th><th scope="col">Telegram</th><th scope="col">Citas activas</th><th scope="col">Próxima cita</th><th scope="col"><span class="sr">Acción</span></th></tr></thead>
+            <thead><tr><th scope="col">Nombre</th><th scope="col">Placas</th><th scope="col">Teléfono</th><th scope="col">Avisos por</th><th scope="col">Estado</th><th scope="col">Citas activas</th><th scope="col">Próxima cita</th><th scope="col"><span class="sr">Acción</span></th></tr></thead>
             <tbody id="tabla-trans"></tbody>
           </table>
         </div>

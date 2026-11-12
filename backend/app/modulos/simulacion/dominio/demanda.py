@@ -1,4 +1,4 @@
-"""Generación de la demanda de camiones (idéntica para ambos mundos: números aleatorios comunes)."""
+"""Generación de la demanda de camiones (determinista por semilla y día)."""
 import math
 import random
 from dataclasses import dataclass
@@ -13,14 +13,14 @@ MIN_DIA = 24 * 60
 class CamionPlan:
     """Un camión con todos sus valores aleatorios ya sorteados.
 
-    Los dos mundos reciben exactamente el mismo plan; solo cambia la política de llegada.
+    El planificador de Fluport decide su franja y entrada reales a partir de este plan.
     """
 
     id: str
     acceso_id: str
     ruta_id: str
     tipo_carga: TipoCarga
-    llegada_deseada: float  # minuto simulado en que llegaría sin Fluport
+    llegada_deseada: float  # minuto simulado en que el camión quisiera llegar (antes de la sugerencia de Fluport)
     ruta_min: float
     servicio_base: float  # minutos de revisión (antes del factor de clima)
     estancia_min: float

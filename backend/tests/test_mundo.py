@@ -13,7 +13,7 @@ def _camion(esc, id_, t, acceso="A1", **kw):
 
 
 def test_ciclo_de_vida_completo(esc):
-    m = MundoSim(Mundo.A, esc)
+    m = MundoSim(Mundo.B, esc)
     c = _camion(esc, "T1", 60)
     m.agregar([c])
     m.avanzar(60 - c.ruta_min + 1)
@@ -28,7 +28,7 @@ def test_ciclo_de_vida_completo(esc):
 
 
 def test_no_show_no_llega(esc):
-    m = MundoSim(Mundo.A, esc)
+    m = MundoSim(Mundo.B, esc)
     c = _camion(esc, "T1", 10)
     c.no_show = True
     m.agregar([c])
@@ -37,7 +37,7 @@ def test_no_show_no_llega(esc):
 
 
 def test_fila_y_espera_cuando_llegan_mas_que_los_carriles(esc):
-    m = MundoSim(Mundo.A, esc)
+    m = MundoSim(Mundo.B, esc)
     m.agregar([_camion(esc, f"T{i}", 100) for i in range(20)])
     m.avanzar(100.5)
     a1 = m.accesos["A1"]
@@ -58,8 +58,10 @@ def test_mundo_b_atiende_primero_la_carga_prioritaria(esc):
 
 
 def test_cierre_bloquea_y_reapertura_libera(esc):
-    m = MundoSim(Mundo.A, esc)
-    m.cerrar("A1")
+    """Con todas las entradas cerradas no hay a dónde desviar: esperan ante la barrera hasta que reabre."""
+    m = MundoSim(Mundo.B, esc)
+    for a in esc.accesos:
+        m.cerrar(a.id)
     assert m.accesos["A1"].estado == EstadoAcceso.cerrado
     m.agregar([_camion(esc, f"T{i}", 50) for i in range(5)])
     m.avanzar(120)
@@ -78,7 +80,7 @@ def test_mundo_b_desvia_si_su_acceso_esta_cerrado(esc):
 
 
 def test_factor_de_norte_alarga_el_servicio(esc):
-    normal, norte = MundoSim(Mundo.A, esc), MundoSim(Mundo.A, esc)
+    normal, norte = MundoSim(Mundo.B, esc), MundoSim(Mundo.B, esc)
     norte.factor_servicio = 2.0
     for m in (normal, norte):
         m.agregar([_camion(esc, f"T{i}", 10) for i in range(30)])

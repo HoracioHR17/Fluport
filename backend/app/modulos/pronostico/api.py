@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/pronostico", tags=["pronostico"])
 async def pronostico(
     acceso_id: str | None = Query(None, description="None = todos los accesos"),
     horas: int = Query(12, ge=1, le=12),
-    mundo: Mundo = Query(Mundo.B, description="B = con Fluport (operación), A = sin Fluport"),
+    mundo: Mundo = Query(Mundo.B, description="B = operación con Fluport (único mundo)"),
 ) -> list[PronosticoOut]:
     sim = operacion()
     res = pronosticador.obtener(sim, mundo)

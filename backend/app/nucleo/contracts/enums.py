@@ -33,8 +33,7 @@ class OrigenCita(StrEnum):
 
 
 class Mundo(StrEnum):
-    A = "A"  # sin Fluport (llegada libre)
-    B = "B"  # con Fluport (llegada según cita sugerida)
+    B = "B"  # operación con Fluport (llegada según cita sugerida); único mundo simulado
 
 
 class EstadoCamion(StrEnum):
@@ -80,6 +79,14 @@ class TipoCorrida(StrEnum):
 class Canal(StrEnum):
     telegram = "telegram"
     web = "web"
+    sms = "sms"  # avisos para transportistas sin smartphone (solo salida)
+
+
+class CanalAviso(StrEnum):
+    """Canal por el que la agencia decide avisarle a cada transportista."""
+
+    telegram = "telegram"
+    sms = "sms"
 
 
 class EstadoAviso(StrEnum):

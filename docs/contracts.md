@@ -8,7 +8,7 @@
 - Fechas ISO 8601 con zona horaria de Veracruz (`-06:00`). Campos `ts_sim` = tiempo **simulado**.
 - Tiempos en minutos (`float`). Progreso de ruta `0..1`.
 - Identificadores de acceso tipo `"A1"`, rutas `"R-A1-norte"`, camiones `"T-0001"`.
-- Mundo `A` = sin Fluport (llegada libre) · Mundo `B` = con Fluport (llegada según cita sugerida).
+- Un solo mundo simulado: `B` = operación con Fluport (llegada según cita sugerida). Se conserva la clave `B` en el contrato.
 - Semáforo único (`semaforo_de`): `< 30` verde (Fluye) · `30–90` amarillo (Lento) · `> 90` rojo (Saturado) (configurable). Los valores del enum no cambian; las etiquetas visibles se definen en `docs/diseno.md`.
 - Errores: `422` validación, `404` no existe, `409` conflicto (acceso cerrado / ventana llena), `501` pendiente.
 
@@ -76,7 +76,7 @@ Notas de mensajería (M5):
 - Avisos proactivos, uno por cita y tipo: `turno_30min` (faltan ≤ 30 min) y `saturacion` (caseta cerrada o espera prevista ≥ 45 min en las próximas 3 h, con la mejor alternativa si ahorra ≥ 15 min). Se guardan en `aviso`, se publican en el WebSocket como `{"tipo": "aviso"}` y se agregan al historial del asistente para que un "SÍ" tenga contexto.
 
 Notas de la vista pública:
-- Usa el Mundo B (operación con Fluport). Nunca incluye citas, transportistas, teléfonos ni la comparación A/B.
+- Usa el Mundo B (operación con Fluport). Nunca incluye citas, transportistas, teléfonos ni datos de operación de agencias.
 - `horas_pico`: franjas consecutivas con semáforo Lento o Saturado unidas en intervalos; `semaforo` es el peor del intervalo.
 
 Notas de simulación:
@@ -94,7 +94,7 @@ Servidor → cliente, JSON. Al conectar se envía un snapshot inmediato; luego u
 { "tipo": "aviso",    "data": AvisoOut }
 ```
 
-`SimSnapshot`: `corrida_id, tick, ts_sim, velocidad, estado, clima, mundos{A,B}, comparacion, eventos_recientes[], etiqueta`.
+`SimSnapshot`: `corrida_id, tick, ts_sim, velocidad, estado, clima, mundos{B}, eventos_recientes[], etiqueta`.
 `MundoEstado`: `camiones[]` (tope `sim_max_camiones_visibles`; el resto en `camiones_ocultos`), `accesos[]`, `kpis`.
 `CamionEstado.progreso` es 0..1 sobre la polilínea `ruta_id` del GeoJSON; el front interpola la posición.
 

@@ -21,6 +21,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.nucleo.contracts.enums import (
     Canal,
+    CanalAviso,
     Clima,
     EstadoAcceso,
     EstadoAviso,
@@ -81,6 +82,9 @@ class Transportista(Base):
     telefono: Mapped[str | None] = mapped_column(String(20), unique=True)  # solo teléfonos de prueba con consentimiento
     telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)  # chat del bot, si se registró ahí
     placas: Mapped[str | None] = mapped_column(String(20))  # placas de la unidad (alta por la agencia)
+    # canal de los avisos: Telegram (smartphone) o SMS (cualquier celular); lo elige la agencia
+    canal_aviso: Mapped[CanalAviso] = mapped_column(pg_enum(CanalAviso, "canal_aviso"), default=CanalAviso.telegram,
+                                                    server_default=CanalAviso.telegram.value)
     es_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     creado_en: Mapped[datetime] = mapped_column(TS, server_default=func.now())
 
@@ -211,7 +215,9 @@ class Aviso(Base):
     canal: Mapped[Canal] = mapped_column(pg_enum(Canal, "canal"))
     tipo: Mapped[str] = mapped_column(String(40))  # acceso_saturado | ventana_cambio | turno_30min | ...
     mensaje: Mapped[str] = mapped_column(Text)
+    destino: Mapped[str | None] = mapped_column(String(40))  # chat de Telegram o teléfono E.164 al que se envió
     estado: Mapped[EstadoAviso] = mapped_column(pg_enum(EstadoAviso, "estado_aviso"), default=EstadoAviso.pendiente)
+    detalle: Mapped[str | None] = mapped_column(Text)  # id del proveedor o motivo del error
     creado_en: Mapped[datetime] = mapped_column(TS, server_default=func.now())
     enviado_en: Mapped[datetime | None] = mapped_column(TS)
 

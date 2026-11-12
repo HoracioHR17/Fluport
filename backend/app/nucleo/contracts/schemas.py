@@ -12,8 +12,10 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from app.nucleo.contracts.enums import (
     Canal,
+    CanalAviso,
     Clima,
     EstadoAcceso,
+    EstadoAviso,
     EstadoCamion,
     EstadoCita,
     EstadoSim,
@@ -179,17 +181,6 @@ class Kpis(Modelo):
     pico_fila: int
 
 
-class KpisComparacion(Modelo):
-    """Diferencia A − B, calculada (no supuesta)."""
-
-    horas_ahorradas: float
-    diesel_l_evitado: float
-    costo_mxn_evitado: float
-    co2_kg_evitado: float
-    reduccion_espera_pct: float
-    reduccion_pico_fila_pct: float
-
-
 class MundoEstado(Modelo):
     camiones: list[CamionEstado]  # tope = sim_max_camiones_visibles
     camiones_ocultos: int = 0
@@ -213,8 +204,7 @@ class SimSnapshot(Modelo):
     velocidad: float
     estado: EstadoSim
     clima: Clima
-    mundos: dict[Mundo, MundoEstado]  # claves "A" y "B"
-    comparacion: KpisComparacion
+    mundos: dict[Mundo, MundoEstado]  # una sola clave: "B" (operación con Fluport)
     eventos_recientes: list[EventoOut] = []
     etiqueta: str = "SIMULACIÓN"
 
@@ -245,9 +235,7 @@ class EventoCreate(Modelo):
 
 class KpisResponse(Modelo):
     ts_sim: datetime
-    A: Kpis
     B: Kpis
-    comparacion: KpisComparacion
 
 
 # ───────────────────────────── Mensajes WebSocket ─────────────────────────────
@@ -293,6 +281,8 @@ class AvisoOut(Modelo):
     canal: Canal
     tipo: str
     mensaje: str
+    estado: EstadoAviso = EstadoAviso.pendiente
+    detalle: str | None = None  # id del proveedor o motivo del error
     creado_en: datetime
 
 
@@ -337,6 +327,7 @@ class TransportistaOut(Modelo):
     alias: str
     telefono_fin: str | None = None  # solo los últimos 4 dígitos
     telegram: bool = False
+    canal_aviso: CanalAviso = CanalAviso.telegram
     placas: str | None = None
     citas_activas: int = 0
     proxima_cita: datetime | None = None
@@ -362,6 +353,15 @@ class TransportistaCreate(Modelo):
     alias: str = Field(min_length=2, max_length=80)
     telefono: str
     placas: str | None = Field(None, max_length=20)
+    canal_aviso: CanalAviso = CanalAviso.telegram  # sms: transportista sin smartphone
+
+
+class TransportistaUpdate(Modelo):
+    """Edición por la agencia: solo los campos enviados cambian."""
+
+    alias: str | None = Field(None, min_length=2, max_length=80)
+    placas: str | None = Field(None, max_length=20)
+    canal_aviso: CanalAviso | None = None
 
 
 class Salud(Modelo):

@@ -1,14 +1,16 @@
-"""Avisos proactivos por Telegram (M5).
+"""Avisos proactivos por Telegram o SMS (M5), según el canal que la agencia eligió para cada transportista.
 
 Cada ciclo se revisan las citas activas de transportistas con teléfono y se generan, una sola vez por cita:
 - `turno_30min`: faltan 30 min (o menos) para su cita.
 - `saturacion`: su caseta está cerrada o tendrá mucha espera a la hora de la cita; se ofrece la mejor alternativa.
+Cada aviso lleva su texto para Telegram y su versión de un solo SMS (GSM-7, máx. 160 caracteres).
 El cálculo usa el simulador (se ejecuta en el event loop); leer y escribir la BD se hace aparte.
 """
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from app.modulos.citas.servicio import ErrorCita, espera_estimada, sugerir
+from app.modulos.mensajeria.dominio.sms import sms
 from app.nucleo.contracts.enums import EstadoCita
 from app.nucleo.contracts.schemas import SugerenciaRequest
 from app.nucleo.puertos import Operacion
@@ -29,6 +31,7 @@ class CitaActiva:
     tipo_carga: str
     estado: EstadoCita
     telegram_chat_id: int | None = None
+    canal: str = "telegram"  # canal_aviso del transportista: telegram | sms
 
 
 @dataclass
@@ -37,8 +40,20 @@ class AvisoNuevo:
     transportista_id: int
     telefono: str
     tipo: str
-    mensaje: str
+    mensaje: str  # texto para Telegram (Markdown)
     telegram_chat_id: int | None = None
+    canal: str = "telegram"  # telegram | sms
+    mensaje_sms: str | None = None  # versión de un solo SMS; si falta se normaliza `mensaje`
+
+    @property
+    def texto(self) -> str:
+        """Texto que se envía (y se registra) por el canal del transportista."""
+        return (self.mensaje_sms or sms(self.mensaje)) if self.canal == "sms" else self.mensaje
+
+    @property
+    def destino(self) -> int | str | None:
+        """Chat de Telegram o teléfono E.164, según el canal."""
+        return self.telefono if self.canal == "sms" else self.telegram_chat_id
 
 
 def _hora(dt: datetime) -> str:
@@ -57,7 +72,9 @@ def revisar(sim: Operacion, citas: list[CitaActiva], ya_enviados: set[tuple[int,
             espera = espera_estimada(sim, c.acceso_id, c.inicio)
             nuevos.append(AvisoNuevo(c.cita_id, c.transportista_id, c.telefono, "turno_30min",
                                      f"⏰ En {faltan:.0f} min es tu turno: *{_hora(c.inicio)}* en *{nombre}* "
-                                     f"(cita *#{c.cita_id}*). Espera prevista ~{espera:.0f} min.", c.telegram_chat_id))
+                                     f"(cita *#{c.cita_id}*). Espera prevista ~{espera:.0f} min.", c.telegram_chat_id,
+                                     c.canal, sms(f"En {faltan:.0f} min es tu turno: {_hora(c.inicio)} en {nombre}, "
+                                                  f"cita #{c.cita_id}. Espera aprox {espera:.0f} min.")))
 
         # 2) Caseta cerrada o saturada a la hora de la cita (solo citas que aún no salen)
         if (c.estado != EstadoCita.agendada or not (ANTICIPACION_TURNO_MIN < faltan <= HORIZONTE_SATURACION_H * 60)
@@ -78,11 +95,16 @@ def revisar(sim: Operacion, citas: list[CitaActiva], ya_enviados: set[tuple[int,
                       and (cerrada or a.espera_min_est <= espera - MEJORA_MINIMA_MIN)), None)
         motivo = "está *cerrada*" if cerrada else f"tendrá ~{espera:.0f} min de espera"
         texto = f"⚠️ Tu cita *#{c.cita_id}* de las *{_hora(c.inicio)}* en *{nombre}*: la caseta {motivo}."
+        motivo_sms = "cerrada" if cerrada else f"con aprox {espera:.0f} min de espera"
+        texto_sms = f"Cita #{c.cita_id} {_hora(c.inicio)} en {nombre}: caseta {motivo_sms}."
         if mejor:
             alt = sim.esc.acceso(mejor.acceso_id).nombre
             texto += (f"\n¿La cambiamos a las *{_hora(mejor.inicio)}* en *{alt}* (~{mejor.espera_min_est:.0f} min)? "
                       "Responde *SÍ* para cambiarla.")
+            texto_sms += f" Alternativa: {_hora(mejor.inicio)} en {alt}. Tu agencia confirmara el cambio."
         else:
             texto += "\nResponde con otra hora si quieres cambiarla."
-        nuevos.append(AvisoNuevo(c.cita_id, c.transportista_id, c.telefono, "saturacion", texto, c.telegram_chat_id))
+            texto_sms += " Tu agencia te avisara si cambia."
+        nuevos.append(AvisoNuevo(c.cita_id, c.transportista_id, c.telefono, "saturacion", texto, c.telegram_chat_id,
+                                 c.canal, sms(texto_sms)))
     return nuevos
