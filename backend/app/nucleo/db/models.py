@@ -88,6 +88,23 @@ class Transportista(Base):
     agencia: Mapped[Agencia | None] = relationship(back_populates="transportistas")
 
 
+class SolicitudAlta(Base):
+    """Un transportista sin alta pidió unirse desde el bot; su agencia la aprueba o la rechaza."""
+
+    __tablename__ = "solicitud_alta"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    telefono: Mapped[str] = mapped_column(String(20))
+    nombre: Mapped[str] = mapped_column(String(80))
+    telegram_chat_id: Mapped[int] = mapped_column(BigInteger, index=True)
+    agencia_id: Mapped[str | None] = mapped_column(ForeignKey("agencia.id", ondelete="CASCADE"), index=True)
+    estado: Mapped[str] = mapped_column(String(16), default="sin_agencia")  # sin_agencia | pendiente | aprobada | rechazada
+    creada_en: Mapped[datetime] = mapped_column(TS, server_default=func.now())
+    resuelta_en: Mapped[datetime | None] = mapped_column(TS)
+
+    agencia: Mapped[Agencia | None] = relationship()
+
+
 class Cita(Base):
     __tablename__ = "cita"
 

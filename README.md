@@ -640,3 +640,27 @@ Cada entrada describe un cambio decidido, realizado y revisado por el equipo. La
 - **Tecnologías usadas:** `typing.Protocol` (biblioteca estándar) para definir los puertos sin herencia: cualquier clase que tenga los métodos cumple el puerto; `ast` (biblioteca estándar) para que las pruebas lean las importaciones y hagan cumplir las reglas de dependencia.
 
 - **Herramientas de IA:** el equipo eligió la arquitectura y sus reglas; se apoyó en Claude (Opus 5.5) como asistente para mover los archivos, reescribir las importaciones, escribir los puertos, la prueba de arquitectura y la documentación, que el equipo revisó y aprobó.
+
+### 2026-11-12 01:40 · `pendiente` · Solicitud de alta desde el bot con elección de agencia
+
+- **Justificación del cambio:** hasta ahora, si un transportista sin alta abría el bot, solo recibía "pide a tu agencia que te registre" y el trámite se quedaba fuera del sistema. El equipo decidió que el bot le pregunte a qué agencia pertenece y le envíe la solicitud, para que la agencia solo apruebe o rechace con un clic desde su panel, sin capturar teléfonos a mano. La agencia conserva el control: nadie queda vinculado sin su aprobación.
+
+- **Qué se cambió:**
+
+  | Archivo | Qué | Detalle |
+  |---|---|---|
+  | `backend/app/nucleo/db/models.py`, `alembic/versions/0005_solicitudes_de_alta.py` (nuevo) | Tabla `solicitud_alta`. | Teléfono, nombre de Telegram, chat, agencia y estado (`sin_agencia → pendiente → aprobada / rechazada`). |
+  | `backend/app/modulos/agencias/servicio.py` (nuevo) | `buscar_agencia`, `abrir_solicitud`, `elegir_agencia`, `listar`, `aprobar`, `rechazar`. | Reconoce la agencia por código, nombre completo o una palabra distintiva ("altamar", "atlántico"), sin acentos; si es ambigua vuelve a preguntar. Aprobar crea el transportista y lo liga al chat. |
+  | `backend/app/modulos/mensajeria/bot_telegram.py` | `_solicitar_alta`, `_seguir_solicitud`; mensajes `PEDIR_AGENCIA`, `AGENCIA_NO_ENCONTRADA`, `SOLICITUD_ENVIADA`, `SOLICITUD_PENDIENTE`. | Número sin alta → botones con las agencias; si llegó con el enlace de una agencia, va directo a ella. Mientras está en revisión, responde que sigue pendiente. |
+  | `backend/app/modulos/mensajeria/adaptadores/telegram.py` | `teclado_opciones`. | Teclado de respuesta con una opción por renglón. |
+  | `backend/app/modulos/mensajeria/servicio.py` | `avisar_resultado_alta`. | Avisa por Telegram si la agencia aprobó o rechazó; al rechazar ofrece volver a compartir el número. |
+  | `backend/app/modulos/agencias/api.py`, `nucleo/contracts/schemas.py` | `GET /api/agencias/{id}/solicitudes`, `POST …/{sid}/aprobar`, `POST …/{sid}/rechazar`; `SolicitudAltaOut`, `AprobarSolicitud`. | El teléfono se muestra enmascarado. |
+  | `frontend/agencia/transportistas/index.html`, `static/js/agencia.js` | Sección "Solicitudes de alta" (aparece solo si hay pendientes) con placas opcionales y botones Aprobar / Rechazar. | El contador del menú y "Requiere atención" del resumen incluyen las solicitudes. |
+  | `backend/tests/test_agencias.py`, `conftest.py` | 3 pruebas nuevas y una ajustada. | Búsqueda de agencia, flujo completo con aprobación, enlace directo y rechazo. |
+  | `docs/contracts.md`, `docs/openapi.json` (actualizados) | Contratos. | Rutas y estados de las solicitudes. |
+
+- **Funcionalidad:** un transportista nuevo abre el bot, comparte su número, elige su agencia y queda en espera; la agencia lo ve en Transportistas, lo aprueba (con placas si quiere) y el bot le da la bienvenida ya conectado. Pruebas: 177 con PostgreSQL de prueba; `alembic upgrade`/`downgrade` y `alembic check` sin diferencias.
+
+- **Tecnologías usadas:** teclado de respuesta de la Bot API de Telegram (`reply_markup.keyboard`) para mostrar las agencias como botones; `unicodedata` (biblioteca estándar) para comparar nombres sin acentos.
+
+- **Herramientas de IA:** el equipo definió el flujo de solicitud y aprobación; se apoyó en Claude (Opus 5.5) como asistente para escribir el servicio, los cambios del bot, la pantalla y las pruebas, que el equipo revisó y aprobó.

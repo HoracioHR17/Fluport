@@ -133,10 +133,12 @@ def test_bot_solo_vincula_numeros_dados_de_alta(cliente, monkeypatch):
 
     monkeypatch.setattr(telegram, "enviar", falso)
     sim = servicio.sim
-    # un número sin alta se rechaza
+    # un número sin alta no se vincula: el bot le pregunta su agencia
     r = cliente.portal.call(bot.procesar_update, sim,
                             _msg(contacto={"phone_number": "5212290007999", "user_id": 888000333}, chat=888000333))
-    assert r == bot.NO_REGISTRADO
+    assert r == bot.PEDIR_AGENCIA
+    with SessionLocal() as db:
+        assert bot.transportista_de_chat(db, 888000333) is None
     # el que dio de alta AG02 se vincula a AG02; un enlace de otra agencia no lo cambia
     chat = 888000222
     assert cliente.portal.call(bot.procesar_update, sim, _msg("/start AG03")) == bot.BIENVENIDA
@@ -192,3 +194,88 @@ def test_cita_asignada_se_confirma_o_rechaza_en_el_bot(cliente, monkeypatch):
     # la agencia ve la cita confirmada
     citas = {c["id"]: c for c in cliente.get("/api/citas?agencia_id=AG02").json()}
     assert citas[c1["id"]]["confirmada_en"] is not None and citas[c2["id"]]["confirmada_en"] is None
+
+
+def test_buscar_agencia_por_nombre_o_codigo(cliente):
+    from app.modulos.agencias.servicio import buscar_agencia
+    from app.nucleo.db.base import SessionLocal
+
+    with SessionLocal() as db:
+        assert buscar_agencia(db, "ag05").id == "AG05"
+        assert buscar_agencia(db, "Grupo Aduanal Altamar").id == "AG04"
+        assert buscar_agencia(db, "altamar").id == "AG04"
+        assert buscar_agencia(db, "  atlántico ").id == "AG02"
+        assert buscar_agencia(db, "agencia aduanal") is None  # ambigua / genérica
+        assert buscar_agencia(db, "Transportes Pérez") is None
+
+
+def test_solicitud_de_alta_desde_el_bot(cliente, monkeypatch):
+    from app.modulos.simulacion.servicio import servicio
+    from app.nucleo.config import get_settings
+    from app.nucleo.db.base import SessionLocal
+
+    enviados = []
+
+    async def falso(chat_id, texto, teclado=None):
+        enviados.append((chat_id, texto, teclado))
+        return True, "1"
+
+    monkeypatch.setattr(telegram, "enviar", falso)
+    monkeypatch.setattr(get_settings(), "telegram_token", "123:ABC")
+    sim, chat = servicio.sim, 888000444
+    contacto = {"phone_number": "5212290007444", "user_id": chat, "first_name": "Toño"}
+
+    # sin alta: pregunta la agencia con botones de las agencias
+    assert cliente.portal.call(bot.procesar_update, sim, _msg(contacto=contacto, chat=chat)) == bot.PEDIR_AGENCIA
+    botones = [b[0]["text"] for b in enviados[-1][2]["keyboard"]]
+    assert "Grupo Aduanal Altamar" in botones and len(botones) == 6
+    # nombre que no existe → vuelve a preguntar; nombre parcial → solicitud a esa agencia
+    assert cliente.portal.call(bot.procesar_update, sim, _msg("Transportes Pérez", chat=chat)) == bot.AGENCIA_NO_ENCONTRADA
+    r = cliente.portal.call(bot.procesar_update, sim, _msg("altamar", chat=chat))
+    assert r == bot.SOLICITUD_ENVIADA.format(nombre="Grupo Aduanal Altamar")
+    r = cliente.portal.call(bot.procesar_update, sim, _msg("¿ya?", chat=chat))
+    assert "sigue en revisión" in r
+
+    # la agencia la ve en su panel (y otra agencia no)
+    pend = cliente.get("/api/agencias/AG04/solicitudes").json()
+    assert [(p["nombre"], p["telefono_fin"]) for p in pend] == [("Toño", "7444")]
+    assert cliente.get("/api/agencias/AG01/solicitudes").json() == []
+    sid = pend[0]["id"]
+    assert cliente.post(f"/api/agencias/AG01/solicitudes/{sid}/aprobar").status_code == 404
+
+    # aprueba: queda dado de alta, ligado al chat, y el bot le avisa
+    r = cliente.post(f"/api/agencias/AG04/solicitudes/{sid}/aprobar", json={"placas": "abc-12-34"})
+    assert r.status_code == 200 and r.json()["telegram"] is True and r.json()["placas"] == "ABC-12-34"
+    assert cliente.post(f"/api/agencias/AG04/solicitudes/{sid}/aprobar").status_code == 409
+    with SessionLocal() as db:
+        t = bot.transportista_de_chat(db, chat)
+        assert t.agencia_id == "AG04" and t.alias == "Toño"
+    assert any(c == chat and "aprobó tu alta" in txt for c, txt, _ in enviados)
+    assert cliente.get("/api/agencias/AG04/solicitudes").json() == []
+
+
+def test_solicitud_con_enlace_va_directo_y_se_puede_rechazar(cliente, monkeypatch):
+    from app.modulos.simulacion.servicio import servicio
+    from app.nucleo.config import get_settings
+
+    enviados = []
+
+    async def falso(chat_id, texto, teclado=None):
+        enviados.append((chat_id, texto))
+        return True, "1"
+
+    monkeypatch.setattr(telegram, "enviar", falso)
+    monkeypatch.setattr(get_settings(), "telegram_token", "123:ABC")
+    sim, chat = servicio.sim, 888000555
+    cliente.portal.call(bot.procesar_update, sim, _msg("/start AG06", chat=chat))
+    r = cliente.portal.call(bot.procesar_update, sim,
+                            _msg(contacto={"phone_number": "5212290007555", "user_id": chat}, chat=chat))
+    assert r == bot.SOLICITUD_ENVIADA.format(nombre="Agencia Aduanal Horizonte")
+    sid = cliente.get("/api/agencias/AG06/solicitudes").json()[0]["id"]
+    r = cliente.post(f"/api/agencias/AG06/solicitudes/{sid}/rechazar")
+    assert r.status_code == 200 and r.json()["estado"] == "rechazada"
+    assert any(c == chat and "no aprobó" in txt for c, txt in enviados)
+    # puede volver a compartir su número y elegir otra agencia
+    r = cliente.portal.call(bot.procesar_update, sim,
+                            _msg(contacto={"phone_number": "5212290007555", "user_id": chat}, chat=chat))
+    assert r == bot.PEDIR_AGENCIA

@@ -137,3 +137,10 @@ docs/                                                               # contratos,
 
 ## Panel de agencia por pantallas (`#019`)
 - `/agencia/` (resumen) · `/agencia/flota/` · `/agencia/citas/` · `/agencia/transportistas/` · `/agencia/avisos/`; la agencia elegida se comparte entre pantallas (`localStorage` o `?agencia=AG01`).
+
+## Solicitudes de alta desde el bot (`#023`)
+- Número sin alta que comparte su contacto → el bot pregunta su agencia (botones con las 6 agencias o texto libre: código, nombre completo o parcial, sin acentos). Con enlace `?start=AGxx` la solicitud va directo a esa agencia.
+- Tabla `solicitud_alta` (migración `0005`): `estado` ∈ `sin_agencia | pendiente | aprobada | rechazada`.
+- `GET /api/agencias/{id}/solicitudes?estado=pendiente` → `SolicitudAltaOut[]` (id, nombre, telefono_fin, estado, creada_en).
+- `POST /api/agencias/{id}/solicitudes/{sid}/aprobar` (`AprobarSolicitud`: placas opcional) → `TransportistaOut`; crea el transportista en la agencia y lo liga al chat. 404 si es de otra agencia, 409 si ya se resolvió o el número es de otra agencia.
+- `POST /api/agencias/{id}/solicitudes/{sid}/rechazar` → `SolicitudAltaOut`. En ambos casos el bot avisa al transportista.

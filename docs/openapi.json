@@ -751,7 +751,7 @@
           "asistente"
         ],
         "summary": "Mensaje",
-        "description": "Conversación con el asistente de citas (la usan los canales de mensajería, el tablero y las pruebas).",
+        "description": "Conversación con el asistente por HTTP, para pruebas locales (`FLUPORT_ASISTENTE_WEB_ACTIVO=true`).\n\nNo autentica al remitente: en un despliegue público queda desactivada y los transportistas usan el bot.",
         "operationId": "mensaje_api_asistente_mensaje_post",
         "requestBody": {
           "content": {
@@ -1092,6 +1092,190 @@
         }
       }
     },
+    "/api/agencias/{agencia_id}/solicitudes": {
+      "get": {
+        "tags": [
+          "agencias"
+        ],
+        "summary": "Solicitudes",
+        "description": "Transportistas que pidieron unirse a la agencia desde el bot (por defecto, solo las pendientes).",
+        "operationId": "solicitudes_api_agencias__agencia_id__solicitudes_get",
+        "parameters": [
+          {
+            "name": "agencia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agencia Id"
+            }
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": "pendiente",
+              "title": "Estado"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SolicitudAltaOut"
+                  },
+                  "title": "Response Solicitudes Api Agencias  Agencia Id  Solicitudes Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agencias/{agencia_id}/solicitudes/{solicitud_id}/aprobar": {
+      "post": {
+        "tags": [
+          "agencias"
+        ],
+        "summary": "Aprobar Solicitud",
+        "description": "Da de alta al transportista, lo liga a su chat y le avisa por Telegram.",
+        "operationId": "aprobar_solicitud_api_agencias__agencia_id__solicitudes__solicitud_id__aprobar_post",
+        "parameters": [
+          {
+            "name": "agencia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agencia Id"
+            }
+          },
+          {
+            "name": "solicitud_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Solicitud Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/AprobarSolicitud"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransportistaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agencias/{agencia_id}/solicitudes/{solicitud_id}/rechazar": {
+      "post": {
+        "tags": [
+          "agencias"
+        ],
+        "summary": "Rechazar Solicitud",
+        "operationId": "rechazar_solicitud_api_agencias__agencia_id__solicitudes__solicitud_id__rechazar_post",
+        "parameters": [
+          {
+            "name": "agencia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Agencia Id"
+            }
+          },
+          {
+            "name": "solicitud_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Solicitud Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SolicitudAltaOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/salud": {
       "get": {
         "tags": [
@@ -1251,6 +1435,24 @@
           "nombre"
         ],
         "title": "AgenciaOut"
+      },
+      "AprobarSolicitud": {
+        "properties": {
+          "placas": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placas"
+          }
+        },
+        "type": "object",
+        "title": "AprobarSolicitud"
       },
       "AsistenteRequest": {
         "properties": {
@@ -2253,6 +2455,41 @@
           "comparacion"
         ],
         "title": "SimSnapshot"
+      },
+      "SolicitudAltaOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "telefono_fin": {
+            "type": "string",
+            "title": "Telefono Fin"
+          },
+          "estado": {
+            "type": "string",
+            "title": "Estado"
+          },
+          "creada_en": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Creada En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "telefono_fin",
+          "estado",
+          "creada_en"
+        ],
+        "title": "SolicitudAltaOut",
+        "description": "Solicitud de un transportista que pidió unirse a la agencia desde el bot (teléfono enmascarado)."
       },
       "Sugerencia": {
         "properties": {

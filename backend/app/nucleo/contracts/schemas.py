@@ -341,6 +341,20 @@ class TransportistaOut(Modelo):
     proxima_cita: datetime | None = None
 
 
+class SolicitudAltaOut(Modelo):
+    """Solicitud de un transportista que pidió unirse a la agencia desde el bot (teléfono enmascarado)."""
+
+    id: int
+    nombre: str
+    telefono_fin: str
+    estado: str
+    creada_en: datetime
+
+
+class AprobarSolicitud(Modelo):
+    placas: str | None = Field(None, max_length=20)
+
+
 class TransportistaCreate(Modelo):
     """Alta de un transportista por su agencia (solo números de prueba con consentimiento)."""
 

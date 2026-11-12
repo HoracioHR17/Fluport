@@ -6,14 +6,18 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.modulos.agencias import servicio
 from app.modulos.citas.servicio import ACTIVAS, ErrorCita, normalizar_telefono
+from app.modulos.mensajeria import servicio as mensajeria
 from app.nucleo.contracts.schemas import (
     AgenciaOut,
+    AprobarSolicitud,
+    SolicitudAltaOut,
     TransportistaCreate,
     TransportistaOut,
 )
 from app.nucleo.db.base import get_db
-from app.nucleo.db.models import Agencia, Cita, Transportista
+from app.nucleo.db.models import Agencia, Cita, SolicitudAlta, Transportista
 
 router = APIRouter(prefix="/api/agencias", tags=["agencias"])
 
@@ -66,3 +70,47 @@ async def alta_transportista(agencia_id: str, body: TransportistaCreate, db: Ses
     t.alias, t.placas, t.agencia_id = body.alias, (body.placas or "").strip().upper() or None, agencia_id
     db.commit()
     return _out(t)
+
+
+def _agencia(db: Session, agencia_id: str) -> Agencia:
+    a = db.get(Agencia, agencia_id)
+    if a is None:
+        raise HTTPException(404, f"agencia {agencia_id} no existe")
+    return a
+
+
+def _solicitud_out(s: SolicitudAlta) -> SolicitudAltaOut:
+    return SolicitudAltaOut(id=s.id, nombre=s.nombre, telefono_fin=s.telefono[-4:], estado=s.estado,
+                            creada_en=s.creada_en)
+
+
+@router.get("/{agencia_id}/solicitudes", response_model=list[SolicitudAltaOut])
+async def solicitudes(agencia_id: str, estado: str | None = "pendiente",
+                      db: Session = Depends(get_db)) -> list[SolicitudAltaOut]:
+    """Transportistas que pidieron unirse a la agencia desde el bot (por defecto, solo las pendientes)."""
+    _agencia(db, agencia_id)
+    return [_solicitud_out(s) for s in servicio.listar(db, agencia_id, estado or None)]
+
+
+@router.post("/{agencia_id}/solicitudes/{solicitud_id}/aprobar", response_model=TransportistaOut)
+async def aprobar_solicitud(agencia_id: str, solicitud_id: int, body: AprobarSolicitud | None = None,
+                            db: Session = Depends(get_db)) -> TransportistaOut:
+    """Da de alta al transportista, lo liga a su chat y le avisa por Telegram."""
+    a = _agencia(db, agencia_id)
+    try:
+        t = servicio.aprobar(db, agencia_id, solicitud_id, body.placas if body else None)
+    except servicio.ErrorSolicitud as e:
+        raise HTTPException(e.codigo, e.mensaje) from e
+    mensajeria.en_segundo_plano(mensajeria.avisar_resultado_alta(t.telegram_chat_id, a.nombre, True))
+    return _out(t)
+
+
+@router.post("/{agencia_id}/solicitudes/{solicitud_id}/rechazar", response_model=SolicitudAltaOut)
+async def rechazar_solicitud(agencia_id: str, solicitud_id: int, db: Session = Depends(get_db)) -> SolicitudAltaOut:
+    a = _agencia(db, agencia_id)
+    try:
+        s = servicio.rechazar(db, agencia_id, solicitud_id)
+    except servicio.ErrorSolicitud as e:
+        raise HTTPException(e.codigo, e.mensaje) from e
+    mensajeria.en_segundo_plano(mensajeria.avisar_resultado_alta(s.telegram_chat_id, a.nombre, False))
+    return _solicitud_out(s)

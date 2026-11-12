@@ -9,7 +9,9 @@ Enlace de agencia: `t.me/<bot>?start=AG01` abre el chat con `/start AG01`; si el
 agencia, queda ligado a esa.
 
 Operación real (`telegram_solo_registrados`, activo por defecto): solo se vinculan números que una agencia dio de
-alta. Cuando la agencia asigna una cita, el transportista la confirma o la rechaza respondiendo SÍ o NO.
+alta. Si un número sin alta comparte su contacto, el bot le pregunta a qué agencia pertenece (botones con las
+agencias o texto libre) y le envía la solicitud; si llegó con el enlace de una agencia, va directo a esa. La agencia
+la aprueba o la rechaza en su panel y el bot le avisa. Cuando la agencia asigna una cita, el transportista la confirma o la rechaza respondiendo SÍ o NO.
 """
 import asyncio
 import logging
@@ -20,6 +22,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.modulos.agencias import servicio as agencias
 from app.modulos.citas.servicio import ErrorCita, normalizar_telefono
 from app.modulos.mensajeria.adaptadores import telegram
 from app.modulos.mensajeria.asistente.agente import asistente, guardar_turnos
@@ -38,8 +41,11 @@ REGISTRADO = ("Listo ✅ Ya te identifiqué con el número terminado en {fin}.\n
               "Escríbeme, por ejemplo: _llego mañana a las 9 con un contenedor de 40_ o _¿cómo está la fila?_")
 CONTACTO_AJENO = "Por seguridad solo puedo registrar *tu propio* número. Usa el botón para compartirlo."
 LIGADO = "Quedaste ligado a la agencia *{nombre}*; ahí verán tus citas y tu camión."
-NO_REGISTRADO = ("Tu número aún no está dado de alta en Fluport. Pide a tu agencia aduanal que te registre "
-                 "y vuelve a compartirlo.")
+PEDIR_AGENCIA = ("Tu número aún no está dado de alta en Fluport. ¿A qué *agencia aduanal* perteneces?\n"
+                 "Elige una de la lista o escribe su nombre y le envío tu solicitud de alta.")
+AGENCIA_NO_ENCONTRADA = "No encontré esa agencia. Elige una de la lista o escribe su nombre como aparece."
+SOLICITUD_ENVIADA = ("Listo 📨 Envié tu solicitud de alta a *{nombre}*. Te aviso aquí en cuanto la revisen.")
+SOLICITUD_PENDIENTE = "Tu solicitud con *{nombre}* sigue en revisión. Te aviso aquí en cuanto respondan."
 CONFIRMADA = "Cita confirmada ✅ {dia} a las {hora} · {caseta}. Te aviso 30 min antes."
 RECHAZADA = "Entendido. Le aviso a tu agencia que no puedes asistir para que reasigne la cita."
 SI = {"si", "confirmo", "confirmar", "acepto", "ok", "va", "claro"}
@@ -139,19 +145,19 @@ async def procesar_update(sim: Operacion, update: dict[str, Any]) -> str | None:
         if contacto.get("user_id") != remitente_id:
             await telegram.enviar(chat_id, CONTACTO_AJENO, telegram.TECLADO_CONTACTO)
             return CONTACTO_AJENO
+        enlace = _agencia_pendiente.pop(chat_id, None)
         try:
             with SessionLocal() as db:
                 t = registrar_contacto(db, chat_id, contacto.get("phone_number", ""), contacto.get("first_name"),
-                                       _agencia_pendiente.pop(chat_id, None))
+                                       enlace)
                 fin = (t.telefono or "")[-4:]
                 agencia = t.agencia.nombre if t.agencia else None
         except ErrorCita:
             await telegram.enviar(chat_id, "No pude leer ese número. Inténtalo de nuevo con el botón.",
                                   telegram.TECLADO_CONTACTO)
             return None
-        except NoRegistrado:
-            await telegram.enviar(chat_id, NO_REGISTRADO, telegram.QUITAR_TECLADO)
-            return NO_REGISTRADO
+        except NoRegistrado as e:
+            return await _solicitar_alta(chat_id, str(e), contacto.get("first_name"), enlace)
         texto = REGISTRADO.format(fin=fin) + ("\n" + LIGADO.format(nombre=agencia) if agencia else "")
         await telegram.enviar(chat_id, texto, telegram.QUITAR_TECLADO)
         return texto
@@ -160,6 +166,10 @@ async def procesar_update(sim: Operacion, update: dict[str, Any]) -> str | None:
     with SessionLocal() as db:
         t = transportista_de_chat(db, chat_id)
         agencia = codigo_agencia(db, texto_usuario) if texto_usuario.startswith("/start") else None
+        if t is None:
+            solicitud = agencias.solicitud_abierta(db, chat_id)
+            if solicitud is not None:
+                return await _seguir_solicitud(db, chat_id, solicitud, texto_usuario, agencia)
         if t is None or texto_usuario.startswith("/start"):
             if t is None:
                 if agencia is not None:
@@ -183,6 +193,35 @@ async def procesar_update(sim: Operacion, update: dict[str, Any]) -> str | None:
                                                                   texto=texto_usuario))
     await telegram.enviar(chat_id, r.respuesta)
     return r.respuesta
+
+
+async def _solicitar_alta(chat_id: int, telefono: str, nombre: str | None, agencia_id: str | None) -> str:
+    """Número sin alta: abre una solicitud; con enlace de agencia va directo a ella, si no se pregunta cuál."""
+    with SessionLocal() as db:
+        s = agencias.abrir_solicitud(db, chat_id, telefono, nombre, agencia_id)
+        if s.estado == "pendiente":
+            texto = SOLICITUD_ENVIADA.format(nombre=s.agencia.nombre)
+            await telegram.enviar(chat_id, texto, telegram.QUITAR_TECLADO)
+            return texto
+        opciones = agencias.nombres_agencias(db)
+    await telegram.enviar(chat_id, PEDIR_AGENCIA, telegram.teclado_opciones(opciones))
+    return PEDIR_AGENCIA
+
+
+async def _seguir_solicitud(db: Session, chat_id: int, s, texto: str, agencia: Agencia | None) -> str:
+    """Mensajes de un chat con solicitud abierta: elegir agencia o informar que sigue en revisión."""
+    if s.estado == "pendiente":
+        respuesta = SOLICITUD_PENDIENTE.format(nombre=s.agencia.nombre)
+        await telegram.enviar(chat_id, respuesta)
+        return respuesta
+    elegida = agencia or (agencias.buscar_agencia(db, texto) if texto and not texto.startswith("/") else None)
+    if elegida is None:
+        await telegram.enviar(chat_id, AGENCIA_NO_ENCONTRADA, telegram.teclado_opciones(agencias.nombres_agencias(db)))
+        return AGENCIA_NO_ENCONTRADA
+    agencias.elegir_agencia(db, s, elegida)
+    respuesta = SOLICITUD_ENVIADA.format(nombre=elegida.nombre)
+    await telegram.enviar(chat_id, respuesta, telegram.QUITAR_TECLADO)
+    return respuesta
 
 
 class PollingTelegram:

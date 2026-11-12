@@ -15,7 +15,7 @@
   var ACTIVAS = { agendada: true, en_ruta: true };
 
   var estado = { agencia: null, agencias: [], accesos: {}, rutas: {}, snap: null, mapa: null, bot: null,
-    transportistas: [], citas: [], avisos: [], filtroCitas: "activas", filtroFlota: "todos", filtroTrans: "todos",
+    transportistas: [], solicitudes: [], citas: [], avisos: [], filtroCitas: "activas", filtroFlota: "todos", filtroTrans: "todos",
     filtroAvisos: "todos", busqueda: "", seleccion: null };
 
   // ───────────── Utilidades ─────────────
@@ -46,7 +46,7 @@
     var pend = estado.citas.filter(sinConfirmar).length;
     var rech = estado.avisos.filter(function (a) { return a.tipo === "cita_rechazada"; }).length;
     var sinBot = estado.transportistas.filter(function (t) { return !t.telegram; }).length;
-    [["citas", pend], ["avisos", rech], ["transportistas", sinBot]].forEach(function (p) {
+    [["citas", pend], ["avisos", rech], ["transportistas", sinBot + estado.solicitudes.length]].forEach(function (p) {
       var n = document.querySelector('[data-contador="' + p[0] + '"]');
       if (n) { n.textContent = p[1]; n.classList.toggle("oculto", !p[1]); }
     });
@@ -120,6 +120,8 @@
     estado.avisos.filter(function (a) { return a.tipo === "cita_rechazada"; }).slice(0, 2).forEach(function (r) {
       items.push(["!", "#FBEAE8", "Un transportista no puede asistir", r.mensaje, "Reasignar", "/agencia/citas/#asignar"]);
     });
+    var sol = estado.solicitudes.length;
+    if (sol) items.push(["+", "#E6F4EA", plural(sol, "solicitud de alta", "solicitudes de alta"), "Transportistas que pidieron unirse a tu agencia desde Telegram.", "Revisar", "/agencia/transportistas/"]);
     var sc = estado.citas.filter(sinConfirmar).length;
     if (sc) items.push(["?", "#FCF3DF", plural(sc, "cita sin confirmar", "citas sin confirmar"), "El transportista aún no responde SÍ en Telegram.", "Ver cuáles", "/agencia/citas/"]);
     var ped = estado.citas.filter(function (c) { return c.estado === "agendada" && c.origen !== "web"; }).length;
@@ -350,6 +352,35 @@
     }) : [el("tr", {}, el("td", { colspan: "7", class: "vacio" }, lista.length ? "Todos están conectados a Telegram." : "Aún no hay transportistas. Da de alta al primero."))]);
   }
 
+  function renderSolicitudes() {
+    if (!$("tabla-solicitudes")) return;
+    var lista = estado.solicitudes;
+    $("caja-solicitudes").classList.toggle("oculto", !lista.length && !$("estado-solicitudes").textContent);
+    F.reemplazar($("tabla-solicitudes"), lista.length ? lista.map(function (s) {
+      var placas = el("input", { "aria-label": "Placas de " + s.nombre, placeholder: "XKL-45-21", autocomplete: "off", style: { maxWidth: "130px" } });
+      return el("tr", {}, [
+        el("td", { style: { fontWeight: "700" } }, s.nombre), el("td", {}, "…" + s.telefono_fin),
+        el("td", {}, F.hora(s.creada_en)), el("td", {}, placas),
+        el("td", { style: { textAlign: "right", whiteSpace: "nowrap" } }, [
+          el("button", { type: "button", class: "btn btn--chico", onclick: function () { resolverSolicitud(s, "aprobar", placas.value); } }, "Aprobar"),
+          " ",
+          el("button", { type: "button", class: "btn btn--sec btn--chico", onclick: function () { resolverSolicitud(s, "rechazar"); } }, "Rechazar")
+        ])
+      ]);
+    }) : [el("tr", {}, el("td", { colspan: "5", class: "vacio" }, "Sin solicitudes pendientes."))]);
+  }
+
+  async function resolverSolicitud(s, accion, placas) {
+    var ruta = "/api/agencias/" + encodeURIComponent(estado.agencia) + "/solicitudes/" + s.id + "/" + accion;
+    try {
+      await F.api(ruta, { method: "POST", json: accion === "aprobar" ? { placas: (placas || "").trim() || null } : {} });
+      $("estado-solicitudes").textContent = accion === "aprobar"
+        ? s.nombre + " quedó dado de alta y ya está conectado al bot; le avisamos por Telegram."
+        : "Solicitud de " + s.nombre + " rechazada; le avisamos por Telegram.";
+      await cargarTransportistas();
+    } catch (e) { $("estado-solicitudes").textContent = "No se pudo " + accion + ": " + e.message; }
+  }
+
   async function darDeAlta(ev) {
     ev.preventDefault();
     try {
@@ -407,9 +438,11 @@
 
   // ───────────── Carga de datos ─────────────
   async function cargarTransportistas() {
-    try { estado.transportistas = await F.api("/api/agencias/" + encodeURIComponent(estado.agencia) + "/transportistas"); }
-    catch (e) { estado.transportistas = []; }
-    selectorTransportistas(); renderTransportistas(); renderTodo();
+    var base = "/api/agencias/" + encodeURIComponent(estado.agencia);
+    var res = await Promise.all([F.api(base + "/transportistas").catch(function () { return []; }),
+      F.api(base + "/solicitudes").catch(function () { return []; })]);
+    estado.transportistas = res[0]; estado.solicitudes = res[1];
+    selectorTransportistas(); renderSolicitudes(); renderTodo();
   }
   async function cargarCitas() {
     try { estado.citas = await F.api("/api/citas?limite=300" + q("&")); } catch (e) { estado.citas = []; }
@@ -434,6 +467,7 @@
 
   function elegirAgencia(id) {
     estado.agencia = id; estado.seleccion = null;
+    if ($("estado-solicitudes")) $("estado-solicitudes").textContent = "";
     try { localStorage.setItem("fluport.agencia", id); } catch (e) { /* sin almacenamiento */ }
     if (estado.mapa) { Object.keys(estado.mapa.camiones).forEach(function (k) { estado.mapa.mapa.removeLayer(estado.mapa.camiones[k]); }); estado.mapa.camiones = {}; }
     renderInvitacion();

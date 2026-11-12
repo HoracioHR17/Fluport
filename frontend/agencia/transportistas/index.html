@@ -60,6 +60,20 @@
           <div class="invitacion" id="invitacion"></div>
         </aside>
       </div>
+      <section class="tarjeta oculto" aria-labelledby="t-solicitudes" id="caja-solicitudes">
+        <div class="cabeza">
+          <h2 id="t-solicitudes">Solicitudes de alta</h2>
+          <span class="tenue" style="font-size:13px">Transportistas que pidieron unirse desde el bot de Telegram</span>
+        </div>
+        <div class="tabla-caja">
+          <table class="tabla">
+            <caption class="sr">Solicitudes de alta pendientes</caption>
+            <thead><tr><th scope="col">Nombre en Telegram</th><th scope="col">Teléfono</th><th scope="col">Recibida</th><th scope="col">Placas (opcional)</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead>
+            <tbody id="tabla-solicitudes"></tbody>
+          </table>
+        </div>
+        <p class="estado-msg" id="estado-solicitudes" role="status"></p>
+      </section>
       <section class="tarjeta" aria-labelledby="t-lista">
         <div class="cabeza">
           <h2 id="t-lista">Mis transportistas</h2>

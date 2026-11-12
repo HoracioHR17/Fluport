@@ -22,6 +22,11 @@ TECLADO_CONTACTO = {
 QUITAR_TECLADO = {"remove_keyboard": True}
 
 
+def teclado_opciones(opciones: list[str]) -> dict[str, Any]:
+    """Teclado de respuesta con una opción por renglón (al tocarla se envía como texto)."""
+    return {"keyboard": [[{"text": o}] for o in opciones], "resize_keyboard": True, "one_time_keyboard": True}
+
+
 def configurado() -> bool:
     return bool(get_settings().telegram_token)
 

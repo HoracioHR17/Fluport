@@ -67,5 +67,5 @@ def vaciar_tablas(engine) -> None:
     from sqlalchemy import text
 
     with engine.begin() as c:
-        c.execute(text("TRUNCATE aviso, mensaje_asistente, cita, transportista, pronostico, evento_sim, "
+        c.execute(text("TRUNCATE aviso, solicitud_alta, mensaje_asistente, cita, transportista, pronostico, evento_sim, "
                        "lectura_congestion, sim_corrida RESTART IDENTITY CASCADE"))
