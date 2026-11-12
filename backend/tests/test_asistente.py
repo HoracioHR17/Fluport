@@ -46,7 +46,7 @@ def test_declaraciones_de_herramientas():
 
 def test_instrucciones_incluyen_hora_y_casetas(sim):
     t = instrucciones(sim)
-    assert "2026-11-12 04:00" in t and "Caseta Paso del Toro" in t and "SIMULACIÓN" in t
+    assert "2026-11-12 04:00" in t and "Entronque Santa Fe" in t and "SIMULACIÓN" in t
 
 
 def test_respaldo_sin_llm(sim):
@@ -55,7 +55,7 @@ def test_respaldo_sin_llm(sim):
     a = Asistente()
     assert get_settings().llm_api_key == "" and a.cliente is None
     r = a._sin_llm(sim)
-    assert "Caseta La Antigua" in r.respuesta and "Fluye" in r.respuesta
+    assert "Av. Rafael Cuervo" in r.respuesta and "Fluye" in r.respuesta
 
 
 def test_herramienta_consultar_espera(sim):

@@ -160,7 +160,7 @@ def test_registro_y_conversacion(cliente, tg_conf, enviados):
 
     r = cliente.portal.call(bot.procesar_update, _sim(),
                             _msg(contacto={"phone_number": "5212290000888", "user_id": CHAT, "first_name": "Raúl"}))
-    assert r.startswith("Listo ✅") and "0888" in r and enviados[-1][2] == telegram.QUITAR_TECLADO
+    assert r.startswith("Listo ✅") and "0888" in r and enviados[-1][2] == telegram.TECLADO_UBICACION
     with SessionLocal() as db:
         t = bot.transportista_de_chat(db, CHAT)
         assert t.telefono == "+522290000888" and t.alias == "Raúl"

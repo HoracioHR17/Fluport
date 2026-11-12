@@ -44,7 +44,7 @@ def test_respaldo_sin_modelo(sim, monkeypatch):
     p.paquete = None  # sin modelo: balance de flujo
     sim.avanzar(6 * 60)
     res = p.calcular(sim, Mundo.B)
-    assert len(res) == 3
+    assert len(res) == 6
     assert all(r.modelo_version == VERSION_RESPALDO and len(r.franjas) == len(HORIZONTES) for r in res)
     assert all(f.espera_min >= 0 for r in res for f in r.franjas)
 

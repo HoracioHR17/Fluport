@@ -5,6 +5,10 @@ Flujo:
 2. Comparte su propio contacto → se registra (`transportista.telegram_chat_id`) y queda identificado.
 3. Mensajes de texto → asistente (el mismo del canal web de pruebas) → respuesta en el chat.
 
+Ubicación: cualquiera (con o sin alta) puede tocar «📍 Entradas cerca de mí» o enviar su ubicación y recibe las entradas
+más cercanas con su estado actual y cuál le conviene. Si comparte su ubicación *en tiempo real*, el bot le avisa cuando
+su mejor entrada cambia o empeora (se satura o se cierra). La ubicación vive solo en memoria y no se guarda en la BD.
+
 Enlace de agencia: `t.me/<bot>?start=AG01` abre el chat con `/start AG01`; si el transportista aún no tiene
 agencia, queda ligado a esa.
 
@@ -15,7 +19,9 @@ la aprueba o la rechaza en su panel y el bot le avisa. Cuando la agencia asigna 
 """
 import asyncio
 import logging
+import time
 import unicodedata
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -26,6 +32,7 @@ from app.modulos.agencias import servicio as agencias
 from app.modulos.citas.servicio import ErrorCita, normalizar_telefono
 from app.modulos.mensajeria.adaptadores import telegram
 from app.modulos.mensajeria.asistente.agente import asistente, guardar_turnos
+from app.modulos.mensajeria.dominio import ubicacion
 from app.nucleo.config import get_settings
 from app.nucleo.contracts.enums import Canal, EstadoAviso, EstadoCita, OrigenCita
 from app.nucleo.contracts.schemas import AsistenteRequest
@@ -35,10 +42,12 @@ from app.nucleo.puertos import Operacion
 
 log = logging.getLogger("fluport.telegram")
 
-BIENVENIDA = ("¡Hola! Soy el asistente de *FLUPORT* para las casetas del puerto de Veracruz (simulación).\n"
-              "Para ver y agendar tus citas, comparte tu número con el botón de abajo.")
+BIENVENIDA = ("¡Hola! Soy el asistente de *FLUPORT* para las entradas al puerto de Veracruz (simulación).\n"
+              "Para ver y agendar tus citas, comparte tu número con el botón de abajo.\n"
+              "¿Solo quieres saber qué entrada te conviene? Toca *📍 Entradas cerca de mí*.")
 REGISTRADO = ("Listo ✅ Ya te identifiqué con el número terminado en {fin}.\n"
-              "Escríbeme, por ejemplo: _llego mañana a las 9 con un contenedor de 40_ o _¿cómo está la fila?_")
+              "Escríbeme, por ejemplo: _llego mañana a las 9 con un contenedor de 40_ o _¿cómo está la fila?_\n"
+              "Toca *📍 Entradas cerca de mí* para ver cuál te conviene desde donde estás.")
 CONTACTO_AJENO = "Por seguridad solo puedo registrar *tu propio* número. Usa el botón para compartirlo."
 LIGADO = "Quedaste ligado a la agencia *{nombre}*; ahí verán tus citas y tu camión."
 PEDIR_AGENCIA = ("Tu número aún no está dado de alta en Fluport. ¿A qué *agencia aduanal* perteneces?\n"
@@ -48,6 +57,12 @@ SOLICITUD_ENVIADA = ("Listo 📨 Envié tu solicitud de alta a *{nombre}*. Te av
 SOLICITUD_PENDIENTE = "Tu solicitud con *{nombre}* sigue en revisión. Te aviso aquí en cuanto respondan."
 CONFIRMADA = "Cita confirmada ✅ {dia} a las {hora} · {caseta}. Te aviso 30 min antes."
 RECHAZADA = "Entendido. Le aviso a tu agencia que no puedes asistir para que reasigne la cita."
+UBICACION_INVALIDA = "No pude leer esa ubicación. Inténtalo de nuevo con el botón 📍."
+EN_VIVO = ("\n📡 Te sigo en tiempo real: te aviso aquí si tu mejor entrada cambia, se satura o se cierra.")
+SUGERIR_EN_VIVO = ("\nTip: comparte tu *ubicación en tiempo real* (📎 → Ubicación) y te aviso si tu mejor entrada "
+                   "cambia o se satura en el camino.")
+ICONO = {"verde": "🟢", "amarillo": "🟡", "rojo": "🔴", "cerrada": "⛔"}
+ESTADO_TXT = {"verde": "fluye", "amarillo": "lento", "rojo": "saturado", "cerrada": "cerrada"}
 SI = {"si", "confirmo", "confirmar", "acepto", "ok", "va", "claro"}
 NO = {"no", "rechazo", "no puedo"}
 
@@ -98,6 +113,114 @@ def responder_asignacion(db: Session, sim: Operacion, t: Transportista, texto: s
                                                     {"role": "model", "parts": [{"text": respuesta}]}])
     return respuesta
 
+# ───────────────────────────── Ubicación ─────────────────────────────
+MAX_CERCANAS = 3
+AVISO_MIN_S = 180  # entre avisos de seguimiento en vivo (segundos reales), para no saturar el chat
+
+
+@dataclass
+class Seguimiento:
+    """Ubicación en tiempo real de un chat (solo en memoria)."""
+    lat: float
+    lon: float
+    hasta: float  # time.monotonic() en que termina la ubicación en tiempo real
+    mejor: str | None = None
+    estado: str | None = None
+    avisado: float = 0.0
+
+
+_en_vivo: dict[int, Seguimiento] = {}
+
+
+def texto_cercanas(sim: Operacion, lat: float, lon: float, en_vivo: bool) -> tuple[str, ubicacion.EntradaCercana | None]:
+    """Mensaje con las entradas más cercanas, su estado y la recomendada."""
+    lista = ubicacion.cercanas(sim, lat, lon)
+    mejor = ubicacion.recomendada(lista)
+    lineas = [f"📍 *Entradas más cercanas a ti* ({sim.ts():%H:%M}, simulación):"]
+    for i, x in enumerate(lista[:MAX_CERCANAS], 1):
+        espera = f"espera ~{x.espera_min:.0f} min" if x.abierta else "sin paso"
+        lineas.append(f"{i}. {ICONO[x.estado]} *{x.nombre}* · {x.distancia_km:.1f} km · {ESTADO_TXT[x.estado]}, {espera}")
+    if mejor is None:
+        lineas.append("⛔ Todas las entradas están cerradas por ahora. Te aviso cuando reabran si sigues compartiendo.")
+    else:
+        lejos = "" if mejor.distancia_km <= ubicacion.LEJOS_KM else " (estás lejos: el tiempo de manejo es aproximado)"
+        lineas.append(f"👉 Te conviene *{mejor.nombre}*: ~{mejor.total_min:.0f} min entre manejo y fila{lejos}.")
+    lineas.append(EN_VIVO if en_vivo else SUGERIR_EN_VIVO)
+    return "\n".join(lineas), mejor
+
+
+def _coordenadas(loc: dict[str, Any]) -> tuple[float, float] | None:
+    try:
+        lat, lon = float(loc["latitude"]), float(loc["longitude"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    return (lat, lon) if ubicacion.coordenadas_validas(lat, lon) else None
+
+
+async def atender_ubicacion(sim: Operacion, chat_id: int, loc: dict[str, Any], editado: bool) -> str | None:
+    """Ubicación puntual o en tiempo real (el primer mensaje o sus actualizaciones)."""
+    coords = _coordenadas(loc)
+    if coords is None:
+        if not editado:
+            await telegram.enviar(chat_id, UBICACION_INVALIDA)
+            return UBICACION_INVALIDA
+        return None
+    lat, lon = coords
+    vivo = loc.get("live_period")
+    if editado:  # actualización de una ubicación en tiempo real: solo se avisa si algo cambió
+        s = _en_vivo.get(chat_id)
+        if s is None:
+            return None
+        s.lat, s.lon = lat, lon
+        return await revisar_seguimiento(sim, chat_id, s)
+    texto, mejor = texto_cercanas(sim, lat, lon, en_vivo=bool(vivo))
+    if vivo:
+        _en_vivo[chat_id] = Seguimiento(lat, lon, time.monotonic() + float(vivo),
+                                        mejor.acceso_id if mejor else None, mejor.estado if mejor else "cerrada",
+                                        time.monotonic())
+    else:
+        _en_vivo.pop(chat_id, None)
+    await telegram.enviar(chat_id, texto)
+    return texto
+
+
+async def revisar_seguimiento(sim: Operacion, chat_id: int, s: Seguimiento) -> str | None:
+    """Avisa si la mejor entrada para esta ubicación cambió o empeoró desde el último aviso."""
+    ahora = time.monotonic()
+    if ahora > s.hasta:
+        _en_vivo.pop(chat_id, None)
+        return None
+    mejor = ubicacion.recomendada(ubicacion.cercanas(sim, s.lat, s.lon))
+    nuevo_id, nuevo_estado = (mejor.acceso_id, mejor.estado) if mejor else (None, "cerrada")
+    cambio = nuevo_id != s.mejor
+    peor = nuevo_id == s.mejor and ubicacion.empeoro(s.estado, nuevo_estado)
+    if not (cambio or peor) or ahora - s.avisado < AVISO_MIN_S:
+        if not (cambio or peor):
+            s.estado = nuevo_estado  # mejoras silenciosas: se actualiza la referencia
+        return None
+    if mejor is None:
+        texto = "⛔ Todas las entradas cerca de ti se cerraron. Te aviso cuando reabran."
+    elif cambio:
+        antes = sim.esc.acceso(s.mejor).nombre if s.mejor else "ninguna"
+        texto = (f"🔁 Ahora te conviene *{mejor.nombre}* ({mejor.distancia_km:.1f} km, espera ~{mejor.espera_min:.0f} min, "
+                 f"~{mejor.total_min:.0f} min en total) en lugar de {antes}.")
+    else:
+        texto = (f"⚠️ *{mejor.nombre}* pasó a *{ESTADO_TXT[nuevo_estado]}* (espera ~{mejor.espera_min:.0f} min). "
+                 "Sigue siendo tu mejor opción por cercanía.")
+    s.mejor, s.estado, s.avisado = nuevo_id, nuevo_estado, ahora
+    await telegram.enviar(chat_id, texto)
+    return texto
+
+
+async def revisar_en_vivo(sim: Operacion) -> None:
+    """Revisa a todos los que comparten ubicación en tiempo real (aunque no se muevan, la fila cambia)."""
+    for chat_id, s in list(_en_vivo.items()):
+        try:
+            await revisar_seguimiento(sim, chat_id, s)
+        except Exception:  # noqa: BLE001  (un chat con error no detiene a los demás)
+            log.exception("Error al revisar la ubicación en vivo de un chat")
+
+
 # código de agencia recibido con /start antes de que el chat comparta su número
 _agencia_pendiente: dict[int, str] = {}
 
@@ -137,11 +260,17 @@ def registrar_contacto(db: Session, chat_id: int, telefono: str, nombre: str | N
 
 async def procesar_update(sim: Operacion, update: dict[str, Any]) -> str | None:
     """Atiende una actualización de Telegram. Devuelve el texto enviado (útil en pruebas)."""
-    msg = update.get("message") or {}
+    editado = "message" not in update and "edited_message" in update
+    msg = update.get("message") or update.get("edited_message") or {}
     chat_id = (msg.get("chat") or {}).get("id")
     if chat_id is None or (msg.get("chat") or {}).get("type") not in (None, "private"):
         return None  # solo chats privados
     remitente_id = (msg.get("from") or {}).get("id")
+
+    if "location" in msg:  # no requiere alta: es información pública del estado de las entradas
+        return await atender_ubicacion(sim, chat_id, msg["location"], editado)
+    if editado:
+        return None  # otras ediciones (p. ej. un texto corregido) no se atienden
 
     if "contact" in msg:
         contacto = msg["contact"]
@@ -162,7 +291,7 @@ async def procesar_update(sim: Operacion, update: dict[str, Any]) -> str | None:
         except NoRegistrado as e:
             return await _solicitar_alta(chat_id, str(e), contacto.get("first_name"), enlace)
         texto = REGISTRADO.format(fin=fin) + ("\n" + LIGADO.format(nombre=agencia) if agencia else "")
-        await telegram.enviar(chat_id, texto, telegram.QUITAR_TECLADO)
+        await telegram.enviar(chat_id, texto, telegram.TECLADO_UBICACION)
         return texto
 
     texto_usuario = (msg.get("text") or "").strip()

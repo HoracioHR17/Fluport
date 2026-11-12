@@ -341,3 +341,10 @@ a:hover { color: #13324F; }
 .bloque-cita--chofer { background: #3D6A8F; color: #FFFFFF; border: 2px solid #3D6A8F; }
 .bloque-cita--ruta { background: #3FAE7A; color: #0A2238; border: 2px solid #1E6B47; }
 .tabla tbody tr.elegida { outline: 3px solid #E9B03B; outline-offset: -3px; }
+
+/* Vista pública · entradas cerca de mí */
+.cerca { margin-top: 4px; }
+.cerca h2 { font-size: 18px; }
+.cerca__lista { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.cerca__lista li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: 16px; }
+.cerca__nota { margin: 0; font-size: 13px; }

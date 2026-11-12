@@ -33,7 +33,7 @@ def test_sin_congestion_no_hay_horas_pico():
 def test_zonas_desde_el_simulador(sim):
     sim.avanzar(6 * 60)
     z = zonas(sim)
-    assert [x.acceso_id for x in z] == ["A1", "A2", "A3"]
+    assert [x.acceso_id for x in z] == ["A1", "A2", "A3", "A4", "A5", "A6"]
     assert all(x.abierto and x.mejor_hora is not None and x.etiqueta == "SIMULACIÓN" for x in z)
 
 
@@ -48,7 +48,7 @@ def test_api_publica_sin_datos_de_operacion():
 
     with TestClient(app) as c:
         r = c.get("/api/publico/zonas")
-        assert r.status_code == 200 and len(r.json()) == 3
+        assert r.status_code == 200 and len(r.json()) == 6
         texto = r.text.lower()
         for prohibido in ("telefono", "transportista", "cita", "comparacion", "mundo"):
             assert prohibido not in texto

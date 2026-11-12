@@ -14,11 +14,14 @@ API = "https://api.telegram.org/bot{token}/{metodo}"
 LIMITE_TEXTO = 4000  # Telegram admite 4 096 caracteres por mensaje
 ESPERA_POLLING_S = 25  # long polling: Telegram mantiene la petición abierta hasta que haya mensajes
 
+BOTON_UBICACION = {"text": "📍 Entradas cerca de mí", "request_location": True}
 TECLADO_CONTACTO = {
-    "keyboard": [[{"text": "📱 Compartir mi número", "request_contact": True}]],
+    "keyboard": [[{"text": "📱 Compartir mi número", "request_contact": True}], [BOTON_UBICACION]],
     "resize_keyboard": True,
     "one_time_keyboard": True,
 }
+# teclado fijo para transportistas identificados: siempre a la mano el botón de ubicación
+TECLADO_UBICACION = {"keyboard": [[BOTON_UBICACION]], "resize_keyboard": True, "is_persistent": True}
 QUITAR_TECLADO = {"remove_keyboard": True}
 
 
@@ -67,7 +70,8 @@ async def enviar(chat_id: int, texto: str, teclado: dict[str, Any] | None = None
 
 async def obtener_actualizaciones(offset: int | None) -> list[dict[str, Any]]:
     """Long polling: espera hasta ESPERA_POLLING_S s por mensajes nuevos a partir de `offset`."""
-    datos: dict[str, Any] = {"timeout": ESPERA_POLLING_S, "allowed_updates": ["message"]}
+    # edited_message: Telegram manda así las actualizaciones de la ubicación en tiempo real
+    datos: dict[str, Any] = {"timeout": ESPERA_POLLING_S, "allowed_updates": ["message", "edited_message"]}
     if offset is not None:
         datos["offset"] = offset
     r = await llamar("getUpdates", datos, timeout_s=ESPERA_POLLING_S + 10)

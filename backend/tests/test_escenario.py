@@ -15,13 +15,15 @@ def _datos():
 
 
 def test_escenario_del_proyecto_es_valido(esc):
-    assert len(esc.accesos) == 3
-    assert {a.id for a in esc.accesos} == {"A1", "A2", "A3"}
+    assert len(esc.accesos) == 6
+    assert [a.id for a in esc.accesos] == ["A1", "A2", "A3", "A4", "A5", "A6"]
+    assert {a.entrada for a in esc.accesos} == {"norte", "sur", "urbana"}
+    assert math.isclose(sum(a.participacion for a in esc.accesos), 1.0)
 
 
 def test_capacidad_por_hora(esc):
-    a1 = esc.acceso("A1")  # 4 carriles, 3.9 min
-    assert a1.capacidad_hora == int(4 * 60 / 3.9)
+    a2 = esc.acceso("A2")  # Distribuidor MEX-140: 3 carriles, 3.9 min
+    assert a2.capacidad_hora == int(3 * 60 / 3.9)
 
 
 def test_perfil_horario_suma_100_y_respeta_franjas(esc):

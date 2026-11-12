@@ -1,5 +1,5 @@
 {
-  "_nota": "Fuente: hoja de Datos Fluport_Rol_Datos.xlsx (11-nov-2026). La mayoría de los valores son SUPUESTO; ver la columna de fuente en esa hoja. Coordenadas aproximadas, por verificar.",
+  "_nota": "Fuente: hoja de Datos Fluport_Rol_Datos.xlsx (11-nov-2026). La mayoría de los valores son SUPUESTO; ver la columna de fuente en esa hoja. Coordenadas aproximadas, por verificar. Entradas (12-nov-2026): los 6 puntos críticos del inventario de acceso terrestre (PMDU Veracruz 2021, programa de infraestructura de la zona conurbada y comunicados SICT 2025–2026) reemplazan a las 3 casetas. Carriles, tiempo de servicio y participación se derivan de los datos integrados de las casetas: se conservan los 11 carriles y la demanda total, con el tiempo de servicio del corredor (norte 3.9 min, sur 4.1 min, urbano 4.5 min) y la participación proporcional a la capacidad, con un ligero sesgo hacia P1 (congestión documentada). SUPUESTO: falta medir aforo, colas y tiempos en cada punto. Coordenadas aproximadas, por verificar.",
   "inicio_hora": 4,
   "camiones_dia": 2000,
   "camiones_dia_incluye_buques": false,
@@ -94,32 +94,33 @@
   "accesos": [
     {
       "id": "A1",
-      "nombre": "Caseta La Antigua",
-      "zona": "La Antigua · autopista Cardel–Veracruz",
-      "lat": 19.339,
-      "lon": -96.342,
-      "carriles": 4,
+      "nombre": "Av. Rafael Cuervo",
+      "zona": "Rafael Cuervo con Fidel Velázquez y Cuauhtémoc · norponiente",
+      "entrada": "norte",
+      "lat": 19.1885,
+      "lon": -96.1585,
+      "carriles": 2,
       "tiempo_servicio_min": 3.9,
-      "participacion": 0.4,
+      "participacion": 0.21,
       "rutas": [
         {
           "id": "R-A1-1",
           "coords": [
             [
-              19.37,
-              -96.37
+              19.17,
+              -96.205
             ],
             [
-              19.36,
-              -96.361
+              19.176,
+              -96.19
             ],
             [
-              19.349,
-              -96.351
+              19.182,
+              -96.173
             ],
             [
-              19.339,
-              -96.342
+              19.1885,
+              -96.1585
             ]
           ]
         }
@@ -127,32 +128,33 @@
     },
     {
       "id": "A2",
-      "nombre": "Caseta Paso del Toro",
-      "zona": "Medellín de Bravo · autopista Córdoba–Veracruz (150D)",
-      "lat": 19.07,
-      "lon": -96.178,
-      "carriles": 4,
-      "tiempo_servicio_min": 4.1,
-      "participacion": 0.38,
+      "nombre": "Distribuidor MEX-140",
+      "zona": "Carretera Xalapa–Veracruz km 93+350 a 95+320",
+      "entrada": "norte",
+      "lat": 19.168,
+      "lon": -96.232,
+      "carriles": 3,
+      "tiempo_servicio_min": 3.9,
+      "participacion": 0.27,
       "rutas": [
         {
           "id": "R-A2-1",
           "coords": [
             [
-              19.03,
-              -96.25
+              19.19,
+              -96.3
             ],
             [
-              19.043,
-              -96.226
+              19.182,
+              -96.278
             ],
             [
-              19.057,
-              -96.202
+              19.175,
+              -96.255
             ],
             [
-              19.07,
-              -96.178
+              19.168,
+              -96.232
             ]
           ]
         }
@@ -160,32 +162,135 @@
     },
     {
       "id": "A3",
-      "nombre": "Caseta San Julián",
-      "zona": "Veracruz · autopista Veracruz–Cardel",
-      "lat": 19.23,
-      "lon": -96.235,
-      "carriles": 3,
-      "tiempo_servicio_min": 4.5,
-      "participacion": 0.22,
+      "nombre": "Bulevar portuario km 13.5",
+      "zona": "Bulevar portuario con la MEX-140 · zona industrial",
+      "entrada": "norte",
+      "lat": 19.18,
+      "lon": -96.215,
+      "carriles": 2,
+      "tiempo_servicio_min": 3.9,
+      "participacion": 0.18,
       "rutas": [
         {
           "id": "R-A3-1",
           "coords": [
             [
-              19.27,
+              19.25,
               -96.27
             ],
             [
-              19.257,
-              -96.258
+              19.228,
+              -96.252
             ],
             [
-              19.243,
-              -96.246
+              19.205,
+              -96.233
             ],
             [
-              19.23,
-              -96.235
+              19.18,
+              -96.215
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "A4",
+      "nombre": "Entronque San Julián",
+      "zona": "Autopista Córdoba–Veracruz y conexión Santa Fe–Paso del Toro · suroeste",
+      "entrada": "sur",
+      "lat": 19.13,
+      "lon": -96.255,
+      "carriles": 2,
+      "tiempo_servicio_min": 4.1,
+      "participacion": 0.17,
+      "rutas": [
+        {
+          "id": "R-A4-1",
+          "coords": [
+            [
+              19.08,
+              -96.33
+            ],
+            [
+              19.097,
+              -96.305
+            ],
+            [
+              19.113,
+              -96.28
+            ],
+            [
+              19.13,
+              -96.255
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "A5",
+      "nombre": "Entronque Santa Fe",
+      "zona": "Carretera Santa Fe–Paso del Toro · poniente",
+      "entrada": "sur",
+      "lat": 19.16,
+      "lon": -96.29,
+      "carriles": 1,
+      "tiempo_servicio_min": 4.1,
+      "participacion": 0.09,
+      "rutas": [
+        {
+          "id": "R-A5-1",
+          "coords": [
+            [
+              19.085,
+              -96.3
+            ],
+            [
+              19.11,
+              -96.297
+            ],
+            [
+              19.135,
+              -96.294
+            ],
+            [
+              19.16,
+              -96.29
+            ]
+          ]
+        }
+      ]
+    },
+    {
+      "id": "A6",
+      "nombre": "Av. Miguel Alemán",
+      "zona": "Corredor urbano de acceso a la ciudad y al puerto",
+      "entrada": "urbana",
+      "lat": 19.17,
+      "lon": -96.135,
+      "carriles": 1,
+      "tiempo_servicio_min": 4.5,
+      "participacion": 0.08,
+      "rutas": [
+        {
+          "id": "R-A6-1",
+          "coords": [
+            [
+              19.12,
+              -96.115
+            ],
+            [
+              19.137,
+              -96.122
+            ],
+            [
+              19.153,
+              -96.128
+            ],
+            [
+              19.17,
+              -96.135
             ]
           ]
         }

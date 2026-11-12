@@ -18,6 +18,7 @@ from app.modulos.pronostico.dominio.features import (
     proyeccion_fluida,
 )
 from app.modulos.pronostico.entrenar import RUTA_MODELO
+from app.modulos.simulacion.dominio.escenario import escenario_actual
 from app.nucleo.config import get_settings
 from app.nucleo.contracts.enums import Clima, EstadoAcceso, Mundo, semaforo_de
 from app.nucleo.contracts.schemas import FranjaPronostico, PronosticoOut
@@ -39,7 +40,15 @@ class Pronosticador:
     def cargar(self) -> bool:
         if RUTA_MODELO.exists():
             try:
-                self.paquete = joblib.load(RUTA_MODELO)
+                paquete = joblib.load(RUTA_MODELO)
+                actuales = sorted(a.id for a in escenario_actual().accesos)
+                if paquete.get("accesos") != actuales:
+                    # el modelo se entrenó con otras entradas: se descarta para que se reentrene con las actuales
+                    log.warning("El modelo se entrenó con %s y el escenario tiene %s: se usa balance de flujo hasta "
+                                "reentrenar", paquete.get("accesos"), actuales)
+                    self.paquete = None
+                    return False
+                self.paquete = paquete
                 log.info("Modelo de pronóstico cargado: %s", self.paquete["metricas"]["version"])
                 return True
             except Exception:  # noqa: BLE001

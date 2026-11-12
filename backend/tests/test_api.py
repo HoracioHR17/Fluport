@@ -27,7 +27,7 @@ def test_raiz_redirige_a_la_vista_publica(cliente):
 
 def test_accesos_y_rutas(cliente):
     accesos = cliente.get("/api/accesos").json()
-    assert [a["id"] for a in accesos] == ["A1", "A2", "A3"]
+    assert [a["id"] for a in accesos] == ["A1", "A2", "A3", "A4", "A5", "A6"]
     geo = cliente.get("/api/accesos/rutas").json()
     assert geo["type"] == "FeatureCollection"
     assert {f["geometry"]["type"] for f in geo["features"]} == {"Point", "LineString"}
@@ -36,7 +36,7 @@ def test_accesos_y_rutas(cliente):
 def test_estado_por_mundo(cliente):
     for mundo in ("A", "B"):
         estado = cliente.get("/api/accesos/estado", params={"mundo": mundo}).json()
-        assert len(estado) == 3 and all(e["semaforo"] in ("verde", "amarillo", "rojo") for e in estado)
+        assert len(estado) == 6 and all(e["semaforo"] in ("verde", "amarillo", "rojo") for e in estado)
 
 
 def test_control_pausa_y_velocidad(cliente):
@@ -66,7 +66,7 @@ def test_kpis(cliente):
 
 def test_pronostico(cliente):
     todos = cliente.get("/api/pronostico").json()
-    assert len(todos) == 3 and all(len(p["franjas"]) == 24 for p in todos)
+    assert len(todos) == 6 and all(len(p["franjas"]) == 24 for p in todos)
     uno = cliente.get("/api/pronostico", params={"acceso_id": "A2", "horas": 2}).json()
     assert len(uno) == 1 and len(uno[0]["franjas"]) == 4
     assert cliente.get("/api/pronostico", params={"acceso_id": "ZZ"}).status_code == 404

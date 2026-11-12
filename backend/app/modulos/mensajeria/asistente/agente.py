@@ -41,7 +41,7 @@ HERRAMIENTAS: list[dict[str, Any]] = [
         "name": "consultar_espera",
         "description": "Espera actual y pronóstico de las próximas horas por caseta. Úsala si preguntan cómo está la fila.",
         "parameters": {"type": "object", "properties": {
-            "acceso_id": {"type": "string", "description": "A1, A2 o A3. Omitir para todas."}}},
+            "acceso_id": {"type": "string", "description": "Id de la entrada (A1…A6). Omitir para todas."}}},
     },
     {
         "name": "sugerir_horario",
@@ -91,12 +91,13 @@ DIAS = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "doming
 
 
 def entradas(sim: Operacion) -> dict[str, list[str]]:
-    """Casetas por entrada al puerto: norte o sur según su latitud respecto al promedio de las casetas."""
-    accesos = sim.esc.accesos
-    centro = sum(a.lat for a in accesos) / len(accesos)
-    res: dict[str, list[str]] = {"norte": [], "sur": []}
-    for a in sorted(accesos, key=lambda a: -a.lat):
-        res["norte" if a.lat >= centro else "sur"].append(f"{a.id} ({a.nombre})")
+    """Puntos de acceso agrupados por corredor de llegada (norte, sur, urbana) con su espera actual."""
+    espera = {e.acceso_id: e for e in sim.estado_accesos(Mundo.B)}
+    res: dict[str, list[str]] = {"norte": [], "sur": [], "urbana": []}
+    for a in sim.esc.accesos:
+        e = espera.get(a.id)
+        ahora = "cerrada" if e and e.estado.value != "abierto" else f"~{e.espera_min:.0f} min" if e else "sin dato"
+        res[a.entrada].append(f"{a.id} ({a.nombre}, {ahora})")
     return res
 
 
@@ -110,8 +111,8 @@ def instrucciones(sim: Operacion) -> str:
         "Formato de Telegram: negritas con UN asterisco (*07:30*), nunca Markdown doble (**, #, tablas).\n"
         f"Fecha y hora actual (hora de Veracruz): {DIAS[ahora.weekday()]} {ahora:%Y-%m-%d %H:%M}. "
         "Es una SIMULACIÓN con datos sintéticos.\n"
-        f"Casetas: {casetas}.\n"
-        f"Casetas por entrada al puerto: {por_entrada}.\n"
+        f"Entradas al puerto (puntos de acceso; el usuario puede llamarlas casetas): {casetas}.\n"
+        f"Entradas por corredor: {por_entrada}.\n"
         f"Tipos de carga válidos: {', '.join(CARGAS)} (\"contenedor de 40\" = contenedor_40).\n"
         "Reglas:\n"
         "1. Para agendar: si el usuario da una hora aproximada, busca con sugerir_horario una ventana de 3 horas "
@@ -128,10 +129,13 @@ def instrucciones(sim: Operacion) -> str:
         "7. Si el usuario responde SÍ a un aviso tuyo que propone cambiar su cita, usa reprogramar_cita con el número "
         "de cita, la hora y la caseta propuestas en ese aviso.\n"
         "8. Si el transportista avisa que cambió de entrada o de ruta (p. ej. \"ya no entro por el norte, voy por el "
-        "sur\" o \"mejor llego por Paso del Toro\"), cambia su cita con reprogramar_cita a una caseta de esa entrada "
-        "conservando la hora (omite inicio), salvo que también pida otra hora. Si esa entrada tiene varias casetas, "
-        "usa la primera de la lista. Si tiene varias citas activas y no queda claro cuál, pregúntale cuál.\n"
-        "9. Tu agencia se entera automáticamente de los cambios y cancelaciones que hagas por aquí; dilo si preguntan."
+        "sur\" o \"mejor llego por Santa Fe\"), cambia su cita con reprogramar_cita a un punto de esa entrada "
+        "conservando la hora (omite inicio), salvo que también pida otra hora. Si ese corredor tiene varios puntos, "
+        "elige el abierto con menor espera actual de la lista de entradas por corredor. Si tiene varias citas activas y no queda claro cuál, pregúntale cuál.\n"
+        "9. Tu agencia se entera automáticamente de los cambios y cancelaciones que hagas por aquí; dilo si preguntan.\n"
+        "10. Si pregunta qué entrada le queda más cerca o cuál le conviene desde donde está, pídele que toque el botón "
+        "*📍 Entradas cerca de mí* o que comparta su ubicación en tiempo real (📎 → Ubicación) para avisarle en el camino; "
+        "no adivines su ubicación."
     )
 
 

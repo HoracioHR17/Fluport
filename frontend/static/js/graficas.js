@@ -89,10 +89,11 @@
   }
 
   // ───────────── Mapa del puerto (Leaflet) ─────────────
-  // Encuadre compacto: el puerto de Veracruz y sus tres casetas de acceso (La Antigua, San Julián, Paso del Toro)
-  // con sus rutas. No se puede desplazar fuera de esa zona ni alejar más allá del encuadre inicial.
+  // Encuadre compacto: el puerto de Veracruz y sus seis puntos de acceso terrestre (Rafael Cuervo, Distribuidor
+  // MEX-140, Bulevar km 13.5, San Julián, Santa Fe y Miguel Alemán) con sus rutas. No se puede desplazar fuera de esa
+  // zona ni alejar más allá del encuadre inicial.
   var PUERTO = { lat: 19.2045, lon: -96.1338, nombre: "Puerto de Veracruz" };
-  var LIMITES = [[19.02, -96.385], [19.385, -96.105]];
+  var LIMITES = [[19.06, -96.36], [19.27, -96.10]];
 
   function mapaPuerto(div) {
     if (!window.L) { div.appendChild(F.el("p", { style: { padding: "16px" } }, "No se pudo cargar el mapa.")); return null; }

@@ -7,7 +7,10 @@
   var F = window.Fluport, el = F.el, $ = function (id) { return document.getElementById(id); };
   var GRAVEDAD = { cerrado: 0, rojo: 1, amarillo: 2, verde: 3 };
   var ESCALA = 150; // min: tope de las barras y del velocímetro
-  var estado = { zonas: [], pron: {}, sel: null, accesos: {}, rutas: {}, mapa: null, conexion: "", dibujadoEn: 0, pendiente: null };
+  var estado = { zonas: [], pron: {}, sel: null, accesos: {}, rutas: {}, mapa: null, conexion: "", dibujadoEn: 0, pendiente: null,
+    yo: null, vigilancia: null, marcaYo: null };
+  // mismos supuestos que el bot (backend/app/modulos/mensajeria/dominio/ubicacion.py)
+  var FACTOR_RUTA = 1.3, VELOCIDAD_KMH = 35, ICONO = { verde: "🟢", amarillo: "🟡", rojo: "🔴", cerrado: "⛔" };
   var CONTINGENCIA = { verde: "normal", amarillo: "lenta", rojo: "saturada" };
   var INTERVALO_DIBUJO_MS = 1000; // como máximo un redibujo por segundo aunque lleguen más snapshots
 
@@ -187,6 +190,65 @@
     }
   }
 
+  // ───────────── Entradas cerca de mí (la ubicación no sale del navegador) ─────────────
+  function distanciaKm(lat1, lon1, lat2, lon2) {
+    var r = Math.PI / 180, dp = (lat2 - lat1) * r, dl = (lon2 - lon1) * r;
+    var a = Math.sin(dp / 2) * Math.sin(dp / 2) + Math.cos(lat1 * r) * Math.cos(lat2 * r) * Math.sin(dl / 2) * Math.sin(dl / 2);
+    return 2 * 6371 * Math.asin(Math.sqrt(a));
+  }
+
+  function renderCerca() {
+    var caja = $("cerca");
+    if (!caja || !estado.yo) return;
+    var lista = estado.zonas.filter(function (z) { return estado.accesos[z.acceso_id]; }).map(function (z) {
+      var a = estado.accesos[z.acceso_id], d = distanciaKm(estado.yo.lat, estado.yo.lon, a.lat, a.lon);
+      var manejo = d * FACTOR_RUTA / VELOCIDAD_KMH * 60;
+      return { z: z, d: d, total: z.abierto ? manejo + z.espera_min : Infinity };
+    }).sort(function (a, b) { return a.d - b.d; });
+    if (!lista.length) return;
+    var mejor = lista.filter(function (x) { return x.z.abierto; }).sort(function (a, b) { return a.total - b.total; })[0];
+    caja.classList.remove("oculto");
+    F.reemplazar(caja, [
+      el("h2", {}, "Entradas cerca de ti"),
+      el("ol", { class: "cerca__lista" }, lista.slice(0, 3).map(function (x) {
+        var e = est(x.z);
+        return el("li", {}, [el("span", { "aria-hidden": "true" }, ICONO[e] || ""), el("b", {}, corto(x.z.nombre)),
+          el("span", { class: "tenue" }, x.d.toFixed(1) + " km · " + (x.z.abierto ? F.num(x.z.espera_min) + " min de espera" : "cerrada"))]);
+      })),
+      mejor ? el("p", { class: "ventana" }, [F.simbolo(est(mejor.z), 20),
+        el("span", {}, [el("b", {}, "Te conviene " + corto(mejor.z.nombre)), " · ~" + F.num(mejor.total) + " min entre manejo y fila"])])
+        : el("p", { class: "ventana" }, "Todas las entradas están cerradas por ahora."),
+      el("p", { class: "tenue cerca__nota" }, "Distancia en línea recta. Tu ubicación se usa solo en este navegador; no se envía a Fluport.")
+    ]);
+    if (estado.mapa && window.L) {
+      if (!estado.marcaYo) estado.marcaYo = L.circleMarker([estado.yo.lat, estado.yo.lon], { radius: 8, color: "#FFFFFF", weight: 3, fillColor: "#2F6FDE", fillOpacity: 1 }).addTo(estado.mapa.mapa).bindTooltip("Estás aquí");
+      else estado.marcaYo.setLatLng([estado.yo.lat, estado.yo.lon]);
+    }
+  }
+
+  function activarUbicacion() {
+    var boton = $("btn-ubicacion"), aviso = $("ubicacion-estado");
+    if (!navigator.geolocation) { aviso.textContent = "Tu navegador no permite compartir la ubicación."; return; }
+    if (estado.vigilancia !== null) { // segundo toque: dejar de compartir
+      navigator.geolocation.clearWatch(estado.vigilancia);
+      estado.vigilancia = null; estado.yo = null;
+      $("cerca").classList.add("oculto");
+      if (estado.marcaYo) { estado.marcaYo.remove(); estado.marcaYo = null; }
+      boton.textContent = "📍 Ver entradas cerca de mí"; aviso.textContent = "";
+      return;
+    }
+    aviso.textContent = "Buscando tu ubicación…";
+    estado.vigilancia = navigator.geolocation.watchPosition(function (p) {
+      estado.yo = { lat: p.coords.latitude, lon: p.coords.longitude };
+      boton.textContent = "Dejar de usar mi ubicación"; aviso.textContent = "";
+      renderCerca();
+    }, function (err) {
+      aviso.textContent = err.code === 1 ? "No diste permiso para usar tu ubicación." : "No pudimos obtener tu ubicación. Intenta de nuevo.";
+      if (estado.vigilancia !== null) navigator.geolocation.clearWatch(estado.vigilancia);
+      estado.vigilancia = null;
+    }, { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 });
+  }
+
   // ───────────── Tiempo real ─────────────
   function dibujar() {
     var zonas = estado.zonas;
@@ -197,6 +259,7 @@
       $("actualizado").textContent = vivo + " · " + F.hora(zonas[0].actualizado_en) + " (hora simulada)";
     }
     renderAlerta(zonas); renderResumen(zonas); renderZonas(zonas); renderMejor(zonas); actualizarMapa(zonas);
+    renderCerca();
   }
 
   /** Copia a cada caseta el estado instantáneo del Mundo B (con Fluport) que trae el snapshot. */
@@ -245,6 +308,7 @@
   }
 
   [].forEach.call(document.querySelectorAll("[data-simbolo]"), function (n) { n.appendChild(F.simbolo(n.dataset.simbolo, 20)); });
+  if ($("btn-ubicacion")) $("btn-ubicacion").addEventListener("click", activarUbicacion);
   cargar().then(cargarMapa).then(function () {
     F.conectarSimulacion(function (m) { if (m.tipo === "snapshot") aplicarSnapshot(m.data); },
       function (e) { estado.conexion = e; });

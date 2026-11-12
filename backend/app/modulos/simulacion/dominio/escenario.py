@@ -5,6 +5,8 @@ import zlib
 from functools import lru_cache
 from pathlib import Path
 
+from typing import Literal
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.nucleo.config import RAIZ_BACKEND
@@ -22,6 +24,7 @@ class AccesoParam(BaseModel):
     id: str
     nombre: str
     zona: str
+    entrada: Literal["norte", "sur", "urbana"] = "urbana"  # por dónde llegan los camiones (corredor carretero)
     lat: float
     lon: float
     carriles: int = Field(gt=0)

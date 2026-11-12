@@ -164,7 +164,13 @@ async def notificar_reasignacion(sim: Operacion, cita_id: int, publicar) -> Avis
 
 
 async def ciclo_avisos(sim: Operacion, publicar) -> list[AvisoOut]:
-    """Revisa citas, genera avisos nuevos, los guarda, los publica en el tablero y los envía por Telegram."""
+    """Revisa citas, genera avisos nuevos, los guarda, los publica en el tablero y los envía por Telegram.
+
+    También revisa a quienes comparten su ubicación en tiempo real (su mejor entrada pudo cambiar sin que se muevan).
+    """
+    from app.modulos.mensajeria.bot_telegram import revisar_en_vivo
+
+    await revisar_en_vivo(sim)
     citas, enviados = await asyncio.to_thread(leer_citas_activas)
     if not citas:
         return []
@@ -190,4 +196,4 @@ ALTA_RECHAZADA = ("*{agencia}* no aprobó tu solicitud de alta. Si crees que es 
 async def avisar_resultado_alta(chat_id: int, agencia: str, aprobada: bool) -> tuple[bool, str]:
     """Le dice al transportista por Telegram si su agencia aprobó o rechazó su solicitud de alta."""
     texto = (ALTA_APROBADA if aprobada else ALTA_RECHAZADA).format(agencia=agencia)
-    return await telegram.enviar(chat_id, texto, None if aprobada else telegram.TECLADO_CONTACTO)
+    return await telegram.enviar(chat_id, texto, telegram.TECLADO_UBICACION if aprobada else telegram.TECLADO_CONTACTO)

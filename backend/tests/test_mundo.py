@@ -41,7 +41,8 @@ def test_fila_y_espera_cuando_llegan_mas_que_los_carriles(esc):
     m.agregar([_camion(esc, f"T{i}", 100) for i in range(20)])
     m.avanzar(100.5)
     a1 = m.accesos["A1"]
-    assert a1.en_revision == 4 and len(a1.en_fila) == 16
+    carriles = esc.acceso("A1").carriles
+    assert a1.en_revision == carriles and len(a1.en_fila) == 20 - carriles
     assert m.espera_estimada("A1") > 0
 
 

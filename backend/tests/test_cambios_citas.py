@@ -20,9 +20,10 @@ TEL = "+522290003330"
 # ───────────── Sin BD ─────────────
 def test_casetas_por_entrada(sim):
     e = entradas(sim)
-    assert [x.split()[0] for x in e["norte"]] == ["A1", "A3"] and [x.split()[0] for x in e["sur"]] == ["A2"]
+    ids = {k: [x.split()[0] for x in v] for k, v in e.items()}
+    assert ids == {"norte": ["A1", "A2", "A3"], "sur": ["A4", "A5"], "urbana": ["A6"]}
     t = instrucciones(sim)
-    assert "entrada norte: A1" in t and "entrada sur: A2" in t and "conservando la hora" in t
+    assert "entrada norte: A1" in t and "entrada sur: A4" in t and "conservando la hora" in t
 
 
 def test_reprogramar_permite_omitir_la_hora():
@@ -109,13 +110,13 @@ def test_agencia_cambia_la_cita_y_el_si_la_confirma(cliente, enviados):
     _transportista_con_bot()
     cita = _cita(cliente)
     _esperar(cliente, enviados, 1)
-    r = cliente.patch(f"/api/citas/{cita['id']}", json={"acceso_id": "A2", "ventana_inicio": _ts(cliente, 4),
+    r = cliente.patch(f"/api/citas/{cita['id']}", json={"acceso_id": "A4", "ventana_inicio": _ts(cliente, 4),
                                                         "ventana_fin": _ts(cliente, 4.5)})
     nueva = r.json()
     _esperar(cliente, enviados, 2)
     assert "cambió tu cita" in enviados[-1][1] and f"#{nueva['id']}" in enviados[-1][1] and "SÍ" in enviados[-1][1]
     respuesta = cliente.portal.call(bot.procesar_update, _sim(), _msg("sí"))
-    assert respuesta.startswith("Cita confirmada") and "Paso del Toro" in respuesta
+    assert respuesta.startswith("Cita confirmada") and "San Julián" in respuesta
     assert cliente.get(f"/api/citas/{nueva['id']}").json()["confirmada_en"] is not None
 
 
@@ -124,13 +125,13 @@ def test_transportista_cambia_de_entrada_conservando_la_hora(cliente, enviados):
     cita = _cita(cliente, "A1", horas=5)
     llm = ag.asistente
     llm.usar_cliente(_Guion([{"role": "model", "parts": [
-        {"functionCall": {"name": "reprogramar_cita", "args": {"cita_id": cita["id"], "acceso_id": "A2"}}}]}]))
+        {"functionCall": {"name": "reprogramar_cita", "args": {"cita_id": cita["id"], "acceso_id": "A4"}}}]}]))
     r = cliente.portal.call(bot.procesar_update, _sim(), _msg("ya no entro por el norte, voy a entrar por el sur"))
-    assert r.startswith("Cambié tu cita") and "Paso del Toro" in r and "antes Caseta La Antigua" in r
+    assert r.startswith("Cambié tu cita") and "Entronque San Julián" in r and "antes Av. Rafael Cuervo" in r
     vieja = cliente.get(f"/api/citas/{cita['id']}").json()
     assert vieja["estado"] == "reprogramada"
     nueva = next(c for c in cliente.get(f"/api/citas?telefono={TEL}").json() if c.get("cita_anterior_id") == cita["id"])
-    assert nueva["acceso_id"] == "A2" and nueva["ventana_inicio"] == vieja["ventana_inicio"]
+    assert nueva["acceso_id"] == "A4" and nueva["ventana_inicio"] == vieja["ventana_inicio"]
     assert nueva["confirmada_en"] is not None  # la pidió el propio transportista
     assert any(a["cita_id"] == nueva["id"] for a in _avisos(cliente, "cambio_chofer"))
 
