@@ -14,7 +14,7 @@ Cientos de camiones llegan al puerto todos los días a las mismas horas. Se form
 1. **Simulador en vivo:** recrea el flujo de camiones hacia los accesos. Corre dos mundos a la vez, uno *sin Fluport* y otro *con Fluport*, para medir la diferencia.
 2. **Pronóstico:** estima la espera de cada acceso durante las próximas 12 horas.
 3. **Citas:** sugiere los tres mejores horarios para llegar y permite agendar, cambiar o cancelar.
-4. **Asistente por WhatsApp:** el transportista pregunta en lenguaje natural, agenda su cita y recibe avisos.
+4. **Asistente por mensaje (Telegram; WhatsApp listo para conectarse):** el transportista pregunta en lenguaje natural, agenda su cita y recibe avisos.
 5. **Tablero del operador:** mapa en vivo, semáforo por acceso, pronóstico y ahorro en horas, diésel, costo y CO₂.
 6. **Vista pública:** semáforo y horas pico por zona para los vecinos.
 
@@ -448,3 +448,34 @@ FLUPORT_TEST_DATABASE_URL=postgresql+psycopg://fluport:fluport@localhost:5432/fl
   - `asyncio.create_task`: procesa cada mensaje en segundo plano.
 
 - **Herramientas de IA:** Claude (Opus 5.5) verificó en la documentación de Twilio el algoritmo de firma y la recomendación de responder rápido, implementó el canal y los avisos, escribió 14 pruebas con Twilio y Gemini simulados (incluido el flujo aviso → "SÍ" → reprogramación) y comprobó el aviso en el tablero con Chrome automatizado.
+
+### 2026-11-11 19:55 · `#016` · Canal de Telegram para el asistente y los avisos
+
+- **Justificación del cambio:** el plan proponía WhatsApp con el Sandbox de Twilio. Al configurarlo, los mensajes `join <código>` enviados al número del Sandbox no llegaron a Twilio (no aparecían en el registro de mensajes de la consola), lo que impedía cualquier prueba real a pocas horas del cierre. Se adopta **Telegram** como canal de la demo porque: el bot se crea en minutos y sin aprobación; no exige unir cada teléfono a un sandbox; no tiene la restricción de WhatsApp de enviar texto libre solo dentro de una ventana de 24 h (crítica para los avisos proactivos); y con *long polling* funciona sin URL pública ni túnel. El canal de WhatsApp con Twilio (`#015`) se conserva completo y probado: si el Sandbox se resuelve, se activa solo con las variables de entorno, y el asistente, las citas y los avisos son los mismos en ambos canales.
+
+- **Qué se agregó:**
+
+  | Archivo | Qué hace | Funciones / elementos principales |
+  |---|---|---|
+  | `backend/app/messaging/telegram.py` | Cliente de la Bot API de Telegram. | `enviar()` manda mensajes con formato `*negritas*` y, si Telegram no puede interpretar el formato, los reenvía como texto plano; `obtener_actualizaciones()` hace *long polling* (`getUpdates`, espera hasta 25 s por mensajes nuevos); `quitar_webhook()`; `TECLADO_CONTACTO` (botón "Compartir mi número") y `QUITAR_TECLADO`. |
+  | `backend/app/messaging/bot_telegram.py` | El bot. | `procesar_update()`: chat nuevo → bienvenida y botón para compartir el número; contacto → `registrar_contacto()` liga el chat con el transportista de ese teléfono (lo crea si no existe) **solo si es el propio contacto del usuario**; texto → asistente (el mismo de WhatsApp y web) → respuesta; ignora grupos; `/start` recuerda cómo usarlo. `PollingTelegram`: tarea en segundo plano que lee mensajes, avanza el `offset` y reintenta si falla la red. |
+  | `backend/alembic/versions/0002_telegram_en_transportista.py` | Migración. | Agrega `transportista.telegram_chat_id` (único). Probada de ida y vuelta. |
+  | `backend/app/db/models.py` (modificado) | Esquema. | Campo `telegram_chat_id`. |
+  | `backend/app/messaging/avisos.py`, `servicio.py` (modificados) | Avisos por canal. | `canal_de()` elige Telegram si el transportista se registró en el bot y, si no, WhatsApp; `enviar_aviso()`; el aviso se guarda en el historial del asistente del mismo canal, para que un "SÍ" tenga contexto. |
+  | `backend/app/api/asistente.py` (modificado) | Rutas. | `POST /webhook/telegram` (modo webhook, valida el encabezado secreto de Telegram); `GET /api/telegram/enlace` (enlace t.me del bot). |
+  | `backend/app/main.py` (modificado) | Arranque. | Inicia y detiene el *polling* de Telegram junto con la app. |
+  | `backend/app/config.py`, `backend/.env.example` (modificados) | Configuración. | `FLUPORT_TELEGRAM_TOKEN`, `FLUPORT_TELEGRAM_MODO` (`polling` \| `webhook` \| `off`), `FLUPORT_TELEGRAM_WEBHOOK_SECRET`. |
+  | `frontend/operador/index.html`, `frontend/static/js/operador.js` (modificados) | Tablero. | La tarjeta pasa a "Avisos a transportistas" y muestra el canal de cada aviso. |
+  | `backend/tests/test_telegram.py` (10) | Pruebas con la Bot API simulada. | Envío sin configuración, reenvío sin formato ante error de interpretación, *long polling* con `offset`, bucle de *polling* que procesa y avanza; con BD: chat nuevo pide contacto, grupos ignorados, contacto ajeno rechazado, registro y conversación con el asistente, aviso enviado por Telegram (no por WhatsApp), webhook (404 en modo polling, 403 con secreto inválido, 200 con secreto correcto). |
+  | `README.md`, `docs/contracts.md`, `docs/openapi.json` (actualizados) | Documentación. | Canal de Telegram, rutas y reglas. |
+
+- **Funcionalidad:** el transportista abre el bot de Fluport en Telegram, comparte su número con un botón y desde ahí conversa con el asistente igual que por WhatsApp: consulta la fila, agenda, cambia o cancela citas. Los avisos de turno y de caseta saturada o cerrada le llegan por Telegram y aparecen en el tablero con su canal. No requiere túnel ni URL pública. Pruebas: 147 con PostgreSQL de prueba, 121 sin él. Pendiente: crear el bot y probarlo con un teléfono real.
+
+- **Tecnologías usadas:**
+  - **Telegram Bot API** (`sendMessage`, `getUpdates`, `deleteWebhook`, `getMe`): API HTTP oficial para bots. **Por qué:** gratuita, sin aprobación ni sandbox, permite mensajes proactivos en cualquier momento y se usa con `httpx` sin bibliotecas extra.
+  - **Long polling**: Fluport pide los mensajes nuevos y Telegram mantiene abierta la petición hasta que llega alguno. **Por qué:** funciona detrás de cualquier red (laptop, hosting) sin exponer una URL pública; el `offset` garantiza que cada mensaje se procese una sola vez.
+  - **Botón de contacto** (`request_contact`): Telegram comparte el número verificado de la cuenta. **Por qué:** identifica al transportista por su teléfono sin que lo escriba, y se comprueba que el contacto es el suyo (`user_id`) para que nadie registre un número ajeno.
+  - **Webhook con secreto** (`X-Telegram-Bot-Api-Secret-Token`): alternativa para hosting; Telegram firma cada petición con el secreto configurado.
+  - `Alembic`: ver `aae10d9`. Segunda migración del esquema.
+
+- **Herramientas de IA:** Claude (Opus 5.5) comparó alternativas a Twilio (Telegram, WhatsApp Cloud API directa, otros proveedores y chat en el tablero), implementó el canal de Telegram reutilizando el asistente y los avisos, generó y probó la migración, y escribió 10 pruebas.

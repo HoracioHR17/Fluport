@@ -53,6 +53,8 @@ Enums: `tipo_carga` (contenedor_20, contenedor_40, refrigerado, peligroso, grane
 | POST | `/webhook/whatsapp` | Formulario de Twilio (`From`, `Body`, …) + `X-Twilio-Signature` | TwiML vacío (la respuesta se envía aparte por la API REST) · 403 si la firma es inválida | M5 |
 | GET | `/api/avisos?limite=10` | — | `AvisoOut[]` (últimos avisos proactivos) | M5 |
 | GET | `/api/whatsapp/enlace` | — | `{numero, enlace, configurado}` (wa.me de respaldo) | M5 |
+| POST | `/webhook/telegram` | Update de Telegram + `X-Telegram-Bot-Api-Secret-Token` (solo en modo `webhook`) | `{ok: true}` · 403 secreto inválido · 404 si el modo no es `webhook` | M5 |
+| GET | `/api/telegram/enlace` | — | `{usuario, enlace}` (t.me del bot) | M5 |
 | GET | `/api/publico/zonas` | — | `ZonaPublica[]` (por caseta: semáforo actual, horas pico de 12 h, mejor hora) | M7 |
 
 Payload de `EventoCreate.payload` por tipo:
@@ -69,7 +71,10 @@ Notas de citas:
 - Ciclo de estados: `agendada → en_ruta → cumplida` (lo actualiza el simulador) · `reprogramada` / `cancelada` (por la API) · `no_show` si la ventana terminó hace más de 60 min sin salir.
 - Sugerencias: franjas de 30 min dentro de `[desde, hasta]` en accesos abiertos, ordenadas por espera prevista (pronóstico a 12 h; más allá, carga agendada vs. capacidad); `ahorro_vs_pico_min` = espera de la peor franja de la ventana − espera de la sugerida.
 
-Notas de WhatsApp (M5):
+Notas de mensajería (M5):
+- Canal principal de la demo: **Telegram**. El bot pide compartir el número (botón de contacto) y guarda `transportista.telegram_chat_id`; desde ahí el transportista es el mismo en web, WhatsApp y Telegram. Solo acepta el contacto propio del usuario y solo chats privados.
+- Modo `polling` (por defecto): Fluport consulta a Telegram, no requiere URL pública. Modo `webhook`: para hosting.
+- Los avisos se envían por Telegram si el transportista tiene `telegram_chat_id`; si no, por WhatsApp.
 - Avisos proactivos, uno por cita y tipo: `turno_30min` (faltan ≤ 30 min) y `saturacion` (caseta cerrada o espera prevista ≥ 45 min en las próximas 3 h, con la mejor alternativa si ahorra ≥ 15 min). Se guardan en `aviso`, se publican en el WebSocket como `{"tipo": "aviso"}` y se agregan al historial del asistente para que un "SÍ" tenga contexto.
 - La firma se valida contra `FLUPORT_TWILIO_WEBHOOK_URL` (la URL pública exacta configurada en Twilio).
 

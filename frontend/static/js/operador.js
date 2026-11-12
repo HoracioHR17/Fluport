@@ -185,13 +185,15 @@
       (vis.camiones_ocultos ? " · " + F.num(vis.camiones_ocultos) + " más no se dibujan" : "");
   }
 
-  // ───────────── Avisos por WhatsApp ─────────────
+  // ───────────── Avisos a transportistas (Telegram o WhatsApp) ─────────────
   var TIPOS_AVISO = { turno_30min: "Recordatorio de turno", saturacion: "Caseta saturada o cerrada" };
+  var CANALES = { telegram: "Telegram", whatsapp: "WhatsApp", web: "Web" };
 
   function renderAvisos(lista) {
     F.reemplazar($("lista-avisos"), lista.length ? lista.slice(0, 6).map(function (a) {
       return el("li", { style: { flexDirection: "column", gap: "4px" } }, [
-        el("span", {}, [el("b", {}, (TIPOS_AVISO[a.tipo] || a.tipo) + " · cita #" + a.cita_id), " · " + F.hora(a.creado_en)]),
+        el("span", {}, [el("b", {}, (TIPOS_AVISO[a.tipo] || a.tipo) + " · cita #" + a.cita_id),
+          " · " + (CANALES[a.canal] || a.canal) + " · " + F.hora(a.creado_en)]),
         el("span", { class: "tenue", style: { whiteSpace: "pre-line" } }, a.mensaje.replace(/\*/g, ""))
       ]);
     }) : [el("li", { class: "tenue" }, "Sin avisos todavía.")]);

@@ -66,6 +66,7 @@ class Transportista(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     alias: Mapped[str] = mapped_column(String(80))
     telefono: Mapped[str | None] = mapped_column(String(20), unique=True)  # solo teléfonos de prueba con consentimiento
+    telegram_chat_id: Mapped[int | None] = mapped_column(BigInteger, unique=True)  # chat del bot, si se registró ahí
     es_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     creado_en: Mapped[datetime] = mapped_column(TS, server_default=func.now())
 

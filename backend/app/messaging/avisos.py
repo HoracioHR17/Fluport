@@ -1,4 +1,4 @@
-"""Avisos proactivos por WhatsApp (M5).
+"""Avisos proactivos por mensaje (Telegram o WhatsApp) (M5).
 
 Cada ciclo se revisan las citas activas de transportistas con teléfono y se generan, una sola vez por cita:
 - `turno_30min`: faltan 30 min (o menos) para su cita.
@@ -28,6 +28,7 @@ class CitaActiva:
     inicio: datetime
     tipo_carga: str
     estado: EstadoCita
+    telegram_chat_id: int | None = None
 
 
 @dataclass
@@ -37,6 +38,7 @@ class AvisoNuevo:
     telefono: str
     tipo: str
     mensaje: str
+    telegram_chat_id: int | None = None
 
 
 def _hora(dt: datetime) -> str:
@@ -55,7 +57,7 @@ def revisar(sim: Simulador, citas: list[CitaActiva], ya_enviados: set[tuple[int,
             espera = espera_estimada(sim, c.acceso_id, c.inicio)
             nuevos.append(AvisoNuevo(c.cita_id, c.transportista_id, c.telefono, "turno_30min",
                                      f"⏰ En {faltan:.0f} min es tu turno: *{_hora(c.inicio)}* en *{nombre}* "
-                                     f"(cita *#{c.cita_id}*). Espera prevista ~{espera:.0f} min."))
+                                     f"(cita *#{c.cita_id}*). Espera prevista ~{espera:.0f} min.", c.telegram_chat_id))
 
         # 2) Caseta cerrada o saturada a la hora de la cita (solo citas que aún no salen)
         if (c.estado != EstadoCita.agendada or not (ANTICIPACION_TURNO_MIN < faltan <= HORIZONTE_SATURACION_H * 60)
@@ -82,5 +84,5 @@ def revisar(sim: Simulador, citas: list[CitaActiva], ya_enviados: set[tuple[int,
                       "Responde *SÍ* para cambiarla.")
         else:
             texto += "\nResponde con otra hora si quieres cambiarla."
-        nuevos.append(AvisoNuevo(c.cita_id, c.transportista_id, c.telefono, "saturacion", texto))
+        nuevos.append(AvisoNuevo(c.cita_id, c.transportista_id, c.telefono, "saturacion", texto, c.telegram_chat_id))
     return nuevos

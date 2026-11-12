@@ -39,7 +39,11 @@ class Settings(BaseSettings):
     twilio_whatsapp_from: str = ""  # número del Sandbox, p. ej. "whatsapp:+14155238886"
     twilio_webhook_url: str = ""  # URL pública EXACTA configurada en Twilio (para validar la firma)
     twilio_validar_firma: bool = True
-    avisos_activos: bool = True  # avisos proactivos por WhatsApp
+    avisos_activos: bool = True  # avisos proactivos (Telegram o WhatsApp, según el canal del transportista)
+    # Telegram (bot creado con @BotFather)
+    telegram_token: str = ""
+    telegram_modo: str = "polling"  # polling (sin URL pública) | webhook | off
+    telegram_webhook_secret: str = ""  # valor de X-Telegram-Bot-Api-Secret-Token en modo webhook
 
     # General
     zona_horaria: str = "America/Mexico_City"

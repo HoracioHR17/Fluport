@@ -762,6 +762,54 @@
     }
    }
   },
+  "/webhook/telegram": {
+   "post": {
+    "tags": [
+     "asistente"
+    ],
+    "summary": "Recibir Telegram",
+    "description": "Webhook de Telegram (modo `webhook`; en modo `polling` no se usa).\n\nTelegram envía el secreto configurado con setWebhook en el encabezado X-Telegram-Bot-Api-Secret-Token.",
+    "operationId": "recibir_telegram_webhook_telegram_post",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Recibir Telegram Webhook Telegram Post"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/api/telegram/enlace": {
+   "get": {
+    "tags": [
+     "asistente"
+    ],
+    "summary": "Enlace Telegram",
+    "description": "Enlace t.me del bot (para mostrarlo o convertirlo en QR en la demo).",
+    "operationId": "enlace_telegram_api_telegram_enlace_get",
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": true,
+         "type": "object",
+         "title": "Response Enlace Telegram Api Telegram Enlace Get"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/api/whatsapp/enlace": {
    "get": {
     "tags": [

@@ -14,6 +14,7 @@ from app.config import get_settings
 from app.contracts.enums import EstadoSim
 from app.contracts.schemas import Salud
 from app.db.base import engine
+from app.messaging.bot_telegram import polling
 from app.sim.servicio import SimNoIniciada, servicio
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -24,9 +25,13 @@ FRONTEND = Path(__file__).resolve().parents[2] / "frontend"
 
 @asynccontextmanager
 async def ciclo_vida(_: FastAPI) -> AsyncIterator[None]:
-    if get_settings().sim_autostart:
+    cfg = get_settings()
+    if cfg.sim_autostart:
         await servicio.iniciar()
+    if cfg.telegram_token and cfg.telegram_modo == "polling":
+        polling.iniciar(lambda: servicio.sim)
     yield
+    await polling.detener()
     await servicio.detener()
 
 

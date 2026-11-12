@@ -1,4 +1,7 @@
-"""Orquestación de WhatsApp: mensajes entrantes → asistente → respuesta, y ciclo de avisos proactivos."""
+"""Orquestación de mensajería: WhatsApp entrante → asistente → respuesta, y ciclo de avisos proactivos.
+
+Los avisos se envían por Telegram si el transportista se registró en el bot; si no, por WhatsApp.
+"""
 import asyncio
 import logging
 from datetime import datetime
@@ -11,7 +14,7 @@ from app.contracts.enums import Canal, EstadoAviso, EstadoCita
 from app.contracts.schemas import AsistenteRequest, AvisoOut, WsAviso
 from app.db.base import SessionLocal
 from app.db.models import Aviso, Cita, Transportista
-from app.messaging import twilio
+from app.messaging import telegram, twilio
 from app.messaging.avisos import AvisoNuevo, CitaActiva, revisar
 from app.sim.motor import Simulador
 
@@ -49,25 +52,37 @@ def leer_citas_activas() -> tuple[list[CitaActiva], set[tuple[int, str]]]:
     """Citas activas de transportistas con teléfono y los avisos ya generados (para no repetir)."""
     with SessionLocal() as db:
         filas = db.execute(
-            select(Cita, Transportista.telefono)
+            select(Cita, Transportista.telefono, Transportista.telegram_chat_id)
             .join(Transportista, Cita.transportista_id == Transportista.id)
             .where(Cita.estado.in_((EstadoCita.agendada, EstadoCita.en_ruta)), Transportista.telefono.is_not(None))
         ).all()
-        citas = [CitaActiva(c.id, c.transportista_id, tel, c.acceso_id, c.ventana_inicio, c.tipo_carga.value, c.estado)
-                 for c, tel in filas]
+        citas = [CitaActiva(c.id, c.transportista_id, tel, c.acceso_id, c.ventana_inicio, c.tipo_carga.value, c.estado,
+                            chat)
+                 for c, tel, chat in filas]
         enviados = {(cid, tipo) for cid, tipo in db.execute(select(Aviso.cita_id, Aviso.tipo)).all() if cid}
     return citas, enviados
 
 
+def canal_de(a: AvisoNuevo) -> Canal:
+    return Canal.telegram if a.telegram_chat_id is not None and telegram.configurado() else Canal.whatsapp
+
+
 def registrar_aviso(a: AvisoNuevo) -> AvisoOut:
+    canal = canal_de(a)
     with SessionLocal() as db:
-        fila = Aviso(transportista_id=a.transportista_id, cita_id=a.cita_id, canal=Canal.whatsapp,
+        fila = Aviso(transportista_id=a.transportista_id, cita_id=a.cita_id, canal=canal,
                      tipo=a.tipo, mensaje=a.mensaje, estado=EstadoAviso.pendiente)
         db.add(fila)
         db.commit()
-        # el aviso queda en el historial del asistente: un "SÍ" posterior tiene contexto
-        guardar_turnos(db, Canal.whatsapp, a.telefono, [{"role": "model", "parts": [{"text": a.mensaje}]}])
+        # el aviso queda en el historial del asistente (del mismo canal): un "SÍ" posterior tiene contexto
+        guardar_turnos(db, canal, a.telefono, [{"role": "model", "parts": [{"text": a.mensaje}]}])
         return AvisoOut.model_validate(fila)
+
+
+async def enviar_aviso(a: AvisoNuevo) -> tuple[bool, str]:
+    if canal_de(a) == Canal.telegram:
+        return await telegram.enviar(a.telegram_chat_id, a.mensaje)
+    return await twilio.enviar(a.telefono, a.mensaje)
 
 
 def marcar_aviso(aviso_id: int, enviado: bool) -> None:
@@ -89,7 +104,7 @@ async def ciclo_avisos(sim: Simulador, publicar) -> list[AvisoOut]:
     for a in nuevos:
         out = await asyncio.to_thread(registrar_aviso, a)
         publicar(WsAviso(data=out).model_dump_json())
-        enviado, detalle = await twilio.enviar(a.telefono, a.mensaje)
+        enviado, detalle = await enviar_aviso(a)
         if not enviado:
             log.warning("Aviso %s (%s) no enviado: %s", out.id, a.tipo, detalle)
         await asyncio.to_thread(marcar_aviso, out.id, enviado)

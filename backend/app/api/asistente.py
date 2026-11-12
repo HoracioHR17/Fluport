@@ -1,4 +1,4 @@
-"""Asistente IA (M4) y canal de WhatsApp con Twilio (M5)."""
+"""Asistente IA (M4) y canales de mensajería: Telegram y WhatsApp con Twilio (M5)."""
 import logging
 from urllib.parse import quote
 
@@ -14,6 +14,7 @@ from app.contracts.schemas import AsistenteRequest, AsistenteResponse, AvisoOut
 from app.db.base import get_db
 from app.db.models import Aviso
 from app.messaging import twilio
+from app.messaging.bot_telegram import procesar_update
 from app.messaging.servicio import atender_mensaje, en_segundo_plano
 from app.sim.servicio import servicio
 
@@ -60,6 +61,35 @@ async def recibir_whatsapp(request: Request) -> Response:
     if remitente:
         en_segundo_plano(atender_mensaje(servicio.requerir(), remitente, texto))
     return Response(content=TWIML_VACIO, media_type="application/xml")
+
+
+@router.post("/webhook/telegram")
+async def recibir_telegram(request: Request) -> dict:
+    """Webhook de Telegram (modo `webhook`; en modo `polling` no se usa).
+
+    Telegram envía el secreto configurado con setWebhook en el encabezado X-Telegram-Bot-Api-Secret-Token.
+    """
+    cfg = get_settings()
+    if cfg.telegram_modo != "webhook" or not cfg.telegram_webhook_secret:
+        raise HTTPException(404, "El webhook de Telegram no está activo")
+    if request.headers.get("x-telegram-bot-api-secret-token") != cfg.telegram_webhook_secret:
+        raise HTTPException(403, "Secreto inválido")
+    en_segundo_plano(procesar_update(servicio.requerir(), await request.json()))
+    return {"ok": True}
+
+
+@router.get("/api/telegram/enlace")
+async def enlace_telegram() -> dict:
+    """Enlace t.me del bot (para mostrarlo o convertirlo en QR en la demo)."""
+    from app.messaging import telegram
+
+    if not telegram.configurado():
+        raise HTTPException(404, "Telegram no está configurado")
+    r = await telegram.llamar("getMe")
+    if not r.get("ok"):
+        raise HTTPException(502, "Telegram no respondió")
+    usuario = r["result"]["username"]
+    return {"usuario": "@" + usuario, "enlace": f"https://t.me/{usuario}"}
 
 
 @router.get("/api/whatsapp/enlace")
